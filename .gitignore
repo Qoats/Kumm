@@ -1,0 +1,14 @@
+# Secrets : ne jamais publier
+.env
+.env.local
+.env.*.local
+*.keystore
+*.jks
+*.pem
+local.properties
+google-services.json
+
+# Fichiers générés
+node_modules
+dist
+android/app/release/

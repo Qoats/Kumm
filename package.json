@@ -1,0 +1,35 @@
+{
+  "name": "kumm",
+  "version": "0.10.4",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n serveur,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch --env-file=.env server/index.ts",
+    "dev:web": "vite",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "start": "node --env-file=.env dist/server/index.js",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.server.json --noEmit",
+    "build:android": "vite build --mode android && cap sync android",
+    "android:open": "cap open android",
+    "check:secrets": "node scripts/check-secrets.mjs"
+  },
+  "engines": {
+    "node": ">=20.6"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "leaflet": "^1.9.4"
+  }
+}

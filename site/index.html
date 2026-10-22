@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kumm – les transports de Strasbourg, simplement</title>
+<meta name="description" content="Kumm : une application indépendante pour suivre les transports de Strasbourg : passages en direct, carte, parkings relais, Vélhop et trajets.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Ikt1bW0iPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzFCN0Y1NSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwQTQ2MzAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiByeD0iMTE2IiBmaWxsPSJ1cmwoI2cpIi8+CiAgPGcgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSI0NCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik0xNjggMjU2TDM1MiAxMzIiIHN0cm9rZT0iI0ZGQzkzQyIvPgogICAgPHBhdGggZD0iTTE2OCAyNTZMMzUyIDM4MCIgc3Ryb2tlPSIjNENDM0ZGIi8+CiAgICA8cGF0aCBkPSJNMTY4IDEzMlYzODAiIHN0cm9rZT0iI2ZmZiIvPgogIDwvZz4KICA8ZyBmaWxsPSIjZmZmIj4KICAgIDxjaXJjbGUgY3g9IjE2OCIgY3k9IjEzMiIgcj0iMzMiLz48Y2lyY2xlIGN4PSIxNjgiIGN5PSIzODAiIHI9IjMzIi8+CiAgICA8Y2lyY2xlIGN4PSIzNTIiIGN5PSIxMzIiIHI9IjMzIi8+PGNpcmNsZSBjeD0iMzUyIiBjeT0iMzgwIiByPSIzMyIvPgogIDwvZz4KICA8ZyBmaWxsPSIjMTM2QTQ1Ij4KICAgIDxjaXJjbGUgY3g9IjE2OCIgY3k9IjEzMiIgcj0iMTMiLz48Y2lyY2xlIGN4PSIxNjgiIGN5PSIzODAiIHI9IjEzIi8+CiAgICA8Y2lyY2xlIGN4PSIzNTIiIGN5PSIxMzIiIHI9IjEzIi8+PGNpcmNsZSBjeD0iMzUyIiBjeT0iMzgwIiByPSIxMyIvPgogIDwvZz4KPC9zdmc+Cg==">
+<style>
+:root{--bg:#F2F6F3;--card:#fff;--ink:#15201B;--mute:#5F6E66;--accent:#1B7F55;--accent-ink:#0F5C3E;--on:#fff;--line:#DCE6DF}
+@media (prefers-color-scheme:dark){:root{--bg:#0D1612;--card:#15231C;--ink:#E8F1EC;--mute:#9DB0A5;--accent:#4FD39A;--accent-ink:#7BE5B6;--on:#06251A;--line:#233A2E}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent-ink)}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+header{padding:28px 0 8px;display:flex;align-items:center;gap:12px}
+header img{width:44px;height:44px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+header b{font-size:22px;letter-spacing:.2px}
+.hero{padding:36px 0 28px}
+h1{font-size:clamp(30px,6vw,46px);line-height:1.12;margin:0 0 16px}
+.lead{font-size:clamp(18px,3vw,21px);color:var(--mute);margin:0 0 26px;max-width:36em}
+.btn{display:inline-block;background:var(--accent);color:var(--on);text-decoration:none;font-weight:700;padding:14px 26px;border-radius:28px;box-shadow:0 6px 16px -6px var(--accent)}
+.btn:hover{filter:brightness(1.06)}
+.btn.off{background:transparent;color:var(--mute);border:1px solid var(--line);box-shadow:none;cursor:default;font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin:0}
+.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin:10px 0 36px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px}
+.card h2{font-size:17px;margin:0 0 6px}
+.card p{margin:0;color:var(--mute);font-size:15.5px}
+.note{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;color:var(--mute);font-size:15px;margin-bottom:28px}
+.note b{color:var(--ink)}
+footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--mute);font-size:14px}
+footer p{margin:0 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Ikt1bW0iPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzFCN0Y1NSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwQTQ2MzAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiByeD0iMTE2IiBmaWxsPSJ1cmwoI2cpIi8+CiAgPGcgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSI0NCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik0xNjggMjU2TDM1MiAxMzIiIHN0cm9rZT0iI0ZGQzkzQyIvPgogICAgPHBhdGggZD0iTTE2OCAyNTZMMzUyIDM4MCIgc3Ryb2tlPSIjNENDM0ZGIi8+CiAgICA8cGF0aCBkPSJNMTY4IDEzMlYzODAiIHN0cm9rZT0iI2ZmZiIvPgogIDwvZz4KICA8ZyBmaWxsPSIjZmZmIj4KICAgIDxjaXJjbGUgY3g9IjE2OCIgY3k9IjEzMiIgcj0iMzMiLz48Y2lyY2xlIGN4PSIxNjgiIGN5PSIzODAiIHI9IjMzIi8+CiAgICA8Y2lyY2xlIGN4PSIzNTIiIGN5PSIxMzIiIHI9IjMzIi8+PGNpcmNsZSBjeD0iMzUyIiBjeT0iMzgwIiByPSIzMyIvPgogIDwvZz4KICA8ZyBmaWxsPSIjMTM2QTQ1Ij4KICAgIDxjaXJjbGUgY3g9IjE2OCIgY3k9IjEzMiIgcj0iMTMiLz48Y2lyY2xlIGN4PSIxNjgiIGN5PSIzODAiIHI9IjEzIi8+CiAgICA8Y2lyY2xlIGN4PSIzNTIiIGN5PSIxMzIiIHI9IjEzIi8+PGNpcmNsZSBjeD0iMzUyIiBjeT0iMzgwIiByPSIxMyIvPgogIDwvZz4KPC9zdmc+Cg==" alt=""><b>Kumm</b></header>
+  <main>
+    <section class="hero">
+      <h1>Les transports de Strasbourg, simplement.</h1>
+      <p class="lead">Une application indépendante pour voir les prochains passages, repérer les arrêts, les parkings relais et les stations Vélhop, et préparer un trajet.</p>
+      <p class="actions"><a class="btn" href="https://app.kumm.fr">Ouvrir l’application</a><span class="btn off" aria-disabled="true">Android : bientôt</span></p>
+    </section>
+    <section class="cards" aria-label="Fonctions">
+      <div class="card"><h2>Passages en direct</h2><p>Les prochains tram et bus à vos arrêts favoris, à partir des données ouvertes de la CTS.</p></div>
+      <div class="card"><h2>Carte</h2><p>Arrêts, parkings relais, Vélhop et véloparcs autour de vous, sur un fond de carte clair ou sombre.</p></div>
+      <div class="card"><h2>Trajets</h2><p>Des itinéraires avec correspondances et un guidage à pied jusqu’à l’arrêt.</p></div>
+    </section>
+    <p class="note"><b>Projet indépendant.</b> Kumm n’est ni édité, ni approuvé, ni affilié à la CTS ni à l’Eurométropole de Strasbourg. Pour acheter vos titres de transport, utilisez l’application officielle de la CTS.</p>
+  </main>
+  <footer>
+    <p>Données : CTS (données ouvertes), Eurométropole de Strasbourg (Licence Ouverte), nextbike, Base Adresse Nationale, Transitous.</p>
+    <p>Cartes et itinéraires piétons © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>.</p>
+  </footer>
+</div>
+</body>
+</html>
