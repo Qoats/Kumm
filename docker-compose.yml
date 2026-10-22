@@ -1,0 +1,41 @@
+# Déploiement sur un serveur (VPS) : Kumm + Caddy (HTTPS automatique avec Let's Encrypt).
+# Lancer : docker compose up -d --build        Voir docs/DEPLOIEMENT-VPS.md
+services:
+  kumm:
+    build:
+      context: .
+      # APP_KEY (optionnelle) est intégrée à l'application web à la compilation ;
+      # mettez-la dans le .env du serveur (variable docker compose la lit automatiquement).
+      args:
+        APP_KEY: "${APP_KEY:-}"
+    restart: unless-stopped
+    env_file: .env              # CTS_TOKEN et réglages : jamais dans l'image ni dans GitHub
+    environment:
+      PORT: "3000"
+      TRUST_PROXY: "1"          # Caddy transmet l'adresse réelle du visiteur
+      CORS_ORIGINS: "https://localhost,capacitor://localhost"   # l'application web (app.kumm.fr) appelle le serveur depuis la même adresse
+    expose:
+      - "3000"                  # visible seulement par Caddy, pas depuis internet
+    mem_limit: 2g
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/site:ro     # site vitrine (kumm.fr)
+      - caddy_data:/data        # certificats : à conserver
+      - caddy_config:/config
+    depends_on:
+      - kumm
+
+volumes:
+  caddy_data:
+  caddy_config:

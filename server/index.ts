@@ -1,0 +1,278 @@
+// Serveur Kumm : sert l'application et relaie les services (CTS, adresses, marche, trajets, parkings, vélos, tuiles)
+// en gardant le jeton CTS côté serveur. Conçu pour un usage public : limites, cache borné, compression, arrêt propre.
+import http from "node:http";
+import crypto from "node:crypto";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { AUTH, APP_KEY, BASE, CACHE_MAX, CTS_BUDGET_PER_MIN, ENABLE_DIAG, LIMIT, MIN_APP_VERSION, ORIGINS, PORT, REQUESTOR, ROOT, STALE_REALTIME_S, TILE_LIMIT, TOKEN, UNKNOWN_REF_PER_MIN, VALIDATE_STOP_REFS, VERSION } from "./config.js";
+import { cacheGet, cacheSet, cacheSize, cacheStats, cacheSweep } from "./cache.js";
+import { ctsCallsLastMinute, ctsPaused, describeError, fetchCts, fetchRetry } from "./cts.js";
+import { diag } from "./diag.js";
+import { GEO_USER_AGENT, geoUpstream } from "./geo.js";
+import { reqOf, securityHeaders, send } from "./http.js";
+import { withinLimit } from "./limit.js";
+import { parkingsRelais, poiResult, velhop } from "./poi.js";
+import { recordRequest, stats } from "./stats.js";
+import { serveStatic } from "./static.js";
+import { serveTile } from "./tiles.js";
+import type { CtsResult } from "./cts.js";
+
+if (!TOKEN) {
+  console.error("CTS_TOKEN manquant : copiez .env.example en .env et renseignez-le (ou définissez la variable chez votre hébergeur).");
+  process.exit(1);
+}
+
+/** Services CTS relayés : durée de cache et durée de service en secours, en secondes */
+const ALLOWED: Record<string, { ttl: number; stale: number }> = {
+  "stop-monitoring":      { ttl: 20,   stale: STALE_REALTIME_S },   // passages en direct : jamais périmés bien longtemps
+  "estimated-timetable":  { ttl: 30,   stale: STALE_REALTIME_S },
+  "general-message":      { ttl: 60,   stale: 600 },
+  "stoppoints-discovery": { ttl: 3600, stale: 86400 },
+  "lines-discovery":      { ttl: 3600, stale: 86400 },
+  "park-and-ride":        { ttl: 60,   stale: 600 },
+  "veloparc":             { ttl: 3600, stale: 86400 },
+  "retail-outlet":        { ttl: 3600, stale: 86400 }
+};
+
+/** Les services « SIRI » sont sous /v1/siri/2.0 ; les autres (P+R, vélo, points de vente) sont cherchés d'abord sous /v1 */
+const SIRI_ONLY = new Set(["stop-monitoring", "stoppoints-discovery", "lines-discovery", "general-message", "estimated-timetable"]);
+const REF = /^[A-Za-z0-9_.\-]{1,60}$/;
+
+/** Comparaison à temps constant : le temps de réponse ne révèle pas la clé, caractère par caractère */
+function keyMatches(sent: unknown): boolean {
+  const a = Buffer.from(String(sent ?? ""));
+  const b = Buffer.from(APP_KEY);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/** Ajoute RequestorRef aux demandes SIRI s'il manque */
+export function withRequestor(search: string): string {
+  const q = new URLSearchParams(search);
+  if (!q.has("RequestorRef")) q.set("RequestorRef", REQUESTOR);
+  return "?" + q.toString();
+}
+
+/** Ne transmet à la CTS que les paramètres prévus : un visiteur ne peut ni en inventer ni remplir le cache d'adresses arbitraires */
+export function cleanQuery(name: string, url: URL): string | null {
+  if (name === "stop-monitoring") {
+    const refs = url.searchParams.getAll("MonitoringRef");
+    if (refs.length !== 1 || !REF.test(refs[0])) return null;
+    return "?MonitoringRef=" + encodeURIComponent(refs[0]);
+  }
+  return "";
+}
+
+/** Fin de validité d'une réponse : « ValidUntil » de la CTS si présent (entre 5 s et 1 h), sinon la durée par défaut */
+export function expiry(body: string, ttl: number, now = Date.now()): number {
+  const m = /"ValidUntil"\s*:\s*"([^"]+)"/.exec(body);
+  const t = m ? Date.parse(m[1]) : NaN;
+  if (Number.isNaN(t)) return now + ttl * 1000;
+  return Math.min(Math.max(t, now + 5000), now + 3600_000);
+}
+
+const inflight = new Map<string, Promise<CtsResult>>();
+
+/* ---------- arrêts connus : on ne laisse pas un visiteur parcourir des milliers de codes inventés ---------- */
+let knownRefs: Set<string> | null = null;
+
+/** Tous les codes valables pour interroger un arrêt : codes de quai, codes sans suffixe (LAMEY_01 → LAMEY) et codes « logiques » */
+export function extractRefs(body: string): Set<string> | null {
+  try {
+    const list = (JSON.parse(body) as { StopPointsDelivery?: { AnnotatedStopPointRef?: unknown[] } }).StopPointsDelivery?.AnnotatedStopPointRef ?? [];
+    const set = new Set<string>();
+    const scan = (o: unknown, depth: number): void => {
+      if (depth > 2 || typeof o !== "object" || o === null) return;
+      for (const [k, v] of Object.entries(o)) {
+        if (/logical.?stop.?code|^stop.?code$/i.test(k) && typeof v === "string" && v) set.add(v);
+        else scan(v, depth + 1);
+      }
+    };
+    for (const s of list) {
+      if (typeof s !== "object" || s === null) continue;
+      const ref = (s as Record<string, unknown>)["StopPointRef"];
+      if (typeof ref === "string" && ref) { set.add(ref); set.add(ref.replace(/_\d+$/, "")); }
+      scan(s, 0);
+    }
+    return set.size ? set : null;
+  } catch { return null; }
+}
+
+let unknownWindow = { n: 0, reset: 0 };
+function unknownRefAllowed(): boolean {
+  if (UNKNOWN_REF_PER_MIN <= 0) return true;
+  const now = Date.now();
+  if (now > unknownWindow.reset) unknownWindow = { n: 0, reset: now + 60_000 };
+  return ++unknownWindow.n <= UNKNOWN_REF_PER_MIN;
+}
+
+/** Réponse avec cache, une seule requête sortante par clé, et dernière réponse connue en cas de panne (dans la limite de son âge) */
+async function cached(res: ServerResponse, key: string, ttl: number, staleS: number, fetcher: () => Promise<CtsResult>, store = true): Promise<void> {
+  const hit = store ? cacheGet(key) : undefined;
+  if (hit && hit.exp > Date.now()) { cacheStats.hits++; return send(res, 200, hit.type, hit.body, "HIT", { memo: hit.memo }); }
+  cacheStats.misses++;
+  const usable = hit && Date.now() < hit.exp + hit.staleMs ? hit : undefined;
+  const serveStale = (): Promise<void> => { cacheStats.stale++; return send(res, 200, usable!.type, usable!.body, "STALE", { memo: usable!.memo }); };
+
+  // si 50 personnes demandent la même chose en même temps, un seul appel part vers le service
+  let p = inflight.get(key);
+  if (!p) {
+    p = fetcher().finally(() => inflight.delete(key));
+    inflight.set(key, p);
+  }
+  try {
+    const r = await p;
+    if (r.status === 200) {
+      const e = { body: r.body, type: r.type, exp: expiry(r.body, ttl), staleMs: staleS * 1000, memo: {} };
+      if (store) cacheSet(key, e);
+      return send(res, 200, r.type, r.body, "MISS", { memo: e.memo });
+    }
+    console.warn("Service externe", r.status, key.split("?")[0].slice(-60));
+    if (usable) return serveStale();
+    return send(res, r.status, r.type, r.body, "MISS");
+  } catch (e) {
+    const why = describeError(e);
+    if (usable) return serveStale();
+    return send(res, why.includes("saturé") || why.includes("budget") ? 503 : 502, "text/plain", "Service injoignable : " + why);
+  }
+}
+
+function upstreamFor(name: string, search: string): () => Promise<CtsResult> {
+  return SIRI_ONLY.has(name)
+    ? () => fetchCts(BASE, AUTH, name, search)
+    : async () => {
+        const r = await fetchCts(ROOT, AUTH, name, search);
+        return r.status === 404 ? fetchCts(BASE, AUTH, name, search) : r;
+      };
+}
+
+function api(res: ServerResponse, url: URL): Promise<void> | void {
+  const name = url.pathname.slice("/api/".length);
+  const conf = ALLOWED[name];
+  if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
+  const clean = cleanQuery(name, url);
+  if (clean === null) return send(res, 400, "text/plain", "Paramètres invalides");
+  const search = withRequestor(clean);
+  // arrêt absent de la liste officielle : toléré (au cas où elle serait incomplète) mais limité, et jamais gardé en mémoire
+  let store = true;
+  if (name === "stop-monitoring" && VALIDATE_STOP_REFS && knownRefs && !knownRefs.has(url.searchParams.get("MonitoringRef") ?? "")) {
+    stats.unknownRefs++;
+    if (!unknownRefAllowed()) { stats.unknownRefused++; return send(res, 404, "text/plain", "Arrêt inconnu"); }
+    store = false;
+  }
+  return cached(res, name + search, conf.ttl, conf.stale, upstreamFor(name, search), store);
+}
+
+/** Charge à l'avance la liste des arrêts et des lignes (gardées en mémoire), puis la renouvelle avant qu'elle n'expire */
+async function prefetch(): Promise<void> {
+  for (const name of ["stoppoints-discovery", "lines-discovery"]) {
+    try {
+      const conf = ALLOWED[name], search = withRequestor("");
+      const r = await upstreamFor(name, search)();
+      if (r.status !== 200) throw new Error("HTTP " + r.status);
+      cacheSet(name + search, { body: r.body, type: r.type, exp: expiry(r.body, conf.ttl), staleMs: conf.stale * 1000, memo: {} });
+      if (name === "stoppoints-discovery") {
+        const refs = extractRefs(r.body);
+        if (refs) knownRefs = refs;
+        console.log(`Liste des arrêts chargée : ${refs ? refs.size + " codes" : "forme non reconnue (aucun filtrage)"}`);
+      }
+    } catch (e) {
+      console.warn("Préchargement impossible (" + name + ") :", describeError(e));
+    }
+  }
+}
+
+function geo(res: ServerResponse, url: URL): Promise<void> | void {
+  const g = geoUpstream(url);
+  if (!g) return send(res, 400, "text/plain", "Paramètres invalides");
+  return cached(res, g.url, g.ttl, g.stale, () => fetchRetry(g.url, { "User-Agent": GEO_USER_AGENT, Accept: "application/json" }));
+}
+
+/** État du service, pour la supervision (aucun secret, aucune donnée de visiteur) */
+function health(res: ServerResponse): Promise<void> {
+  const paused = ctsPaused();
+  const body = JSON.stringify({
+    ok: true, version: VERSION, minApp: MIN_APP_VERSION,
+    uptime_s: Math.round((Date.now() - stats.started) / 1000),
+    cache: { entrees: cacheSize(), max: CACHE_MAX, hits: cacheStats.hits, miss: cacheStats.misses, secours: cacheStats.stale, evinces: cacheStats.evicted },
+    cts: { en_pause: paused.paused, secondes: paused.paused ? paused.seconds : 0, appels_derniere_minute: ctsCallsLastMinute(), plafond_par_minute: CTS_BUDGET_PER_MIN, refuses_plafond: stats.budgetRefused, arrets_connus: knownRefs?.size ?? null, arrets_inconnus_demandes: stats.unknownRefs, arrets_inconnus_refuses: stats.unknownRefused },
+    requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
+  });
+  res.setHeader("Cache-Control", "no-store");
+  return send(res, 200, "application/json", body);
+}
+
+async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const started = Date.now();
+  reqOf.set(res, req);
+  let pathOnly = "?";
+  res.on("finish", () => {
+    const ms = Date.now() - started;
+    recordRequest(res.statusCode, ms);
+    // journal sans donnée personnelle : seulement la méthode, le chemin (jamais la requête : elle contient adresses et positions), le statut et la durée
+    if (res.statusCode >= 500 || ms > 3000) console.warn(`${req.method} ${pathOnly} ${res.statusCode} ${ms} ms`);
+  });
+
+  let url: URL;
+  try { url = new URL(req.url ?? "/", "http://localhost"); } catch { return send(res, 400, "text/plain", "Adresse invalide"); }
+  pathOnly = url.pathname.slice(0, 80);
+
+  securityHeaders(req, res);
+  const origin = req.headers.origin;
+  if (origin && ORIGINS.includes(origin)) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
+  if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS", "Access-Control-Max-Age": "86400" }); return void res.end(); }
+  if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "text/plain", "Méthode non autorisée");
+
+  const p = url.pathname;
+  if (p === "/health") return health(res);
+
+  const isTile = p.startsWith("/tiles/");
+  const isService = p.startsWith("/api/") || p.startsWith("/geo/") || p.startsWith("/poi/");
+  if (isService && APP_KEY && !keyMatches(req.headers["x-app-key"])) {
+    res.writeHead(403, { "Content-Type": "text/plain" });
+    return void res.end("Accès réservé à l'application");
+  }
+  if ((isTile && !withinLimit(req, "tiles", TILE_LIMIT)) || (isService && !withinLimit(req, "api", LIMIT))) {
+    res.writeHead(429, { "Content-Type": "text/plain", "Retry-After": "60" });
+    return void res.end("Trop de requêtes : réessayez dans une minute");
+  }
+
+  if (p.startsWith("/api/")) return api(res, url);
+  if (p.startsWith("/geo/")) return geo(res, url);
+  if (p === "/poi/velhop") return cached(res, "poi:velhop", 60, 600, async () => poiResult(await velhop()));
+  if (p === "/poi/pr") return cached(res, "poi:pr", 120, 3600, async () => poiResult(await parkingsRelais()));
+  if (isTile) return serveTile(res, p);
+  if (p === "/diag" && ENABLE_DIAG) return diag(res);
+  return serveStatic(res, p);
+}
+
+const server = http.createServer((req, res) => {
+  handle(req, res).catch(e => {
+    console.error("Erreur inattendue :", e instanceof Error ? e.message : e);
+    try { if (!res.headersSent) res.writeHead(500, { "Content-Type": "text/plain" }); res.end("Erreur du serveur"); } catch { /* client parti */ }
+  });
+});
+// délais prudents (un client lent ou malveillant ne doit pas garder des connexions ouvertes indéfiniment)
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
+server.requestTimeout = 30_000;
+
+setInterval(() => { cacheSweep(); }, 5 * 60_000).unref();
+setInterval(() => {
+  console.log(`Bilan : ${stats.requests} requêtes, ${stats.limited} refusées (429), ${stats.errors5xx} erreurs 5xx, cache ${cacheSize()}/${CACHE_MAX} (${cacheStats.hits} hits, ${cacheStats.misses} miss, ${cacheStats.stale} en secours)`);
+}, 15 * 60_000).unref();
+
+/* arrêt propre : l'hébergeur envoie SIGTERM lors d'une mise à jour ; on termine les requêtes en cours */
+function shutdown(signal: string): void {
+  console.log(`${signal} reçu : arrêt en cours…`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 10_000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("unhandledRejection", r => console.error("Promesse rejetée :", r instanceof Error ? r.message : r));
+process.on("uncaughtException", e => { console.error("Erreur fatale :", e.message); process.exit(1); });
+
+server.listen(PORT, () => {
+  console.log(`Kumm ${VERSION} : http://localhost:${PORT}`);
+  void prefetch();
+  setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
+});

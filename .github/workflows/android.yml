@@ -1,0 +1,50 @@
+# Compile l'APK Android de Kumm sur les serveurs de GitHub (rien à installer sur votre PC).
+# Utilisation : onglet « Actions » du dépôt → « APK Android » → « Run workflow ».
+# Avant : indiquez l'adresse de votre serveur, soit dans le fichier web/.env.android,
+#         soit dans Settings → Secrets and variables → Actions → Variables → KUMM_API_BASE.
+name: APK Android
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  apk:
+    # Version fixée : « ubuntu-latest » passe à Ubuntu 26 depuis le 19 octobre 2026
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Adresse du serveur
+        run: |
+          if [ -n "${{ vars.KUMM_API_BASE }}" ]; then
+            echo "VITE_API_BASE=${{ vars.KUMM_API_BASE }}" > web/.env.android
+          fi
+          cat web/.env.android
+          if grep -q "votre-serveur.example" web/.env.android; then
+            echo "::error::Renseignez l'adresse de votre serveur : variable KUMM_API_BASE, ou fichier web/.env.android."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run build:android
+
+      - name: Compiler l'APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: kumm-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
