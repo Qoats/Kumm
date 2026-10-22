@@ -1,8 +1,8 @@
 import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
-import { LINE_MODES, LINE_NAMES, NEWS, isTram, kindOfStop } from "./data";
+import { LINE_MODES, LINE_NAMES, MESSAGES, MOCK_MESSAGES, MSG_STATE, isTram, kindOfStop } from "./data";
 import { ic, type IconName } from "./icons";
-import { loadLineInfo, loadPois, loadStops, nextDepartures } from "./api";
+import { loadLineInfo, loadMessages, loadPois, loadStops, nextDepartures } from "./api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
@@ -212,7 +212,6 @@ app.addEventListener("click", e => {
     case "closeOverlay": S.overlay = null; break;
     case "tabHome": S.tab = S.tab === "lines" ? "search" : "home"; break;
     case "sheet": if (S.swiped) return; S.sheet = !S.sheet; break;
-    case "nextNews": rotateNews(); return;
     case "msgs": S.overlay = { k: "msgs" }; break;
     case "favs": S.overlay = { k: "favs" }; break;
     case "locate": recenter(); toast("Position centrée"); return;
@@ -276,16 +275,6 @@ app.addEventListener("pointerup", e => {
 });
 
 setInterval(() => { if (!document.hidden && document.activeElement?.tagName !== "INPUT") void loadDeps(); }, 30000);
-/** Change seulement l'actualité affichée : pas de redessin de tout l'accueil (les favoris restent en place) */
-function rotateNews(): void {
-  S.news = (S.news + 1) % NEWS.length;
-  const n = NEWS[S.news], box = document.querySelector(".news");
-  const b = box?.querySelector("b"), p = box?.querySelector("p");
-  if (!b || !p) return;
-  b.textContent = n.t; p.textContent = n.s;
-  document.querySelectorAll(".dots i").forEach((i, k) => i.classList.toggle("on", k === S.news));
-}
-setInterval(() => { if (S.tab === "home" && !S.overlay && !S.modal) rotateNews(); }, 6000);
 
 /* ============ DONNÉES RÉELLES ============ */
 let remotePois: Poi[] = [];
@@ -296,7 +285,22 @@ function rebuildPois(): void {
   [...remotePois, ...buildVeloparks(STOPS)].forEach(p => POIS.push(project(p)));
 }
 
+/** Infos trafic de la CTS : au démarrage puis toutes les 5 minutes ; en cas d'échec on garde les dernières connues */
+async function refreshMessages(): Promise<void> {
+  try {
+    const list = await loadMessages();
+    MESSAGES.length = 0; MESSAGES.push(...list);
+    MSG_STATE.status = "ok";
+    render();
+  } catch (e) {
+    console.warn("Infos trafic indisponibles :", e);
+    if (MSG_STATE.status === "loading") { MSG_STATE.status = "error"; render(); }
+  }
+}
+
 async function initReal(): Promise<void> {
+  void refreshMessages();
+  setInterval(() => { if (!document.hidden) void refreshMessages(); }, 5 * 60_000);
   // modes des lignes (tram / bus / TER) : améliore le classement des arrêts dès qu'ils arrivent
   void loadLineInfo().then(info => { Object.assign(LINE_MODES, info.modes); Object.assign(LINE_NAMES, info.names); render(); }).catch(e => console.warn("lines-discovery indisponible :", e));
   // 1) démarrage instantané avec la liste d'arrêts gardée sur le téléphone (7 jours)
@@ -359,5 +363,6 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
 /* pour inspecter les données dans la console du navigateur : __kumm.STOPS, __kumm.LINE_MODES */
 (window as unknown as { __kumm: unknown }).__kumm = { STOPS, POIS, LINE_MODES, LINE_NAMES, kindOfStop };
 
-if (!CONFIG.USE_MOCK) void initReal();
+if (CONFIG.USE_MOCK) { MESSAGES.push(...MOCK_MESSAGES); MSG_STATE.status = "ok"; }
+else void initReal();
 render();

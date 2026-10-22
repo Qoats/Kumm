@@ -9,7 +9,6 @@ export const KY = 13344;
 
 export const COLORS: Record<string, string> = {A:"#E30613",B:"#009FE3",C:"#F29100",D:"#009A3E",E:"#8E84BA",F:"#9AC20C",G:"#F5CD00",H:"#A5213F",C1:"#1FAE85",L1:"#7AB8E0",L2:"#C7A6D9",L3:"#E6A0B5"};
 export const TRAMS: string[] = ["A","B","C","D","E","F"];
-export const ALERTS: string[] = ["A","B","C","D","F","G","C1"];
 export const ALL_LINES: string[] = ["A","B","C","D","E","F","G","H","C1","L1","L2","L3"];
 export const DIRS: Record<string, [string, string]> = {
   A:["Illkirch Lixenbühl","Parc des Sports Zénith"], B:["Hœnheim Gare","Lingolsheim Alouettes"],
@@ -70,23 +69,29 @@ export const MOCK_STOPS: Stop[] = RAW_STOPS.map(r => ({
   lon: CENTER.lon + (r.x - 170) / KX
 }));
 
-export const NEWS: { t: string; s: string }[] = [
-  {t:"Agence commerciale temporairement fermée",s:"À partir du 17 octobre et pour une durée indéterminée"},
-  {t:"Gagnez vos places pour l’Opéra !",s:"Tentez de remporter 2 places pour l’opéra Ariane à Naxos le 4 novembre à 20 h !"},
-  {t:"Travaux ligne B",s:"Trafic perturbé entre Gare Centrale et Broglie ce week-end"},
-  {t:"Nouveau : Flex’hop",s:"Le transport à la demande étendu à de nouvelles communes"},
-  {t:"Vélhop",s:"Louez un vélo pour la journée dès 3 €"}
+/** Une info trafic de la CTS (texte brut, préparé par le serveur : /api/messages) */
+export interface TrafficMsg {
+  id: string;
+  channel: "disruption" | "works";
+  lines: string[];
+  title: string;
+  period: string;
+  text: string;
+}
+
+/** Infos trafic en cours (rempli au démarrage puis toutes les 5 minutes) */
+export const MESSAGES: TrafficMsg[] = [];
+export const MSG_STATE: { status: "loading" | "ok" | "error" } = { status: "loading" };
+const sameLine = (a: string, b: string): boolean => a === b || lineLabel(a) === lineLabel(b);
+export const messagesFor = (l: string): TrafficMsg[] => MESSAGES.filter(m => m.lines.some(r => sameLine(r, l)));
+/** Ligne touchée par un incident ou des travaux en cours */
+export const hasAlert = (l: string): boolean => MESSAGES.some(m => m.lines.some(r => sameLine(r, l)));
+
+/** Infos trafic de démonstration (mode ?mock uniquement) */
+export const MOCK_MESSAGES: TrafficMsg[] = [
+  { id: "demo-1", channel: "disruption", lines: ["B"], title: "Exemple : ligne B interrompue", period: "Démonstration", text: "Message fictif du mode démonstration." },
+  { id: "demo-2", channel: "works", lines: ["C1", "G"], title: "Exemple : arrêt déplacé", period: "Démonstration", text: "Message fictif du mode démonstration." }
 ];
-
-
-export const MSG: Record<string, string> = {
-  A:"Tous les jours dès 20 h, le terminus côté Parc des Sports Zénith est déplacé à Hôpital de Hautepierre. Parc des Sports Zénith, Le Galet, Cervantès et Dante ne sont plus desservis.",
-  B:"Ligne interrompue entre Martin Schongauer et Montagne Verte en journée, puis entre Ostwald Hôtel de Ville et Montagne Verte après 20 h. Bus de remplacement : ligne C4 (Ostwald, Wihrel, Elmerforst) ou arrêt provisoire au 41 rue de l’Unterelsau.",
-  C:"Dès 20 h, le terminus vers Neuhof Rodolphe Reuss est déplacé à Kibitzenau. Saint Christophe et Neuhof Rodolphe Reuss ne sont plus desservis.",
-  D:"Dès 20 h, le terminus vers Poteries est déplacé à Hôpital de Hautepierre. Dante, Paul Eluard, Marcel Rudloff et Poteries ne sont plus desservis.",
-  F:"Dès 20 h, le terminus vers Wolfisheim Henri Rendu est déplacé à Comtes. Les stations au-delà de Comtes ne sont plus desservies."
-};
-
 
 /* Points de démonstration (mode ?mock) */
 const RAW_POIS: { id: string; kind: Poi["kind"]; name: string; x: number; y: number; info?: string }[] = [

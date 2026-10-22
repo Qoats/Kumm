@@ -4,6 +4,7 @@ import { appHeaders, CONFIG, url } from "./config";
 import { DIRS, isTram, kindOfStop } from "./data";
 import { parseLineInfo } from "./lines";
 import type { LineInfo } from "./lines";
+import type { TrafficMsg } from "./data";
 
 /** Dernières réponses brutes, affichées dans « Détails techniques » quand un arrêt reste vide */
 export const debug: { last: unknown[]; info: unknown } = { last: [], info: null };
@@ -111,6 +112,11 @@ export async function loadStops(): Promise<Stop[]> {
 /** Mode (tram, bus, TER) et nom public de chaque ligne, d'après lines-discovery */
 export async function loadLineInfo(): Promise<LineInfo> {
   return parseLineInfo(await get<unknown>("/lines-discovery"));
+}
+
+/** Infos trafic en cours (incidents et travaux), déjà en texte brut */
+export async function loadMessages(): Promise<TrafficMsg[]> {
+  return (await get<{ items?: TrafficMsg[] }>("/messages")).items ?? [];
 }
 
 /** Stations Vélhop et parkings relais : sources ouvertes, relayées par notre serveur */

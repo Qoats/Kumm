@@ -1,6 +1,7 @@
 import type { Place, Stop, StopDeparture } from "../../shared/types";
 import { CONFIG, VERSION } from "./config";
-import { ALERTS, ALL_LINES, COLORS, DIRS, MSG, NEWS, isTram, kindOfStop, lineKind, lineLabel } from "./data";
+import { ALL_LINES, COLORS, DIRS, MESSAGES, MSG_STATE, hasAlert, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
+import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES } from "./themes";
 import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_POINTS_DE_VENTE, CTS_SITE, isIOS } from "./links";
@@ -24,10 +25,29 @@ export const lineChip = (l: string, sm = false): string => {
   return `<span class="ln ${sm ? "sm" : ""}" style="background:${COLORS[name] ?? COLORS[l] ?? "#777"};${name === "G" ? "color:#222" : ""}">${esc(name)}</span>`;
 };
 const chipAlert = (l: string): string =>
-  `<button class="ln" data-line="${esc(l)}" style="background:${COLORS[l]};${l === "G" ? "color:#222" : ""}">${esc(l)}${ALERTS.includes(l) ? '<span class="al" style="color:#fff">!</span>' : ""}</button>`;
+  `<button class="ln" data-line="${esc(l)}" style="background:${COLORS[l]};${l === "G" ? "color:#222" : ""}">${esc(l)}${hasAlert(l) ? '<span class="al" style="color:#fff">!</span>' : ""}</button>`;
 const live = '<span class="live"></span>';
 const dirs = (l: string): [string, string] => DIRS[l] ?? ["", ""];
 const dirText = (l: string): string => { const d = dirs(l); return d[0] + (d[0] !== d[1] ? " ⇄ " + d[1] : ""); };
+/** Une info trafic de la CTS : lignes, titre, période, et le détail repliable */
+const msgCard = (m: TrafficMsg, withLines = true): string =>
+  `<div class="box" style="display:block;margin-bottom:10px${m.channel === "disruption" ? ";border-color:#E8402F" : ""}">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${m.channel === "disruption" ? '<span class="warn">!</span>' : ""}${withLines ? m.lines.slice(0, 8).map(l => lineChip(l, true)).join("") : ""}<b>${esc(m.title)}</b></div>
+    ${m.period ? `<small style="color:var(--mute);display:block;margin-top:4px">${esc(m.period)}</small>` : ""}
+    ${m.text ? `<details style="margin-top:6px"><summary style="color:var(--mute);cursor:pointer">Détails</summary><p style="white-space:pre-line;margin:8px 0 0">${esc(m.text)}</p></details>` : ""}
+  </div>`;
+
+/** Résumé de l'accueil : les deux premières infos trafic (incidents d'abord) */
+function trafficSummary(): string {
+  if (!MESSAGES.length) {
+    const t = MSG_STATE.status === "loading" ? "Chargement des infos trafic…" : MSG_STATE.status === "error" ? "Infos trafic indisponibles pour le moment" : "Aucune perturbation signalée par la CTS";
+    return `<div class="box"><span>${t}</span><span class="rb">${ic("bus")}</span></div>`;
+  }
+  const rest = MESSAGES.length - 2;
+  return `<button class="box" data-act="msgs" style="text-align:left"><span>${MESSAGES.slice(0, 2).map(m =>
+    `<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">${m.lines.slice(0, 4).map(l => lineChip(l, true)).join("")}<b>${esc(m.title)}</b></span>`).join("")}${rest > 0 ? `<small style="color:var(--mute)">et ${rest} autre${rest > 1 ? "s" : ""} info${rest > 1 ? "s" : ""} trafic</small>` : ""}</span><span class="rb">${ic("bus")}</span></button>`;
+}
+
 const pinIcon = (): string => ic("pin", 'width="22" height="22" fill="none" stroke="var(--accent)" stroke-width="2"');
 
 const greeting = (): string => {
@@ -55,7 +75,6 @@ export function bar(title: string, back?: string): string {
 
 /* ============ ÉCRANS ============ */
 export function screenHome(): string {
-  const n = NEWS[S.news];
   const favStops = S.fav.map(stopById).filter((s): s is Stop => !!s);
   const more: [string, string, IconName, string?][] = [
     ["Mon compte", "#EF8B00", "user2"], ["Flex’hop", "#fff", "clock"], ["Objets perdus", "#00BFA5", "lost"], ["Parkings", "#1B6EC2", "parking"],
@@ -68,7 +87,7 @@ export function screenHome(): string {
       `<div class="box"><span>Affichez les prochains passages à vos arrêts favoris</span><span class="rb">${ic("heart")}</span></div>`}
 
     <h2>Infos trafic <button class="pill" data-act="msgs">Toutes les perturbations</button></h2>
-    <div class="box"><span>Abonnez-vous à des lignes pour recevoir des alertes personnalisées en cas de perturbations</span><span class="rb">${ic("bus")}</span></div>
+    ${trafficSummary()}
     <div class="sub">Toutes les lignes</div>
     <div class="chips">${ALL_LINES.map(chipAlert).join("")}</div>
 
@@ -78,9 +97,6 @@ export function screenHome(): string {
     <h2>En plus</h2>
     <div class="more">${more.map(m => { const inner = `<div class="c" style="background:${m[1]}">${m[1] === "#fff" ? '<b style="color:#999;font-size:20px;line-height:1">flex<br>hop</b>' : ic(m[2])}</div>${m[0].replace(" ", "<br>")}`; return m[3] ? `<a href="${m[3]}" target="_blank" rel="noopener noreferrer">${inner}</a>` : `<button data-more="${m[0]}">${inner}</button>`; }).join("")}</div>
 
-    <h2>Actualités</h2>
-    <div class="news" data-act="nextNews"><div style="flex:1"><b>${n.t}</b><p>${n.s}</p></div>${ic("chev", 'width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round"')}</div>
-    <div class="dots">${NEWS.map((_, i) => `<i class="${i === S.news ? "on" : ""}"></i>`).join("")}</div>
     <p class="ver">Kumm v${VERSION}${CONFIG.USE_MOCK ? " · démonstration : données fictives" : ""}</p>
   </div>`;
 }
@@ -102,7 +118,7 @@ export function screenSearch(): string {
 }
 
 export function screenLines(): string {
-  return bar("Toutes les lignes", "tabHome") + `<div class="pad">${ALL_LINES.map(l => `<button class="item" data-line="${esc(l)}">${lineChip(l)}<span>${esc(dirText(l))}<br><small style="color:var(--mute)">${isTram(l) ? "Tram" : "Bus"}</small></span>${ALERTS.includes(l) ? '<span class="warn ml">!</span>' : ""}</button>`).join("")}</div>`;
+  return bar("Toutes les lignes", "tabHome") + `<div class="pad">${ALL_LINES.map(l => `<button class="item" data-line="${esc(l)}">${lineChip(l)}<span>${esc(dirText(l))}<br><small style="color:var(--mute)">${isTram(l) ? "Tram" : "Bus"}</small></span>${hasAlert(l) ? '<span class="warn ml">!</span>' : ""}</button>`).join("")}</div>`;
 }
 
 export const layerCounts = (): Record<Layer, number> => {
@@ -359,7 +375,7 @@ export function overlayLine(l: string): string {
   const stops = STOPS.filter(s => s.lines.includes(l));
   return `<div class="overlay" style="--c:${COLORS[l] ?? "#777"}">${bar("Ligne " + l)}
    <main><div class="pad"><div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(l)}<b style="font-size:18px">${esc(dirText(l))}</b></div>
-   ${ALERTS.includes(l) ? `<div class="box" style="margin:10px 0;border-color:#E8402F"><span class="warn">!</span><span style="flex:1">${esc(MSG[l] ?? "Perturbation en cours sur cette ligne. Consultez les infos trafic.")}</span></div>` : ""}
+   ${messagesFor(l).length ? `<div style="margin:10px 0">${messagesFor(l).map(m => msgCard(m, false)).join("")}</div>` : ""}
    <div style="position:relative;margin-top:10px"><div class="rail"></div>${stops.map(s => `<button class="stopline" style="width:100%;text-align:left" data-stop="${esc(s.id)}"><span class="d"></span><span class="r">${esc(s.name)}</span></button>`).join("")}</div></div></main></div>`;
 }
 
@@ -373,7 +389,13 @@ export function overlayStop(id: string): string {
 }
 
 export function overlayMsgs(): string {
-  return `<div class="overlay">${bar("Perturbations")}<main><div class="pad">${ALERTS.map(l => `<div class="box" style="margin-bottom:10px;align-items:flex-start"><span style="display:flex;gap:12px;align-items:flex-start">${lineChip(l, true)}<span>${esc(MSG[l] ?? "Perturbation en cours. Consultez le détail sur cts-strasbourg.eu.")}</span></span></div>`).join("")}<small style="color:var(--mute)">Source : page Infos trafic de la CTS (texte copié à la main pour la maquette).</small></div></main></div>`;
+  const dis = MESSAGES.filter(m => m.channel === "disruption"), works = MESSAGES.filter(m => m.channel === "works");
+  const empty = MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Infos trafic indisponibles pour le moment." : "Aucune perturbation signalée.";
+  return `<div class="overlay">${bar("Infos trafic")}<main><div class="pad">
+    ${dis.length ? `<div class="sub" style="margin-top:4px">Incidents en cours</div>${dis.map(m => msgCard(m)).join("")}` : ""}
+    ${works.length ? `<div class="sub">Travaux et changements</div>${works.map(m => msgCard(m)).join("")}` : ""}
+    ${MESSAGES.length ? "" : `<div class="empty">${empty}</div>`}
+    <small style="color:var(--mute)">${CONFIG.USE_MOCK ? "Messages fictifs (mode démonstration)." : "Source : CTS, infos trafic en temps réel (mises à jour toutes les 5 minutes)."}</small></div></main></div>`;
 }
 
 export function overlayFavs(): string {
@@ -388,7 +410,7 @@ export function depCards(list: StopDeparture[]): string {
     if (!t.length) continue;
     const m = mins(t[0]);
     rows.push(`<button class="dep" style="--lc:${COLORS[d.line] ?? "#999"}" data-stop="${esc(stop.id)}">
-      <div class="h">${lineChip(d.line, true)}${ALERTS.includes(d.line) ? '<span class="warn">!</span>' : ""}<b>${esc(stop.name)}</b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
+      <div class="h">${lineChip(d.line, true)}${hasAlert(d.line) ? '<span class="warn">!</span>' : ""}<b>${esc(stop.name)}</b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
       <div class="f"><span>${ic(lineKind(d.line) === "ter" ? "train" : isTram(d.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(d.dest)}</b></span></span><span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div></button>`);
   }
   return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';

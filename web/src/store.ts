@@ -13,7 +13,6 @@ export interface Modal { t: string; p: string; b: string[]; go?: () => void }
 
 export interface State {
   tab: Tab;
-  news: number;
   filter: Filter;
   prefs: Prefs;
   /** catégories visibles sur la carte */
@@ -55,7 +54,7 @@ export const stopById = (id: string): Stop | undefined => STOPS.find(s => s.id =
 export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now()) / 60000));
 
 export const S: State = {
-  tab: "home", news: 0, filter: "all", prefs: loadPrefs(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: false, overlay: null, q: "", fav: [], modal: null,
+  tab: "home", filter: "all", prefs: loadPrefs(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: false, overlay: null, q: "", fav: [], modal: null,
   trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null }, locOn: false, askedLoc: false, swiped: false, toast: ""
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }

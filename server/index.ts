@@ -14,6 +14,7 @@ import { parkingsRelais, poiResult, velhop } from "./poi.js";
 import { recordRequest, stats } from "./stats.js";
 import { serveStatic } from "./static.js";
 import { serveTile } from "./tiles.js";
+import { parseGeneralMessages } from "./messages.js";
 import { realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
 import type { CtsResult } from "./cts.js";
 
@@ -157,6 +158,7 @@ function upstreamFor(name: string, search: string): () => Promise<CtsResult> {
 
 function api(res: ServerResponse, url: URL): Promise<void> | void {
   const name = url.pathname.slice("/api/".length);
+  if (name === "messages") return cached(res, "info:messages", 60, 3600, trafficMessages);
   const conf = ALLOWED[name];
   if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
   const clean = cleanQuery(name, url);
@@ -175,6 +177,13 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
     store = false;
   }
   return cached(res, name + search, conf.ttl, conf.stale, upstreamFor(name, search), store);
+}
+
+/** Infos trafic en cours, en texte brut (l'application n'a jamais à afficher le HTML de la CTS) */
+async function trafficMessages(): Promise<CtsResult> {
+  const r = await fetchCts(BASE, AUTH, "general-message", withRequestor(""));
+  if (r.status !== 200) return r;
+  return { status: 200, type: "application/json; charset=utf-8", body: JSON.stringify({ items: parseGeneralMessages(r.body) }) };
 }
 
 /** Charge à l'avance la liste des arrêts et des lignes (gardées en mémoire), puis la renouvelle avant qu'elle n'expire */
