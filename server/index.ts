@@ -178,7 +178,10 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
 }
 
 /** Charge à l'avance la liste des arrêts et des lignes (gardées en mémoire), puis la renouvelle avant qu'elle n'expire */
+/** Après un échec (CTS injoignable, jeton pas encore actif…), nouvel essai une minute plus tard plutôt qu'au prochain renouvellement (50 min) */
+let prefetchRetry: NodeJS.Timeout | null = null;
 async function prefetch(): Promise<void> {
+  let failed = false;
   for (const name of ["stoppoints-discovery", "lines-discovery"]) {
     try {
       const conf = ALLOWED[name], search = withRequestor("");
@@ -193,7 +196,12 @@ async function prefetch(): Promise<void> {
       }
     } catch (e) {
       console.warn("Préchargement impossible (" + name + ") :", describeError(e));
+      failed = true;
     }
+  }
+  if (failed && !prefetchRetry) {
+    prefetchRetry = setTimeout(() => { prefetchRetry = null; void prefetch(); }, 60_000);
+    prefetchRetry.unref();
   }
 }
 
