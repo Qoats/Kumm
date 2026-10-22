@@ -5,6 +5,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+# APP_KEY (optionnelle) est integree a l'application web au moment du build : le serveur l'exige et l'app l'envoie
+ARG APP_KEY=""
+ENV VITE_APP_KEY=$APP_KEY
 RUN npm run build
 
 # Image finale : le serveur n'utilise aucune dépendance (seulement Node), donc pas de node_modules
