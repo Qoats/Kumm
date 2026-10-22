@@ -54,6 +54,8 @@ export interface WalkRoute {
   /** tracé : [longitude, latitude] */
   coords: [number, number][];
   steps: WalkStep[];
+  /** mode de guidage : à pied (défaut) ou à vélo */
+  mode?: "walk" | "bike";
 }
 
 /** Autres points d'intérêt de la carte (hors arrêts de bus et de tram) */

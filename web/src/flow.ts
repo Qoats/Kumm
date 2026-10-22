@@ -1,6 +1,7 @@
 import type { Place } from "../../shared/types";
 import { startNav } from "./nav";
 import { fetchWalk } from "./walk";
+import { fetchBike } from "./bike";
 import { JOURNEYS, PLAN } from "./views";
 import { hm, minutes } from "./transit";
 import type { Journey } from "./transit";
@@ -46,13 +47,33 @@ export async function launchNav(kind: string): Promise<void> {
 
 /** Guidage à pied depuis votre position jusqu'à un point de la carte (Vélhop, P+R…) */
 export async function walkToPoi(id: string): Promise<void> {
-  if (CONFIG.USE_MOCK) { toast("Le guidage à pied est disponible avec le serveur"); return; }
+  await navToPoi(id, "walk");
+}
+
+/** Guidage à vélo vers un point de la carte */
+export async function bikeToPoi(id: string): Promise<void> {
+  await navToPoi(id, "bike");
+}
+
+/** Guidage vers un point de la carte, à pied ou à vélo */
+async function navToPoi(id: string, mode: "walk" | "bike"): Promise<void> {
+  if (CONFIG.USE_MOCK) { toast("Le guidage est disponible avec le serveur"); return; }
   const p = POIS.find(x => x.id === id);
   if (!p) return;
+  const dest = { lat: p.lat, lon: p.lon, label: p.name };
   try {
-    const route = await fetchWalk(USER, p);
-    startNav({ title: `À pied vers ${p.name}`, route, dest: { lat: p.lat, lon: p.lon, label: p.name } });
+    if (mode === "bike") {
+      const routes = await fetchBike(USER, p);
+      startNav({ title: `À vélo vers ${p.name}`, route: toWalkRoute(routes[0], "bike"), dest });
+    } else {
+      startNav({ title: `À pied vers ${p.name}`, route: await fetchWalk(USER, p), dest });
+    }
   } catch { fail(); }
+}
+
+/** Convertit un itinéraire vélo au format attendu par le guidage, avec la vitesse à vélo */
+function toWalkRoute(r: { distance: number; duration: number; coords: [number, number][]; steps: import("../../shared/types").WalkStep[] }, mode: "bike"): import("../../shared/types").WalkRoute {
+  return { distance: r.distance, duration: r.duration, coords: r.coords, steps: r.steps, mode };
 }
 
 /** Résumé des étapes en transport : « Ligne B vers … : départ 14:32 à …, arrivée 14:46 à … » */

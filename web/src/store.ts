@@ -26,6 +26,8 @@ export interface State {
   trip: {
     fromText: string;
     toText: string;
+    /** mode choisi : à pied, à vélo, en transports (tram/bus) */
+    mode: "walk" | "bike" | "transit";
     /** départ = ma position (sinon `from`, une adresse ou un arrêt choisi) */
     fromIsMe: boolean;
     from: Place | null;
@@ -54,7 +56,7 @@ export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now(
 
 export const S: State = {
   tab: "home", news: 0, filter: "all", prefs: loadPrefs(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: false, overlay: null, q: "", fav: [], modal: null,
-  trip: { fromText: "Ma position", toText: "", fromIsMe: true, from: null, dest: null, sugg: null }, locOn: false, askedLoc: false, swiped: false, toast: ""
+  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null }, locOn: false, askedLoc: false, swiped: false, toast: ""
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }
 

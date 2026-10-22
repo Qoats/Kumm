@@ -20,7 +20,9 @@ import type { Accent, Theme } from "./themes";
 import type { Place, Poi, StopDeparture } from "../../shared/types";
 import { buildVeloparks } from "./places";
 import { geocode } from "./walk";
-import { launchNav, walkToPoi } from "./flow";
+import { bikeToPoi, launchNav, walkToPoi } from "./flow";
+import { BIKE_ROUTES, PLAN } from "./views";
+import { startNav } from "./nav";
 import { mountLiveMap, recenter } from "./livemap";
 
 const app = document.getElementById("app") as HTMLElement;
@@ -136,7 +138,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -159,6 +161,25 @@ app.addEventListener("click", e => {
     S.trip.sugg = null; render(); return;
   }
   if (d.nav) { void launchNav(d.nav); return; }
+  if (d.bikenav) {
+    const r = BIKE_ROUTES[Number(d.bikenav)];
+    if (r && PLAN?.dest) startNav({ title: `À vélo vers ${PLAN.dest.label}`, route: { distance: r.distance, duration: r.duration, coords: r.coords, steps: r.steps, mode: "bike" }, dest: PLAN.dest });
+    return;
+  }
+  if (d.mode) { S.trip.mode = d.mode as "walk" | "bike" | "transit"; render(); return; }
+  if (d.poibike) { void bikeToPoi(d.poibike); return; }
+  if (d.poitrip) {
+    const p = POIS.find(x => x.id === d.poitrip);
+    if (p) {
+      S.trip.dest = { label: p.name, lat: p.lat, lon: p.lon };
+      S.trip.toText = p.name;
+      S.trip.mode = "transit";
+      S.overlay = null;
+      S.tab = "trips";
+      render();
+    }
+    return;
+  }
   if (d.themePick || d.accentPick || d.darkmap || d.reset) {
     if (d.themePick) S.prefs.theme = d.themePick as Theme;
     if (d.accentPick) S.prefs.accent = d.accentPick as Accent;

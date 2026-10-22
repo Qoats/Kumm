@@ -17,9 +17,11 @@ export interface NavOptions {
   actions?: NavAction[];
 }
 
-const SPEED = 1.35;        // m/s, marche normale
+const WALK_SPEED = 1.35;   // m/s, marche normale
+const BIKE_SPEED = 4.2;    // m/s, vélo en ville (~15 km/h)
 const SIM_STEP = 14;       // mètres parcourus par tick en simulation
 let current: (() => void) | null = null;
+let currentSpeed: number = WALK_SPEED;
 
 export function stopNav(): void {
   current?.();
@@ -28,6 +30,7 @@ export function stopNav(): void {
 
 export function startNav(o: NavOptions): void {
   stopNav();
+  currentSpeed = o.route.mode === "bike" ? BIKE_SPEED : WALK_SPEED;
   let route = o.route;
   let cum = cumulative(route.coords);
   let idx = Math.min(1, route.steps.length - 1);
@@ -116,7 +119,7 @@ export function startNav(o: NavOptions): void {
     $("nv-dist").textContent = d > 30 ? `Dans ${fmtDist(d)}` : "Maintenant";
     let remaining = d;
     for (let j = idx; j < steps.length; j++) remaining += steps[j].distance;
-    $("nv-eta").textContent = fmtMin(remaining / SPEED);
+    $("nv-eta").textContent = fmtMin(remaining / currentSpeed);
     $("nv-rem").textContent = fmtDist(remaining);
     if (d < 80 && !spoken.has(idx)) { spoken.add(idx); speak(`Dans ${Math.round(d / 10) * 10} mètres, ${isEnd ? "votre destination" : next.text}`); }
 

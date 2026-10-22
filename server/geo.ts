@@ -2,6 +2,7 @@
 
 const ADDR = process.env.GEO_ADDRESS_BASE ?? "https://api-adresse.data.gouv.fr/search/";
 const WALK = process.env.GEO_WALK_BASE ?? "https://routing.openstreetmap.de/routed-foot/route/v1/foot";
+const BIKE = process.env.GEO_BIKE_BASE ?? "https://routing.openstreetmap.de/routed-bike/route/v1/bike";
 export const TRANSIT = process.env.TRANSIT_BASE ?? "https://api.transitous.org/api/v5/plan";
 export const GEO_USER_AGENT = process.env.GEO_USER_AGENT ?? "Kumm/0.8";
 
@@ -35,11 +36,21 @@ export function geoUpstream(url: URL): GeoUpstream | null {
     if (time) u.searchParams.set("time", time);
     return { url: u.toString(), ttl: 60, stale: 120 };
   }
+/** Construit la requête OSRM (piéton ou vélo) à partir de coordonnées validées */
+function osrm(base: string, from: string, to: string, alternatives: boolean): string | null {
+  const [fa, fo] = from.split(","), [ta, tn] = to.split(",");
+  return `${base}/${fo},${fa};${tn},${ta}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives}`;
+}
+
   if (url.pathname === "/geo/walk") {
     const from = url.searchParams.get("from") ?? "", to = url.searchParams.get("to") ?? "";
     if (!LATLON.test(from) || !LATLON.test(to)) return null;
-    const [fa, fo] = from.split(","), [ta, tn] = to.split(",");
-    return { url: `${WALK}/${fo},${fa};${tn},${ta}?overview=full&geometries=geojson&steps=true&alternatives=false`, ttl: 300, stale: 3600 };
+    return { url: osrm(WALK, from, to, false) as string, ttl: 300, stale: 3600 };
+  }
+  if (url.pathname === "/geo/bike") {
+    const from = url.searchParams.get("from") ?? "", to = url.searchParams.get("to") ?? "";
+    if (!LATLON.test(from) || !LATLON.test(to)) return null;
+    return { url: osrm(BIKE, from, to, true) as string, ttl: 300, stale: 3600 };
   }
   return null;
 }
