@@ -23,6 +23,8 @@ export const ENABLE_DIAG = process.env.ENABLE_DIAG === "1";             // page 
 export const CACHE_MAX = num(process.env.CACHE_MAX_ENTRIES, 4000);      // réponses gardées en mémoire
 export const STALE_REALTIME_S = num(process.env.STALE_REALTIME_S, 120); // en panne, on ressert les passages « temps réel » au plus 2 min
 export const UPSTREAM_QUEUE_MAX = num(process.env.UPSTREAM_QUEUE_MAX, 300);
+/** Requêtes simultanées vers l'extérieur, par file (CTS d'un côté, autres services de l'autre) */
+export const UPSTREAM_PARALLEL = Math.max(1, num(process.env.UPSTREAM_PARALLEL, 4));
 /** Plafond global d'appels vers la CTS par minute, tous visiteurs confondus (0 = aucun plafond). À régler avec les quotas donnés par la CTS. */
 export const CTS_BUDGET_PER_MIN = num(process.env.CTS_BUDGET_PER_MIN, 1500);
 /** Arrêts dont le code n'est pas dans la liste officielle : nombre de demandes acceptées par minute, tous visiteurs confondus */

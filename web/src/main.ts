@@ -82,11 +82,17 @@ const slotCache = new Map<string, string>();
 const slotKey = (id: string): string =>
   id === "nearlist" ? `nearlist|${S.filter}`
   : id === "stopdeps" ? `stopdeps|${S.overlay?.k === "stop" ? S.overlay.id : ""}`
-  : id === "trips" ? `trips|${S.trip.dest?.label ?? ""}|${S.trip.fromIsMe ? "me" : S.trip.from?.label ?? ""}`
+  : id === "trips" ? `trips|${S.trip.mode}|${S.trip.dest?.label ?? ""}|${S.trip.fromIsMe ? "me" : S.trip.from?.label ?? ""}`
   : id;
-function setSlot(el: HTMLElement, html: string): void {
-  el.innerHTML = html;
-  slotCache.set(slotKey(el.id), html);
+/** Remplit une zone avec un résultat arrivé après une attente : ignoré si l'écran a changé entre-temps
+   (autre arrêt, autre mode…), sinon un ancien résultat s'afficherait au mauvais endroit */
+async function fillSlot(id: string, load: () => Promise<string>): Promise<void> {
+  const key = slotKey(id);
+  const html = await load();
+  if (slotKey(id) !== key) return;
+  slotCache.set(key, html);
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
 }
 function restoreSlots(): void {
   document.querySelectorAll<HTMLElement>("#nearlist,#stopdeps,#trips,[id^=fav-]").forEach(el => {
@@ -104,31 +110,34 @@ async function loadDeps(): Promise<void> {
     if (S.tab === "nearby" && !S.overlay) {
       const near = STOPS.filter(s => matchesFilter(s))
         .sort((a, b) => Math.hypot(a.x - 170, a.y - 222) - Math.hypot(b.x - 170, b.y - 222)).slice(0, 4);
-      const res = await Promise.all(near.map(s => nextDepartures(s).then(ds => ds.map(d => ({ stop: s, d }))).catch(() => [] as StopDeparture[])));
-      const all: StopDeparture[] = [];
-      for (const rows of res) {
-        rows.filter(({ d }) => S.filter === "all" || (S.filter === "tram") === isTram(d.line)).sort(sortByTime).slice(0, 2).forEach(r => all.push(r));
-      }
-      const el = document.getElementById("nearlist");
-      if (el) setSlot(el, depCards(all));
+      const filter = S.filter;
+      await fillSlot("nearlist", async () => {
+        const res = await Promise.all(near.map(s => nextDepartures(s).then(ds => ds.map(d => ({ stop: s, d }))).catch(() => [] as StopDeparture[])));
+        const all: StopDeparture[] = [];
+        for (const rows of res) {
+          rows.filter(({ d }) => filter === "all" || (filter === "tram") === isTram(d.line)).sort(sortByTime).slice(0, 2).forEach(r => all.push(r));
+        }
+        return depCards(all);
+      });
     }
     if (S.tab === "home") {
       for (const id of S.fav) {
-        const el = document.getElementById("fav-" + id), s = stopById(id);
-        if (!el || !s) continue;
-        setSlot(el, depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime).slice(0, 2)));
+        const s = stopById(id);
+        if (!s || !document.getElementById("fav-" + id)) continue;
+        await fillSlot("fav-" + id, async () => depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime).slice(0, 2)));
       }
     }
     if (S.overlay?.k === "stop") {
-      const s = stopById(S.overlay.id), el = document.getElementById("stopdeps");
-      if (s && el) {
-        const h = depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime));
-        setSlot(el, h.includes('class="dep"') ? h : h + debugBox());
+      const s = stopById(S.overlay.id);
+      if (s && document.getElementById("stopdeps")) {
+        await fillSlot("stopdeps", async () => {
+          const h = depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime));
+          return h.includes('class="dep"') ? h : h + debugBox();
+        });
       }
     }
     if (S.tab === "trips") {
-      const el = document.getElementById("trips");
-      if (el) setSlot(el, CONFIG.USE_MOCK ? tripsDemo() : await planTrips());
+      if (document.getElementById("trips")) await fillSlot("trips", async () => CONFIG.USE_MOCK ? tripsDemo() : planTrips());
     }
   } catch (e) {
     console.error(e);

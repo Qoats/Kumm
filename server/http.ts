@@ -15,12 +15,28 @@ export interface Memo { gz?: Buffer }
 const COMPRESSIBLE = /^(text\/|application\/(json|javascript|manifest\+json)|image\/svg\+xml)/;
 const MIN_COMPRESS = 1024;
 
+/** Ce que la page a le droit de charger : un texte injecté par erreur ne pourrait ni exécuter de script ni envoyer de données ailleurs.
+   Les styles inline restent permis (l'interface en utilise partout) ; l'APK charge ses fichiers localement et n'est pas concerné. */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'"
+].join("; ");
+
 /** En-têtes appliqués à toutes les réponses */
 export function securityHeaders(req: IncomingMessage, res: ServerResponse): void {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
+  res.setHeader("Content-Security-Policy", CSP);
   if (TRUST_PROXY && req.headers["x-forwarded-proto"] === "https") res.setHeader("Strict-Transport-Security", "max-age=31536000");
 }
 

@@ -14,11 +14,8 @@
 <title>Kumm – Transports de Strasbourg</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script>
-/* applique le thème choisi avant le premier affichage (évite un éclair de la mauvaise couleur) */
-try{var p=JSON.parse(localStorage.getItem("prefs")||"{}"),r=document.documentElement,d=matchMedia("(prefers-color-scheme: dark)").matches,t=p.theme||"auto";
-r.dataset.scheme=t==="auto"?(d?"dark":"light"):t;r.dataset.accent=p.accent||"green";r.dataset.mapdark=p.v===2&&p.darkMap===false?"0":"1"}catch(e){}
-</script>
+<!-- applique le thème choisi avant le premier affichage (évite un éclair de la mauvaise couleur) -->
+<script src="/theme-init.js"></script>
 </head>
 <body>
 <div id="app"></div>

@@ -43,7 +43,9 @@ const place = (p: MotisLeg["from"]) => ({ name: p.name && p.name !== "START" && 
 
 function toLeg(l: MotisLeg): JLeg {
   const kind = kindOfMode(l.mode);
-  const color = l.routeColor ? (l.routeColor.startsWith("#") ? l.routeColor : "#" + l.routeColor) : undefined;
+  // couleur venant d'un service externe, insérée dans un attribut style : seulement « #RRGGBB » ou « #RGB »
+  const hex = (l.routeColor ?? "").replace(/^#/, "");
+  const color = /^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex) ? "#" + hex : undefined;
   return {
     kind, from: place(l.from), to: place(l.to),
     start: Date.parse(l.startTime), end: Date.parse(l.endTime), duration: l.duration,

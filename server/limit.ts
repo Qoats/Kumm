@@ -7,8 +7,9 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of hits) if (v.res
 
 export function clientIp(req: IncomingMessage): string {
   if (TRUST_PROXY) {
+    // la dernière adresse est celle ajoutée par notre proxy ; les précédentes peuvent venir du visiteur lui-même
     const f = req.headers["x-forwarded-for"];
-    if (typeof f === "string" && f) return f.split(",")[0].trim();
+    if (typeof f === "string" && f) return (f.split(",").pop() ?? "").trim() || (req.socket.remoteAddress ?? "?");
   }
   return req.socket.remoteAddress ?? "?";
 }

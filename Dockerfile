@@ -12,7 +12,9 @@ RUN npm run build
 
 # Image finale : le serveur n'utilise aucune dépendance (seulement Node), donc pas de node_modules
 FROM node:22-alpine
-ENV NODE_ENV=production PORT=3000 TRUST_PROXY=1
+# TRUST_PROXY n'est pas activé ici : sans proxy devant, n'importe qui pourrait choisir son adresse (X-Forwarded-For).
+# docker-compose.yml l'active, car Caddy est devant.
+ENV NODE_ENV=production PORT=3000
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json

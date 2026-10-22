@@ -26,7 +26,7 @@ Organisation des noms : `kumm.fr` = site vitrine et pages légales, `app.kumm.fr
 | Variable | Valeur |
 |---|---|
 | `CTS_TOKEN` | votre jeton CTS (**secret**, jamais dans le dépôt) |
-| `TRUST_PROXY` | `1` (déjà dans le Dockerfile) |
+| `TRUST_PROXY` | `1` **seulement si un proxy est devant le serveur** (hébergeur, Caddy…) ; déjà mis par `docker-compose.yml`. Sans proxy, laissez-le vide : sinon chacun pourrait choisir son adresse et contourner la limite de requêtes |
 | `GEO_USER_AGENT` | `Kumm/1.0 (contact@votre-domaine.fr)` : **un vrai contact**, exigé par OpenStreetMap et courtois envers les autres services |
 | `CORS_ORIGINS` | `https://localhost,capacitor://localhost` (l'application Android) |
 | `RATE_LIMIT_PER_MIN` | 240 par défaut ; baissez si besoin |

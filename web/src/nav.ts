@@ -6,9 +6,11 @@ import type { LL } from "./geo";
 import { arrowFor, fetchWalk } from "./walk";
 import { accentColor } from "./themes";
 import { makeBaseLayer } from "./tiles";
+import { esc } from "./util";
 
 export interface NavAction { label: string; run: () => void }
 export interface NavOptions {
+  /** texte brut (échappé à l'affichage) */
   title: string;
   route: WalkRoute;
   dest: LL & { label: string };
@@ -79,7 +81,7 @@ export function startNav(o: NavOptions): void {
     speak("Vous êtes arrivé");
     const end = $("nv-end");
     end.hidden = false;
-    end.innerHTML = `<b>${o.title}</b><p>${o.endHtml ?? "Vous êtes arrivé à destination."}</p><div class="nv-acts"></div>`;
+    end.innerHTML = `<b>${esc(o.title)}</b><p>${o.endHtml ?? "Vous êtes arrivé à destination."}</p><div class="nv-acts"></div>`;
     const acts = end.querySelector(".nv-acts") as HTMLElement;
     for (const a of o.actions ?? []) {
       const b = document.createElement("button");

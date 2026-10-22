@@ -44,6 +44,16 @@ function keyMatches(sent: unknown): boolean {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+/** Tuiles : une page d'un autre site (que le navigateur signale dans Referer) ne peut pas s'en servir comme fournisseur gratuit.
+   Sans Referer (navigateur qui le masque), on accepte : la limite par adresse s'applique toujours. */
+export function tileRefererAllowed(req: IncomingMessage): boolean {
+  const ref = req.headers.referer;
+  if (!ref) return true;
+  let origin: string, host: string;
+  try { const u = new URL(ref); origin = u.origin; host = u.host; } catch { return false; }
+  return host === req.headers.host || ORIGINS.includes(origin);
+}
+
 /** Ajoute RequestorRef aux demandes SIRI s'il manque */
 export function withRequestor(search: string): string {
   const q = new URLSearchParams(search);
@@ -239,7 +249,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (p.startsWith("/geo/")) return geo(res, url);
   if (p === "/poi/velhop") return cached(res, "poi:velhop", 60, 600, async () => poiResult(await velhop()));
   if (p === "/poi/pr") return cached(res, "poi:pr", 120, 3600, async () => poiResult(await parkingsRelais()));
-  if (isTile) return serveTile(res, p);
+  if (isTile) {
+    if (!tileRefererAllowed(req)) { res.writeHead(403, { "Content-Type": "text/plain" }); return void res.end("Tuiles réservées à l'application"); }
+    return serveTile(res, p);
+  }
   if (p === "/diag" && ENABLE_DIAG) return diag(res);
   return serveStatic(res, p);
 }
