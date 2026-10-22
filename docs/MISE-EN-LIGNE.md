@@ -32,12 +32,13 @@ Organisation des noms : `kumm.fr` = site vitrine et pages légales, `app.kumm.fr
 | `RATE_LIMIT_PER_MIN` | 240 par défaut ; baissez si besoin |
 | `CTS_BUDGET_PER_MIN` | 1500 par défaut : **à régler avec les quotas donnés par la CTS** |
 | `UNKNOWN_REF_PER_MIN` | 60 par défaut ; `VALIDATE_STOP_REFS=0` désactive ce filtrage si des arrêts valables étaient refusés |
+| `ET_POLL_S` | 30 par défaut : le serveur charge les passages de **tout le réseau** en un appel (`estimated-timetable`) toutes les 30 s et répond aux arrêts depuis la mémoire ; un arrêt absent de cette photo est demandé à la CTS comme avant. `0` = désactivé |
 | `MIN_APP_VERSION` | `0.0.0` ; à relever seulement après une évolution incompatible |
 | `ENABLE_DIAG` | **ne pas définir** sur un serveur public |
 
 ## 4. Supervision
 - Créez une surveillance (UptimeRobot, Better Stack… offres gratuites existent) sur `https://app.kumm.fr/health` : alerte par e-mail si le serveur ne répond plus.
-- Lisez le contenu de `/health` : `cts.en_pause` (la CTS ne répond plus), `cts.appels_derniere_minute` face à `cts.plafond_par_minute` (si vous approchez du plafond en permanence, relevez-le avec l'accord de la CTS), `cts.refuses_plafond`, `cts.arrets_connus` (nombre de codes d'arrêt chargés : `null` veut dire que la liste n'a pas pu être chargée), `cts.arrets_inconnus_refuses`, `requetes.erreurs_5xx`, `requetes.refusees_429`, `cache.secours` (réponses servies en secours).
+- Lisez le contenu de `/health` : `cts.en_pause` (la CTS ne répond plus), `cts.appels_derniere_minute` face à `cts.plafond_par_minute` (si vous approchez du plafond en permanence, relevez-le avec l'accord de la CTS), `cts.refuses_plafond`, `cts.arrets_connus` (nombre de codes d'arrêt chargés : `null` veut dire que la liste n'a pas pu être chargée), `cts.arrets_inconnus_refuses`, `requetes.erreurs_5xx`, `requetes.refusees_429`, `cache.secours` (réponses servies en secours), `reseau_en_memoire` (âge de la photo du réseau en secondes, nombre de courses, échecs de chargement, arrêts servis depuis la mémoire).
 
 ## 5. Services partagés à remplacer avant un lancement large
 Plusieurs services utilisés par Kumm sont **gratuits, communautaires et à usage modéré**. Pour un grand public, remplacez-les par des services dédiés ; le serveur le prévoit (variables d'environnement) et l'application n'a rien à changer.

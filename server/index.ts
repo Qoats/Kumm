@@ -14,6 +14,7 @@ import { parkingsRelais, poiResult, velhop } from "./poi.js";
 import { recordRequest, stats } from "./stats.js";
 import { serveStatic } from "./static.js";
 import { serveTile } from "./tiles.js";
+import { realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
 import type { CtsResult } from "./cts.js";
 
 if (!TOKEN) {
@@ -160,6 +161,11 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
   if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
   const clean = cleanQuery(name, url);
   if (clean === null) return send(res, 400, "text/plain", "Paramètres invalides");
+  // passages en direct : d'abord la photo du réseau gardée en mémoire (aucun appel à la CTS)
+  if (name === "stop-monitoring") {
+    const fromSnapshot = stopMonitoringFromSnapshot(url.searchParams.get("MonitoringRef") ?? "");
+    if (fromSnapshot) { stats.snapshotServed++; return send(res, 200, "application/json; charset=utf-8", fromSnapshot, "SNAPSHOT"); }
+  }
   const search = withRequestor(clean);
   // arrêt absent de la liste officielle : toléré (au cas où elle serait incomplète) mais limité, et jamais gardé en mémoire
   let store = true;
@@ -180,6 +186,7 @@ async function prefetch(): Promise<void> {
       if (r.status !== 200) throw new Error("HTTP " + r.status);
       cacheSet(name + search, { body: r.body, type: r.type, exp: expiry(r.body, conf.ttl), staleMs: conf.stale * 1000, memo: {} });
       if (name === "stoppoints-discovery") {
+        setStopIndex(r.body);
         const refs = extractRefs(r.body);
         if (refs) knownRefs = refs;
         console.log(`Liste des arrêts chargée : ${refs ? refs.size + " codes" : "forme non reconnue (aucun filtrage)"}`);
@@ -204,6 +211,7 @@ function health(res: ServerResponse): Promise<void> {
     uptime_s: Math.round((Date.now() - stats.started) / 1000),
     cache: { entrees: cacheSize(), max: CACHE_MAX, hits: cacheStats.hits, miss: cacheStats.misses, secours: cacheStats.stale, evinces: cacheStats.evicted },
     cts: { en_pause: paused.paused, secondes: paused.paused ? paused.seconds : 0, appels_derniere_minute: ctsCallsLastMinute(), plafond_par_minute: CTS_BUDGET_PER_MIN, refuses_plafond: stats.budgetRefused, arrets_connus: knownRefs?.size ?? null, arrets_inconnus_demandes: stats.unknownRefs, arrets_inconnus_refuses: stats.unknownRefused },
+    reseau_en_memoire: { ...realtimeStatus(), arrets_servis_depuis_la_memoire: stats.snapshotServed },
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });
   res.setHeader("Cache-Control", "no-store");
@@ -287,5 +295,6 @@ process.on("uncaughtException", e => { console.error("Erreur fatale :", e.messag
 server.listen(PORT, () => {
   console.log(`Kumm ${VERSION} : http://localhost:${PORT}`);
   void prefetch();
+  startRealtime();
   setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
 });

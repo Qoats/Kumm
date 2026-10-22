@@ -22,6 +22,8 @@ export const TRUST_PROXY = process.env.TRUST_PROXY === "1";             // derri
 export const ENABLE_DIAG = process.env.ENABLE_DIAG === "1";             // page /diag (jamais sur un serveur public)
 export const CACHE_MAX = num(process.env.CACHE_MAX_ENTRIES, 4000);      // réponses gardées en mémoire
 export const STALE_REALTIME_S = num(process.env.STALE_REALTIME_S, 120); // en panne, on ressert les passages « temps réel » au plus 2 min
+/** Passages de tout le réseau rechargés toutes les N secondes (la CTS indique 20 s au minimum) ; 0 = désactivé, appel arrêt par arrêt */
+export const ET_POLL_S = (n => (n <= 0 ? 0 : Math.max(20, n)))(num(process.env.ET_POLL_S, 30));
 export const UPSTREAM_QUEUE_MAX = num(process.env.UPSTREAM_QUEUE_MAX, 300);
 /** Requêtes simultanées vers l'extérieur, par file (CTS d'un côté, autres services de l'autre) */
 export const UPSTREAM_PARALLEL = Math.max(1, num(process.env.UPSTREAM_PARALLEL, 4));
