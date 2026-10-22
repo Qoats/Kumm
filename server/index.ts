@@ -1,8 +1,9 @@
 // Serveur Kumm : sert l'application et relaie les services (CTS, adresses, marche, trajets, parkings, vélos, tuiles)
 // en gardant le jeton CTS côté serveur. Conçu pour un usage public : limites, cache borné, compression, arrêt propre.
 import http from "node:http";
+import crypto from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { AUTH, BASE, CACHE_MAX, CTS_BUDGET_PER_MIN, ENABLE_DIAG, LIMIT, MIN_APP_VERSION, ORIGINS, PORT, REQUESTOR, ROOT, STALE_REALTIME_S, TILE_LIMIT, TOKEN, UNKNOWN_REF_PER_MIN, VALIDATE_STOP_REFS, VERSION } from "./config.js";
+import { AUTH, APP_KEY, BASE, CACHE_MAX, CTS_BUDGET_PER_MIN, ENABLE_DIAG, LIMIT, MIN_APP_VERSION, ORIGINS, PORT, REQUESTOR, ROOT, STALE_REALTIME_S, TILE_LIMIT, TOKEN, UNKNOWN_REF_PER_MIN, VALIDATE_STOP_REFS, VERSION } from "./config.js";
 import { cacheGet, cacheSet, cacheSize, cacheStats, cacheSweep } from "./cache.js";
 import { ctsCallsLastMinute, ctsPaused, describeError, fetchCts, fetchRetry } from "./cts.js";
 import { diag } from "./diag.js";
@@ -35,6 +36,13 @@ const ALLOWED: Record<string, { ttl: number; stale: number }> = {
 /** Les services « SIRI » sont sous /v1/siri/2.0 ; les autres (P+R, vélo, points de vente) sont cherchés d'abord sous /v1 */
 const SIRI_ONLY = new Set(["stop-monitoring", "stoppoints-discovery", "lines-discovery", "general-message", "estimated-timetable"]);
 const REF = /^[A-Za-z0-9_.\-]{1,60}$/;
+
+/** Comparaison à temps constant : le temps de réponse ne révèle pas la clé, caractère par caractère */
+function keyMatches(sent: unknown): boolean {
+  const a = Buffer.from(String(sent ?? ""));
+  const b = Buffer.from(APP_KEY);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 /** Ajoute RequestorRef aux demandes SIRI s'il manque */
 export function withRequestor(search: string): string {
@@ -218,6 +226,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
   const isTile = p.startsWith("/tiles/");
   const isService = p.startsWith("/api/") || p.startsWith("/geo/") || p.startsWith("/poi/");
+  if (isService && APP_KEY && !keyMatches(req.headers["x-app-key"])) {
+    res.writeHead(403, { "Content-Type": "text/plain" });
+    return void res.end("Accès réservé à l'application");
+  }
   if ((isTile && !withinLimit(req, "tiles", TILE_LIMIT)) || (isService && !withinLimit(req, "api", LIMIT))) {
     res.writeHead(429, { "Content-Type": "text/plain", "Retry-After": "60" });
     return void res.end("Trop de requêtes : réessayez dans une minute");

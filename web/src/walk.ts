@@ -1,7 +1,7 @@
 import type { Place, WalkRoute, WalkStep } from "../../shared/types";
 import type { AddressResponse, OsrmResponse, OsrmStep } from "../../shared/geo-api";
 import type { LL } from "./geo";
-import { url } from "./config";
+import { appHeaders, url } from "./config";
 
 const DIR: Record<string, string> = {
   left: "à gauche", "slight left": "légèrement à gauche", "sharp left": "franchement à gauche",
@@ -42,7 +42,7 @@ const toStep = (s: OsrmStep): WalkStep => ({
 });
 
 async function getJson<T>(path: string): Promise<T> {
-  const r = await fetch(url(path));
+  const r = await fetch(url(path), { headers: appHeaders() });
   if (!r.ok) throw new Error("Service " + r.status);
   return (await r.json()) as T;
 }

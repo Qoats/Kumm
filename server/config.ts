@@ -12,6 +12,8 @@ export const ROOT = process.env.CTS_ROOT ?? "https://api.cts-strasbourg.eu/v1";
 /** Identifiant du demandeur exigé par le protocole SIRI (n'importe quel nom court) */
 export const REQUESTOR = process.env.CTS_REQUESTOR ?? "kumm";
 export const PORT = num(process.env.PORT, 3000);
+/** Clé d'application : si définie, /api, /geo et /poi exigent l'en-tête X-App-Key (l'application l'envoie ; vide = aucune vérification). Une clé dans l'APK reste extractible : cela bloque les appels extérieurs simples, pas un attaquant déterminé. */
+export const APP_KEY = process.env.APP_KEY ?? "";
 
 /* protection et capacité */
 export const LIMIT = num(process.env.RATE_LIMIT_PER_MIN, 240);          // API, adresses, trajets, parkings… par adresse (0 = aucune limite)

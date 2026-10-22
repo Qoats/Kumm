@@ -1,6 +1,6 @@
 import type { Departure, Poi, PoiKind, Stop } from "../../shared/types";
 import type { AnnotatedStopPoint, SiriStopMonitoring, SiriStopPoints } from "../../shared/cts-api";
-import { CONFIG, url } from "./config";
+import { appHeaders, CONFIG, url } from "./config";
 import { DIRS, isTram, kindOfStop } from "./data";
 import { parseLineInfo } from "./lines";
 import type { LineInfo } from "./lines";
@@ -18,7 +18,7 @@ async function get<T>(path: string): Promise<T> {
     const ctl = new AbortController();
     const to = setTimeout(() => ctl.abort(), 9000);
     try {
-      const r = await fetch(CONFIG.CTS_BASE + path, { signal: ctl.signal });
+      const r = await fetch(CONFIG.CTS_BASE + path, { signal: ctl.signal, headers: appHeaders() });
       if (!r.ok) {
         const body = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
         throw new HttpError(r.status, `CTS ${r.status}${body ? " : " + body : ""}`);
@@ -119,7 +119,7 @@ export async function loadPois(): Promise<Poi[]> {
   const sources: { path: string; kind: PoiKind }[] = [{ path: "/poi/pr", kind: "pr" }, { path: "/poi/velhop", kind: "velhop" }];
   await Promise.all(sources.map(async s => {
     try {
-      const r = await fetch(url(s.path));
+      const r = await fetch(url(s.path), { headers: appHeaders() });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = (await r.json()) as { items?: { id: string; name: string; lat: number; lon: number; info?: string }[] };
       for (const p of j.items ?? []) out.push({ id: p.id, kind: s.kind, name: p.name, lat: p.lat, lon: p.lon, x: 0, y: 0, info: p.info });

@@ -2,7 +2,7 @@ import type { MotisItinerary, MotisLeg, MotisPlan } from "../../shared/geo-api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import type { LL } from "./geo";
-import { url } from "./config";
+import { appHeaders, url } from "./config";
 
 /** Une étape d'un trajet : à pied, ou à bord d'un tram / bus / train */
 export interface JLeg {
@@ -68,7 +68,7 @@ export function parseJourneys(plan: MotisPlan): Journey[] {
 }
 
 export async function fetchTransit(from: LL, to: LL): Promise<Journey[]> {
-  const r = await fetch(url(`/geo/transit?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}`));
+  const r = await fetch(url(`/geo/transit?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}`), { headers: appHeaders() });
   if (!r.ok) {
     const detail = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 140);
     throw new Error(`erreur ${r.status}${detail ? " : " + detail : ""}`);

@@ -14,3 +14,7 @@ export const CONFIG = {
   /** relais côté serveur : le token CTS n'est jamais dans le navigateur */
   CTS_BASE: API_BASE + "/api"
 };
+
+/** Clé d'application : si le serveur exige l'en-tête X-App-Key (APP_KEY côté serveur), elle est fixée à la compilation (VITE_APP_KEY). */
+export const APP_KEY = ((import.meta.env["VITE_APP_KEY"] as string | undefined) ?? "").trim();
+export const appHeaders = (): Record<string, string> => APP_KEY ? { "X-App-Key": APP_KEY } : {};
