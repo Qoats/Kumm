@@ -29,11 +29,35 @@ const chipAlert = (l: string): string =>
 const live = '<span class="live"></span>';
 const dirs = (l: string): [string, string] => DIRS[l] ?? ["", ""];
 const dirText = (l: string): string => { const d = dirs(l); return d[0] + (d[0] !== d[1] ? " ⇄ " + d[1] : ""); };
-/** Une info trafic de la CTS : lignes, titre, période, et le détail repliable */
+/** Date et heure à Strasbourg ; 04h00 et 02h00 sont le début et la fin de journée de service de la CTS : on n'affiche alors que la date */
+function moment(iso?: string): { day: string; hm: string; today: boolean; dayOnly: boolean } | null {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return null;
+  const tz = { timeZone: "Europe/Paris" } as const;
+  const day = d.toLocaleDateString("fr-FR", { ...tz, day: "2-digit", month: "2-digit" });
+  const hm = d.toLocaleTimeString("fr-FR", { ...tz, hour: "2-digit", minute: "2-digit" }).replace(":", "h");
+  return { day, hm, today: day === new Date().toLocaleDateString("fr-FR", { ...tz, day: "2-digit", month: "2-digit" }), dayOnly: hm === "04h00" || hm === "02h00" };
+}
+/** « 15h49 », « le 21/10 à 15h49 » ou « le 21/10 » */
+const at = (t: NonNullable<ReturnType<typeof moment>>): string => (t.dayOnly ? `le ${t.day}` : t.today ? t.hm : `le ${t.day} à ${t.hm}`);
+
+/** Heures d'une info trafic : début précis d'un incident et dernière mise à jour */
+function msgTimes(m: TrafficMsg): string {
+  const start = moment(m.start), upd = moment(m.updated);
+  const parts: string[] = [];
+  if (m.channel === "disruption" && start) parts.push(`Depuis ${at(start)}`);
+  if (upd && (m.channel !== "disruption" || !start || Date.parse(m.updated!) - Date.parse(m.start!) > 60_000)) {
+    parts.push(`${m.channel === "disruption" ? "mis à jour" : "Publié"} ${upd.today && !upd.dayOnly ? "à " : ""}${at(upd)}`);
+  }
+  return parts.join(" · ");
+}
+
+/** Une info trafic de la CTS : lignes, titre, heures, période, et le détail repliable */
 const msgCard = (m: TrafficMsg, withLines = true): string =>
   `<div class="box" style="display:block;margin-bottom:10px${m.channel === "disruption" ? ";border-color:#E8402F" : ""}">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${m.channel === "disruption" ? '<span class="warn">!</span>' : ""}${withLines ? m.lines.slice(0, 8).map(l => lineChip(l, true)).join("") : ""}<b>${esc(m.title)}</b></div>
-    ${m.period ? `<small style="color:var(--mute);display:block;margin-top:4px">${esc(m.period)}</small>` : ""}
+    ${msgTimes(m) ? `<small style="display:block;margin-top:4px;font-weight:600">${esc(msgTimes(m))}</small>` : ""}
+    ${m.period ? `<small style="color:var(--mute);display:block;margin-top:2px">${esc(m.period)}</small>` : ""}
     ${m.text ? `<details style="margin-top:6px"><summary style="color:var(--mute);cursor:pointer">Détails</summary><p style="white-space:pre-line;margin:8px 0 0">${esc(m.text)}</p></details>` : ""}
   </div>`;
 

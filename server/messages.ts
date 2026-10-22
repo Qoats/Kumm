@@ -12,6 +12,8 @@ export interface TrafficMessage {
   text: string;
   start?: string;
   end?: string;
+  /** dernière publication ou mise à jour du message par la CTS */
+  updated?: string;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -68,7 +70,7 @@ export function parseGeneralMessages(body: string, now = Date.now()): TrafficMes
         channel: /disrupt|incident|perturb/i.test(str(m["InfoChannelRef"])) ? "disruption" : "works",
         lines: (Array.isArray(c["ImpactedLineRef"]) ? c["ImpactedLineRef"] : []).map(str).filter(Boolean),
         title, period: htmlToText(zones["period"] ?? ""), text: htmlToText(zones["details"] ?? ""),
-        start: start || undefined, end: end || undefined
+        start: start || undefined, end: end || undefined, updated: str(m["RecordedAtTime"]) || undefined
       });
     }
   }

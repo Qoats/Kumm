@@ -77,6 +77,10 @@ export interface TrafficMsg {
   title: string;
   period: string;
   text: string;
+  /** début de la perturbation, fin prévue, dernière mise à jour (dates ISO) */
+  start?: string;
+  end?: string;
+  updated?: string;
 }
 
 /** Infos trafic en cours (rempli au démarrage puis toutes les 5 minutes) */
