@@ -36,7 +36,8 @@ import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { mountLiveMap, recenter, zoomBy } from "./livemap";
-import { CAN_UPDATE, checkUpdate, installUpdate } from "./update";
+import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
+import { acceptTerms, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
 import type { Release } from "./update";
 import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
 
@@ -81,7 +82,8 @@ function draw(): void {
     whenSheet() +
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "") +
-    (S.updating !== null ? `<div class="updbar" role="status"><span>Téléchargement de la mise à jour… ${S.updating} %</span><i style="width:${S.updating}%"></i></div>` : "");
+    // pages plein écran : mise à jour obligatoire (prioritaire), puis présentation du premier lancement
+    (S.upd ? updateView(S.upd, VERSION) : S.onb ? onboardingView(S.onb.steps, S.onb.i, S.onb.refused) : "");
 
   const m = document.querySelector<HTMLElement>("#app > main");
   if (m && !o) m.scrollTop = top;
@@ -188,13 +190,15 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
   // ne jamais remonter hors de l'application : la page elle-même porte des attributs de thème (data-darkmap…)
   if (!b || !app.contains(b)) return;
   const d = b.dataset;
+  if (d.onb) { void onboardingAction(d.onb); return; }
+  if (d.upd) { updateAction(d.upd); return; }
   if (d.dirk !== undefined && d.dirv !== undefined) { pickDir(d.dirk, d.dirv); render(); return; }   // direction d'une ligne, sans ouvrir l'arrêt
   if (d.mb !== undefined) { const m = S.modal; S.modal = null; if (d.mb === "1" && m?.go) m.go(); render(); return; }
   if (d.tab) {
@@ -329,38 +333,68 @@ async function offerUpdate(manual: boolean): Promise<void> {
   try { rel = await checkUpdate(); } catch { if (manual) toast("Impossible de vérifier les mises à jour pour le moment"); return; }
   if (rel === "unpublished") { if (manual) toast(`Version ${VERSION} · aucune mise à jour n'est encore proposée par le serveur`); return; }
   if (!rel) { if (manual) toast(`Kumm est à jour (version ${VERSION})`); return; }
-  const r = rel;
-  S.modal = {
-    t: "Nouvelle version disponible",
-    p: `Kumm ${esc(r.version)} est prête à être installée (${(r.size / 1e6).toFixed(1).replace(".", ",")} Mo).`,
-    b: ["Plus tard", "Mettre à jour"], go: () => { void startUpdate(r); }
-  };
+  // une version plus récente existe : l'application n'est plus utilisable tant qu'elle n'est pas installée
+  S.upd = { rel, phase: "ready", pct: 0 };
   render();
 }
 
 async function startUpdate(rel: Release): Promise<void> {
-  if (S.updating !== null) return;
-  S.updating = 0; render();
+  if (S.upd?.phase === "down") return;
+  S.upd = { rel, phase: "down", pct: 0 }; render();
   try {
-    const r = await installUpdate(rel, pct => { if (pct !== S.updating) { S.updating = pct; render(); } });
-    S.updating = null;
+    const r = await installUpdate(rel, pct => { if (S.upd && pct !== S.upd.pct) { S.upd.pct = pct; render(); } });
     if (r === "permission") {
       // Android ouvre son réglage ; au retour dans Kumm, l'installation reprend toute seule
       waitingPermission = rel;
-      S.modal = { t: "Une autorisation est nécessaire", p: "Activez « Autoriser depuis cette source » pour Kumm, puis revenez dans l'application : l'installation reprendra.", b: ["OK"] };
+      S.upd = { rel, phase: "perm", pct: 0 };
+    } else {
+      // l'installateur d'Android est ouvert ; si on l'annule, la page propose de recommencer
+      S.upd = { rel, phase: "ready", pct: 0 };
     }
     render();
   } catch (e) {
-    S.updating = null; render();
-    toast(e instanceof Error && e.message ? e.message : "Échec de la mise à jour");
+    S.upd = { rel, phase: "error", pct: 0, err: e instanceof Error && e.message ? e.message : undefined }; render();
   }
 }
 
-/** Premier lancement de l'application : propose tout de suite les alertes (fenêtre d'autorisation d'Android), une seule fois */
-function offerAlertsOnce(): void {
-  if (!NATIVE || !PUSH_READY || S.alerts.enabled) return;
-  try { if (localStorage.getItem("alertsOffered")) return; localStorage.setItem("alertsOffered", "1"); } catch { return; }
-  void changeAlerts("toggle");
+function updateAction(a: string): void {
+  if (a === "go" && S.upd?.rel) void startUpdate(S.upd.rel);
+  else if (a === "quit") void CapApp.exitApp();
+  else if (a === "reload") location.reload();
+}
+
+/* ---------- présentation du premier lancement ---------- */
+async function onboardingAction(a: string): Promise<void> {
+  const o = S.onb;
+  if (!o) return;
+  const next = (): void => { if (o.i < o.steps.length - 1) o.i++; render(); };
+  if (a === "next") return next();
+  if (a === "back") { if (o.i > 0) o.i--; o.refused = false; return render(); }
+  if (a === "loc") {
+    // la fenêtre d'autorisation du téléphone s'ouvre ; qu'elle soit acceptée ou non, on passe à la suite
+    await new Promise<void>(done => {
+      if (!navigator.geolocation) return done();
+      navigator.geolocation.getCurrentPosition(p => { setUserPosition(p); done(); }, () => done(), { timeout: 15000 });
+    });
+    return next();
+  }
+  if (a === "alerts") { if (!S.alerts.enabled) await changeAlerts("toggle"); return next(); }
+  if (a === "accept") { acceptTerms(); S.onb = null; locateIfAllowed(); return render(); }
+  if (a === "refuse") {
+    if (NATIVE) return void CapApp.exitApp();
+    o.refused = true; render();
+  }
+}
+
+/** Position du téléphone : arrêts proches, « Ma position » */
+function setUserPosition(p: GeolocationPosition): void {
+  USER.lat = p.coords.latitude; USER.lon = p.coords.longitude;
+  STOPS.forEach(project); POIS.forEach(project); S.locOn = true; render();
+}
+/** Au démarrage : position demandée seulement après la présentation (où son usage est expliqué) */
+function locateIfAllowed(): void {
+  if (!onboardingDone()) return;
+  navigator.geolocation?.getCurrentPosition(setUserPosition, () => { /* position refusée : on garde Homme de Fer */ });
 }
 
 /** ⇅ : la destination devient le départ et inversement (« Ma position » passe en destination) */
@@ -465,7 +499,7 @@ async function initReal(): Promise<void> {
   // alertes : réglages renvoyés au programme d'arrière-plan à chaque démarrage ; toucher une notification ouvre les infos trafic
   if (S.alerts.enabled) syncAlerts(S.alerts).catch(e => console.warn("Alertes trafic :", e));
   onAlertTap(() => { S.overlay = { k: "msgs" }; render(); });
-  void refreshMessages().finally(offerAlertsOnce);
+  void refreshMessages();
   setInterval(() => { if (!document.hidden) void refreshMessages(); }, 5 * 60_000);
   // modes des lignes (tram / bus / TER) : améliore le classement des arrêts dès qu'ils arrivent
   void loadLineInfo().then(info => { Object.assign(LINE_MODES, info.modes); Object.assign(LINE_NAMES, info.names); Object.assign(COLORS, info.colors); Object.assign(TEXT_COLORS, info.text); render(); }).catch(e => console.warn("lines-discovery indisponible :", e));
@@ -487,10 +521,7 @@ async function initReal(): Promise<void> {
   }
   // points d'intérêt (P+R, Vélopark…) : chargés à part, une panne ne bloque rien
   void loadPois().then(list => { remotePois = list; rebuildPois(); render(); });
-  navigator.geolocation?.getCurrentPosition(p => {
-    USER.lat = p.coords.latitude; USER.lon = p.coords.longitude;
-    STOPS.forEach(project); POIS.forEach(project); S.locOn = true; render();
-  }, () => { /* position refusée : on garde Homme de Fer */ });
+  locateIfAllowed();
 }
 
 /* Le serveur peut exiger une version minimale de l'application (après une évolution incompatible) */
@@ -500,7 +531,9 @@ async function checkVersion(): Promise<void> {
     if (!r.ok) return;
     const j = (await r.json()) as { minApp?: string };
     if (j.minApp && cmpVersion(VERSION, j.minApp) < 0) {
-      S.modal = { t: "Mise à jour nécessaire", p: "Cette version de Kumm n'est plus compatible avec le serveur. Installez la dernière version de l'application.", b: ["Plus tard"] };
+      // version trop ancienne pour le serveur : page de mise à jour, avec l'APK à télécharger s'il est publié
+      const rel = CAN_UPDATE ? await checkUpdate().catch(() => null) : null;
+      S.upd = { rel: rel && rel !== "unpublished" ? rel : null, phase: "ready", pct: 0 };
       render();
     }
   } catch { /* serveur injoignable : les écrans l'indiquent déjà */ }
@@ -508,11 +541,11 @@ async function checkVersion(): Promise<void> {
 if (!CONFIG.USE_MOCK) void checkVersion();
 // nouvelle version de l'application : proposée quelques secondes après le lancement (sans gêner l'affichage des horaires)
 if (!CONFIG.USE_MOCK && CAN_UPDATE) {
-  setTimeout(() => { if (!S.modal) void offerUpdate(false); }, 4000);
+  setTimeout(() => { if (!S.upd) void offerUpdate(false); }, 2500);
   void CapApp.addListener("resume", () => {
     if (!waitingPermission) return;
     const rel = waitingPermission; waitingPermission = null;
-    S.modal = null; void startUpdate(rel);
+    void startUpdate(rel);
   });
 }
 
@@ -523,7 +556,9 @@ window.addEventListener("online", () => { toast("Connexion rétablie"); void loa
 /* Android : le bouton « retour » ferme d'abord le guidage, une fenêtre ou une fiche, puis revient à l'accueil, puis quitte */
 if (Capacitor.isNativePlatform()) {
   void CapApp.addListener("backButton", () => {
-    if (document.getElementById("navlayer")) stopNav();
+    if (S.upd) void CapApp.exitApp();   // application à mettre à jour : « retour » quitte
+    else if (S.onb) { if (S.onb.i > 0) { S.onb.i--; render(); } }
+    else if (document.getElementById("navlayer")) stopNav();
     else if (S.modal) { S.modal = null; render(); }
     else if (S.trip.whenDraft) { S.trip.whenDraft = null; render(); }
     else if (S.overlay) { S.overlay = null; render(); }
@@ -538,6 +573,9 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
 
 /* pour inspecter les données dans la console du navigateur : __kumm.STOPS, __kumm.LINE_MODES */
 (window as unknown as { __kumm: unknown }).__kumm = { STOPS, POIS, LINE_MODES, LINE_NAMES, kindOfStop };
+
+// premier lancement (ou conditions modifiées) : présentation avant tout le reste
+{ const steps = onboardingSteps(); if (steps.length) S.onb = { steps, i: 0, refused: false }; }
 
 if (CONFIG.USE_MOCK) { MESSAGES.push(...MOCK_MESSAGES); MSG_STATE.status = "ok"; }
 else void initReal();

@@ -1,3 +1,5 @@
+import type { StepId } from "./onboarding";
+import type { Release } from "./update";
 import type { Place, Poi, Stop } from "../../shared/types";
 import { LAYERS } from "./kinds";
 import { loadPrefs } from "./themes";
@@ -48,8 +50,18 @@ export interface State {
   askedLoc: boolean;
   swiped: boolean;
   toast: string;
-  /** téléchargement d'une mise à jour de l'application : pourcentage (null : aucun) */
-  updating: number | null;
+  /** présentation du premier lancement : étapes à montrer et étape en cours (null : terminée) */
+  onb: { steps: StepId[]; i: number; refused: boolean } | null;
+  /** page de mise à jour (plein écran, l'application n'est plus utilisable tant qu'elle n'est pas à jour) */
+  upd: UpdatePage | null;
+}
+
+export interface UpdatePage {
+  /** version à installer (null : version trop ancienne pour le serveur, sans mise à jour téléchargeable) */
+  rel: Release | null;
+  phase: "ready" | "down" | "perm" | "error";
+  pct: number;
+  err?: string;
 }
 
 export const STOPS: Stop[] = CONFIG.USE_MOCK ? [...MOCK_STOPS] : [];
@@ -68,7 +80,7 @@ export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now(
 
 export const S: State = {
   tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null,
-  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", updating: null
+  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", onb: null, upd: null
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }
 

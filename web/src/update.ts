@@ -43,3 +43,39 @@ export async function installUpdate(rel: Release, onProgress: (pct: number) => v
   finally { void h.remove(); }
   return "started";
 }
+
+/* ---------- page de mise à jour (plein écran) ---------- */
+const mo = (b: number): string => (b / 1e6).toFixed(1).replace(".", ",") + " Mo";
+const escText = (t: string): string => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+
+/** Page affichée tant que l'application n'est pas à jour : télécharger et installer, ou quitter */
+export function updateView(p: { rel: Release | null; phase: "ready" | "down" | "perm" | "error"; pct: number; err?: string }, current: string): string {
+  const web = !Capacitor.isNativePlatform();
+  const title = p.rel ? "Mise à jour disponible" : "Mise à jour nécessaire";
+  const text = p.rel
+    ? `La version ${escText(p.rel.version)} de Kumm est disponible. Installez-la pour continuer à utiliser l’application.`
+    : web
+      ? "Une nouvelle version de Kumm est en ligne. Rechargez la page pour l’utiliser."
+      : "Cette version de Kumm n’est plus compatible avec le serveur. Installez la dernière version pour continuer.";
+  let status = "", actions = "";
+  if (p.phase === "down") {
+    status = `<div class="upd-bar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p.pct}%"></i></div>
+      <p class="upd-pct">Téléchargement… ${p.pct} %</p>`;
+  } else {
+    if (p.phase === "perm") status = `<p class="upd-msg">Android demande d’autoriser Kumm à installer des applications : activez « Autoriser depuis cette source », puis revenez ici. L’installation reprendra toute seule.</p>`;
+    if (p.phase === "error") status = `<p class="upd-msg upd-err" role="alert">${escText(p.err ?? "Le téléchargement a échoué.")} Vérifiez votre connexion et réessayez.</p>`;
+    actions = web
+      ? `<button class="onb-main" data-upd="reload">Recharger</button>`
+      : `${p.rel ? `<button class="onb-main" data-upd="go">${p.phase === "error" ? "Réessayer" : "Télécharger et installer"}</button>` : ""}<button class="onb-sec" data-upd="quit">Quitter</button>`;
+  }
+  return `<div class="onb upd" role="dialog" aria-modal="true" aria-label="${title}">
+    <div class="onb-top"></div>
+    <div class="onb-body">
+      <div class="onb-logo">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>'}</div>
+      <h1>${title}</h1>
+      <p>${text}</p>
+      <div class="upd-ver"><span>Version installée <b>${escText(current)}</b></span>${p.rel ? `<span>Nouvelle version <b>${escText(p.rel.version)}</b> · ${mo(p.rel.size)}</span>` : ""}</div>
+      ${status}
+    </div>
+    <div class="onb-actions">${actions}</div></div>`;
+}
