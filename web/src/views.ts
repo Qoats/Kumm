@@ -154,7 +154,7 @@ export const layerCounts = (): Record<Layer, number> => {
 };
 
 export function screenNearby(): string {
-  const h = S.sheet ? "84%" : "42%";
+  const h = ["64px", "42%", "84%"][S.sheet];
   const inView = (p: { x: number; y: number }): boolean => p.x > -10 && p.x < 370 && p.y > -10 && p.y < 450;
   const stopPins = STOPS
     .filter(s => {
@@ -177,9 +177,9 @@ export function screenNearby(): string {
     ${background}
     <div class="layers">${chips}</div>
     <div class="tools"><button data-act="prefs" aria-label="Réglages">${ic("gear", 'stroke="currentColor"')}</button><button data-act="locate" aria-label="Me localiser">${ic("target", 'stroke="var(--accent)"')}</button></div>
-    <div class="sheet" style="height:${h}">
-      <button class="grab" data-act="sheet" aria-label="Agrandir">${ic(S.sheet ? "down" : "up")}</button>
-      <h3>À proximité</h3>
+    <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
+      <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
+      <h3${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>
       <div class="seg">
         <button data-f="bus" class="${S.filter === "bus" ? "on" : ""}">${ic("bus")}Bus</button>
         <button data-f="tram" class="${S.filter === "tram" ? "on" : ""}">${ic("tram")}Tram</button>

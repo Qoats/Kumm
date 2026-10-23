@@ -234,7 +234,7 @@ app.addEventListener("click", e => {
     case "when": S.trip.whenDraft = { ...S.trip.when, at: S.trip.when.at || Math.ceil(Date.now() / 300_000) * 300_000 }; break;
     case "whenClose": S.trip.whenDraft = null; break;
     case "whenOk": if (S.trip.whenDraft) S.trip.when = S.trip.whenDraft; S.trip.whenDraft = null; S.trip.sel = 0; break;
-    case "sheet": if (S.swiped) return; S.sheet = !S.sheet; break;
+    case "sheet": if (S.swiped) return; S.sheet = S.sheet === 0 ? 1 : S.sheet === 2 ? 1 : 0; break;
     case "msgs": S.overlay = { k: "msgs" }; break;
     case "favs": S.overlay = { k: "favs" }; break;
     case "locate": recenter(); toast("Position centrée"); return;
@@ -314,7 +314,7 @@ app.addEventListener("pointerup", e => {
   if (y0 === null) return;
   const dy = e.clientY - y0;
   y0 = null;
-  if (Math.abs(dy) > 24) { S.sheet = dy < 0; S.swiped = true; setTimeout(() => { S.swiped = false; }, 300); render(); }
+  if (Math.abs(dy) > 24) { S.sheet = (dy < 0 ? Math.min(2, S.sheet + 1) : Math.max(0, S.sheet - 1)) as 0 | 1 | 2; S.swiped = true; setTimeout(() => { S.swiped = false; }, 300); render(); }
 });
 
 setInterval(() => { if (!document.hidden && document.activeElement?.tagName !== "INPUT") void loadDeps(); }, 30000);
