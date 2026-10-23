@@ -36,7 +36,13 @@ jobs:
           fi
 
       - run: npm ci
-      - run: npm run build:android
+
+      # Le projet Android (dossier android/) n'est pas dans le dépôt : il est créé ici à partir de capacitor.config.ts
+      - name: Projet Android
+        run: |
+          npx vite build --mode android
+          if [ ! -d android ]; then npx cap add android; fi
+          npx cap sync android
 
       - name: Compiler l'APK
         working-directory: android
