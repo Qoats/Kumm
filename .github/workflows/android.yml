@@ -49,7 +49,25 @@ jobs:
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then export VITE_PUSH=1; echo "Firebase : configuré"; else echo "::warning::Pas de secret GOOGLE_SERVICES_JSON : alertes trafic indisponibles dans cet APK."; fi
           npx vite build --mode android
           if [ ! -d android ]; then npx cap add android; fi
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json; fi
+          # google-services.json : vérifié avant la compilation (copier-coller depuis un téléphone : guillemets typographiques,
+          # morceau manquant…) ; on accepte aussi le fichier encodé en base64. Le contenu n'est jamais affiché.
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then node -e '
+            const raw = (process.env.GOOGLE_SERVICES_JSON || "").replace(/^\uFEFF/, "").trim().replace(/^```(json)?/, "").replace(/```$/, "").trim();
+            const tries = [raw, raw.replace(/[\u201C\u201D\u00AB\u00BB]/g, "\""), (() => { try { return Buffer.from(raw, "base64").toString("utf8"); } catch { return ""; } })()];
+            let j = null;
+            for (const t of tries) { try { const v = JSON.parse(t); if (v && v.project_info) { j = v; break; } } catch {} }
+            if (!j) {
+              console.log("::error::Le secret GOOGLE_SERVICES_JSON n est pas un fichier google-services.json valide : longueur " + raw.length +
+                ", commence par " + JSON.stringify(raw.slice(0, 1)) + ", finit par " + JSON.stringify(raw.slice(-1)) +
+                ", contient project_info : " + raw.includes("project_info") + ", contient fr.kumm.app : " + raw.includes("fr.kumm.app") +
+                (raw.includes("private_key") ? " ; ATTENTION : il contient une clé privée (clé du serveur ?) : ce n est pas le bon fichier, supprimez ce secret." : ""));
+              process.exit(1);
+            }
+            const pkgs = (j.client || []).map(c => c.client_info && c.client_info.android_client_info && c.client_info.android_client_info.package_name);
+            if (!pkgs.includes("fr.kumm.app")) { console.log("::error::google-services.json ne contient pas l application fr.kumm.app (trouvé : " + pkgs.join(", ") + ")"); process.exit(1); }
+            require("fs").writeFileSync("android/app/google-services.json", JSON.stringify(j, null, 2));
+            console.log("google-services.json valide (projet " + j.project_info.project_id + ")");
+          '; fi
           # icône et écran de démarrage Kumm (au lieu de ceux de Capacitor) ; fond vert de l'écran de démarrage (Android 12+)
           cp -r android-res/. android/app/src/main/res/
           STYLES=android/app/src/main/res/values/styles.xml
