@@ -44,9 +44,6 @@ nav.top img{width:42px;height:42px;border-radius:12px;box-shadow:0 6px 16px rgba
 nav.top b{font-size:22px;font-weight:800;letter-spacing:.2px}
 nav.top a.small{margin-left:auto;color:var(--hero-ink);text-decoration:none;font-weight:700;font-size:15px;padding:9px 16px;border-radius:20px;background:rgba(255,255,255,.12)}
 .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center;padding:44px 0 0}
-.badge{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--hero-mute);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);padding:6px 14px;border-radius:20px;margin-bottom:18px}
-.badge .dot{width:8px;height:8px;border-radius:50%;background:#4FD39A;box-shadow:0 0 0 4px rgba(79,211,154,.25);animation:pulse 1.8s ease-in-out infinite}
-@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(79,211,154,0)}}
 h1{font-size:clamp(34px,5.6vw,58px);line-height:1.06;margin:0 0 18px;font-weight:800;letter-spacing:-.5px}
 h1 em{font-style:normal;color:#7BE5B6}
 .lead{font-size:clamp(17px,2.2vw,20px);color:var(--hero-mute);margin:0 0 28px;max-width:32em}
@@ -126,7 +123,6 @@ footer p{margin:0 0 8px}
     <nav class="top"><img src="/logo.svg" alt=""><b>Kumm</b><a class="small" href="https://app.kumm.fr">Ouvrir l’application</a></nav>
     <div class="hero-grid">
       <div>
-        <div class="badge"><span class="dot"></span>Données de la CTS en temps réel</div>
         <h1>Strasbourg en tram et en bus, <em>en direct.</em></h1>
         <p class="lead">Les prochains passages à la minute, les trams et bus qui roulent sur la carte, une alerte dès qu’une perturbation touche vos lignes. Gratuit, sans compte et sans publicité.</p>
         <div class="actions">
