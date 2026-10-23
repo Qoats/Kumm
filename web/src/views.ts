@@ -492,7 +492,10 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
     return `<div class="dep" role="button" tabindex="0" style="--lc:${c};--lt:${lineText(COLORS[g.line] ? g.line : lineLabel(g.line))}" data-stop="${esc(g.stop.id)}">
       <div class="h">${lineChip(g.line, true)}${hasAlert(g.line) ? '<span class="warn">!</span>' : ""}<b>${esc(g.stop.name)}</b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
       ${picker}
-      <div class="f"><span>${ic(lineKind(g.line) === "ter" ? "train" : isTram(g.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(dest)}</b></span></span><span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div></div>`;
+      <div class="f">${picker
+        // la direction est déjà dans le sélecteur : seulement les passages suivants
+        ? `<span>Ensuite</span>`
+        : `<span>${ic(lineKind(g.line) === "ter" ? "train" : isTram(g.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(dest)}</b></span></span>`}<span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div></div>`;
   });
   return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
 }
