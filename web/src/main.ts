@@ -372,15 +372,16 @@ async function onboardingAction(a: string): Promise<void> {
   const next = (): void => { if (o.i < o.steps.length - 1) o.i++; render(); };
   if (a === "next") return next();
   if (a === "back") { if (o.i > 0) o.i--; o.refused = false; return render(); }
+  // autorisations : la demande part, et on passe tout de suite à l'étape suivante. Sans attendre la réponse : une première
+  // position GPS ou l'inscription aux notifications peuvent prendre plusieurs secondes, et l'écran semblait bloqué.
   if (a === "loc") {
-    // la fenêtre d'autorisation du téléphone s'ouvre ; qu'elle soit acceptée ou non, on passe à la suite
-    await new Promise<void>(done => {
-      if (!navigator.geolocation) return done();
-      navigator.geolocation.getCurrentPosition(p => { setUserPosition(p); done(); }, () => done(), { timeout: 15000 });
-    });
+    navigator.geolocation?.getCurrentPosition(setUserPosition, () => { /* refusée : la carte reste centrée sur Strasbourg */ }, { timeout: 20000, maximumAge: 60000 });
     return next();
   }
-  if (a === "alerts") { if (!S.alerts.enabled) await changeAlerts("toggle"); return next(); }
+  if (a === "alerts") {
+    if (!S.alerts.enabled) void changeAlerts("toggle");
+    return next();
+  }
   if (a === "accept") { acceptTerms(); S.onb = null; locateIfAllowed(); return render(); }
   if (a === "refuse") {
     if (NATIVE) return void CapApp.exitApp();
