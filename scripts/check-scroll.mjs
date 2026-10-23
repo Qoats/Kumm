@@ -13,6 +13,7 @@ await ctx.addInitScript(() => {
 });
 const p = await ctx.newPage(); const errs = []; p.on("pageerror", e => errs.push(e.message));
 await p.goto(URL_APP, { waitUntil: "networkidle" }); await p.waitForTimeout(4000);
+if (await p.locator('[data-onb="accept"]').count()) { await p.click('[data-onb="accept"]'); await p.waitForTimeout(800); }   // conditions modifiées
 const ids = await p.evaluate(() => {
   const K = window.__kumm; const hdf = K.STOPS.find(s => s.name === "Homme de Fer"); const gare = K.STOPS.find(s => s.name === "Gare Centrale");
   K.S.fav.push(hdf.id, gare.id);

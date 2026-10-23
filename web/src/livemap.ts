@@ -8,7 +8,8 @@ import { makeBaseLayer, wantsDarkMap } from "./tiles";
 import { POIS, S, STOPS, USER, render } from "./store";
 import { COLORS, lineLabel, lineText } from "./data";
 import { esc } from "./util";
-import { VEHICLES, refreshVehicles, vehicleHeading, vehicleKind, vehiclePos } from "./vehicles";
+import { VEHICLES, refreshVehicles, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
+import type { Vehicle } from "./vehicles";
 
 /**
  * Vraie carte (OpenStreetMap) pour l'écran « À proximité ».
@@ -85,7 +86,8 @@ function create(): void {
   }).addTo(map);
   map.on("moveend", sync);
   // pour inspecter la carte dans la console du navigateur (comme __kumm.STOPS)
-  (window as unknown as { __kummMap?: L.Map }).__kummMap = map;
+  (window as unknown as { __kummMap?: L.Map; __kummVeh?: unknown }).__kummMap = map;
+  (window as unknown as { __kummVeh?: unknown }).__kummVeh = VEHICLES;
 }
 
 /** Positions des arrêts modifiées (repères recentrés) : tous les repères sont recréés au prochain affichage */
@@ -169,22 +171,32 @@ const vehIcon = (line: string, h: number): L.DivIcon => L.divIcon({
 
 /** Place les véhicules visibles (catégories et filtre Tram / Bus respectés) ; appelé chaque seconde */
 /**
- * Véhicule à quai ou tout près d'une station : il reste sur sa voie (déplacé seulement dans son sens de marche) et s'arrête
- * juste avant l'icône de la station, puis passe juste après au départ. Les deux sens se placent ainsi de part et d'autre
- * de la station, sans la cacher et sans sortir du tracé (près d'une station, la voie est droite à cette échelle).
+ * Véhicule qui recouvrirait l'icône d'une station : il reste sur sa voie et attend juste avant l'icône (en arrivant), ou
+ * se place juste après (en repartant). On cherche, le long de son propre tracé (virages compris), le premier point où il
+ * ne touche plus aucune station. Un véhicule qui ne touche pas de station n'est jamais déplacé.
  */
-function besideStops(m: L.Map, p: L.LatLngTuple, h: number, stops: L.Point[], min: number): L.LatLngTuple {
-  const pt = m.latLngToContainerPoint(p), reach = min * 2.5;
-  let near: L.Point | null = null, best = reach;
-  for (const s of stops) { const d = s.distanceTo(pt); if (d < best) { best = d; near = s; } }
-  if (!near) return p;
-  const r = (h * Math.PI) / 180, dir = L.point(Math.sin(r), -Math.cos(r));   // sens de marche à l'écran (0° = nord)
-  const rel = pt.subtract(near), u = rel.x * dir.x + rel.y * dir.y;          // position le long de la voie, par rapport à la station
-  if (Math.abs(u) >= reach) return p;
-  // avant la station : de -reach à -min ; après : de +min à +reach (rien ne change au-delà de « reach »)
-  const u2 = (u < 0 ? -min : min) + (u / reach) * (reach - min);
-  const q = m.containerPointToLatLng(pt.add(dir.multiplyBy(u2 - u)));
-  return [q.lat, q.lng];
+function besideStops(m: L.Map, v: Vehicle, p: L.LatLngTuple, h: number, stops: L.Point[], min: number): L.LatLngTuple {
+  const gap = (q: L.LatLngTuple): number => { const pt = m.latLngToContainerPoint(q); let d = Infinity; for (const s of stops) d = Math.min(d, s.distanceTo(pt)); return d; };
+  if (gap(p) >= min) return p;
+  const metersPerPx = 40_075_016.7 * Math.cos((p[0] * Math.PI) / 180) / (256 * 2 ** m.getZoom());
+  const at = (px: number): L.LatLngTuple | null => vehiclePosAlong(v, px * metersPerPx);
+  // arrive-t-il vers la station la plus proche, ou en repart-il ? (sa distance diminue-t-elle un peu plus loin sur le tracé ?)
+  const ahead = at(4);
+  const arriving = ahead ? gap(ahead) < gap(p) : true;
+  for (const sign of arriving ? [-1, 1] : [1, -1]) {
+    for (let px = 3; px <= min * 4; px += 3) {
+      const q = at(sign * px);
+      if (!q) break;                    // tracé inconnu (véhicule à quai)
+      if (gap(q) >= min) return q;
+    }
+  }
+  // à quai, sans tracé en cours : le long du quai (droit), juste avant la station
+  const r = (h * Math.PI) / 180, dir = L.point(Math.sin(r), -Math.cos(r)), pt = m.latLngToContainerPoint(p);
+  for (let px = 3; px <= min * 4; px += 3) {
+    const q = m.containerPointToLatLng(pt.add(dir.multiplyBy(-px)));
+    if (gap([q.lat, q.lng]) >= min) return [q.lat, q.lng];
+  }
+  return p;
 }
 
 function syncVehicles(): void {
@@ -202,13 +214,14 @@ function syncVehicles(): void {
     if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
     const h = Math.round(vehicleHeading(v)), raw = vehiclePos(v);
     if (!b.contains(raw) || ++count > 150) continue;
-    const p = stopPts.length ? besideStops(mp, raw, h, stopPts, clearance) : raw;
+    const p = stopPts.length ? besideStops(mp, v, raw, h, stopPts, clearance) : raw;
     seen.add(v.id);
     let m = vehMarkers.get(v.id);
     if (!m) {
       m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}` })
         .on("click", () => { S.overlay = { k: "veh", id: v.id }; render(); })
         .addTo(vehLayer);
+      m.getElement()?.setAttribute("data-vid", v.id);   // pour scripts/check-map.mjs
       vehMarkers.set(v.id, m);
     } else {
       m.setLatLng(p);

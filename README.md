@@ -179,6 +179,14 @@ choix de la direction dans « À proximité »…). Désormais :
 - **Après toute modification de l'interface**, lancez `node scripts/check-scroll.mjs` (serveur démarré) : il passe dans chaque
   menu, fait défiler toutes ses zones, redessine l'écran et signale toute zone qui a bougé. Ajoutez-y chaque nouveau menu.
 
+## Règle de carte : un véhicule reste toujours sur sa voie, sans cacher les stations
+- La position d'un tram ou d'un bus vient de son tracé réel (`web/src/vehicles.ts`). **Tout déplacement d'affichage se fait le
+  long de ce tracé** (`vehiclePosAlong`), jamais en ligne droite ni sur le côté : sinon le véhicule sort de sa voie dans les virages.
+- Près d'une station, le véhicule attend juste avant l'icône (ou se place juste après en repartant), sur sa voie (`besideStops`
+  dans `web/src/livemap.ts`). Un véhicule qui ne touche pas de station n'est jamais déplacé.
+- **Après toute modification de la carte**, lancez `node scripts/check-map.mjs` (serveur démarré) : pendant 30 s, à plusieurs
+  endroits du réseau, il vérifie que chaque véhicule est à moins de 3 px de son tracé et qu'aucun ne recouvre une station.
+
 ## Sécurité
 - Le token reste dans `.env`, côté serveur. Ne le publiez jamais (`.gitignore` l'exclut).
 - Les textes venant de l'API sont échappés avant affichage.

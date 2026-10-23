@@ -82,6 +82,17 @@ export function vehiclePos(v: Vehicle, t = serverNow()): [number, number] {
   return [la1 + (la2 - la1) * f, lo1 + (lo2 - lo1) * f];
 }
 
+/**
+ * Position décalée de « meters » le long du tracé (négatif : en arrière), sans sortir du tronçon : sert à faire attendre un
+ * véhicule juste avant l'icône d'une station en restant sur sa voie, virages compris. null si le tracé est inconnu.
+ */
+export function vehiclePosAlong(v: Vehicle, meters: number, t = serverNow()): [number, number] | null {
+  if (!v.p || v.p.length < 2) return null;
+  const c = cumOf(v, v.p), total = c[c.length - 1] * 111_320;   // longueur du tronçon en mètres
+  if (total < 1) return null;
+  return along(v, Math.max(0, Math.min(1, progress(v, t) + meters / total)))?.pos ?? null;
+}
+
 /** Direction à l'instant t (degrés) : celle du tracé à cet endroit, pour que la flèche suive les virages */
 export function vehicleHeading(v: Vehicle, t = serverNow()): number {
   const a = along(v, progress(v, t));
