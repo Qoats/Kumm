@@ -296,8 +296,9 @@ let waitingPermission: Release | null = null;
 
 async function offerUpdate(manual: boolean): Promise<void> {
   if (!CAN_UPDATE) { if (manual) toast("Mises à jour automatiques disponibles dans l'application Android"); return; }
-  let rel: Release | null;
+  let rel: Release | null | "unpublished";
   try { rel = await checkUpdate(); } catch { if (manual) toast("Impossible de vérifier les mises à jour pour le moment"); return; }
+  if (rel === "unpublished") { if (manual) toast(`Version ${VERSION} · aucune mise à jour n'est encore proposée par le serveur`); return; }
   if (!rel) { if (manual) toast(`Kumm est à jour (version ${VERSION})`); return; }
   const r = rel;
   S.modal = {

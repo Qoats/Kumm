@@ -21,11 +21,12 @@ const Updater = registerPlugin<Updater>("KummUpdater");
 
 export const CAN_UPDATE = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android" && Capacitor.isPluginAvailable("KummUpdater");
 
-/** Version plus récente que celle installée, ou null (à jour, hors ligne, rien de publié) */
-export async function checkUpdate(): Promise<Release | null> {
+/** Version plus récente que celle installée, null si à jour ; « unpublished » : le serveur n'a encore aucun APK à distribuer */
+export async function checkUpdate(): Promise<Release | null | "unpublished"> {
   if (!CAN_UPDATE) return null;
   const [info, r] = await Promise.all([App.getInfo(), fetch(url("/app/latest.json"), { cache: "no-store", headers: appHeaders() })]);
-  if (!r.ok) return null;
+  if (r.status === 404) return "unpublished";
+  if (!r.ok) throw new Error("HTTP " + r.status);
   const j = (await r.json()) as Partial<Release>;
   if (typeof j.version !== "string" || !Number.isInteger(j.code) || typeof j.sha256 !== "string" || !Number.isInteger(j.size)) return null;
   return j.code! > Number(info.build) ? (j as Release) : null;
