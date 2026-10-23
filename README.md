@@ -62,6 +62,9 @@ L'APK est l'application Kumm dans un habillage Android (Capacitor). Elle ne cont
 ### 3. Installer sur le téléphone
 Copiez `app-debug.apk` sur le téléphone, ouvrez-le et autorisez « installer des applications inconnues » quand Android le demande. Au premier lancement, acceptez la localisation.
 
+### Icône et écran de démarrage
+Les icônes Android (toutes tailles, icône adaptative Android 8+) et l'écran de démarrage sont dans `android-res/`, dessinés d'après le logo par `python3 scripts/build-android-icons.py` (Pillow). Le workflow les copie dans le projet Android ; en local, après `npx cap add android` : `cp -r android-res/. android/app/src/main/res/`.
+
 ### Signature : installer chaque version par-dessus la précédente
 Android n'accepte une mise à jour que si elle est signée avec **la même clé** que la version installée. Le workflow « APK Android » signe l'APK avec la clé de l'application si ces deux secrets existent (Settings → Secrets and variables → Actions → **Secrets** → New repository secret) :
 - `KUMM_KEYSTORE_B64` : le fichier de clé `kumm-release.jks` encodé en base64 (sur Linux : `base64 -w0 kumm-release.jks`) ;

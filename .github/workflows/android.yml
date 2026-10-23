@@ -43,6 +43,10 @@ jobs:
         run: |
           npx vite build --mode android
           if [ ! -d android ]; then npx cap add android; fi
+          # icône et écran de démarrage Kumm (au lieu de ceux de Capacitor) ; fond vert de l'écran de démarrage (Android 12+)
+          cp -r android-res/. android/app/src/main/res/
+          STYLES=android/app/src/main/res/values/styles.xml
+          grep -q windowSplashScreenBackground "$STYLES" || sed -i 's|<item name="android:background">@drawable/splash</item>|<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">#136342</item>|' "$STYLES"
           npx cap sync android
 
       # Numéro de version : versionCode croissant (numéro d'exécution du workflow), versionName = version de package.json.

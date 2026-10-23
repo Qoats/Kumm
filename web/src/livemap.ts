@@ -67,7 +67,6 @@ function create(): void {
   host.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;z-index:0";
   map = L.map(host, { zoomControl: false, attributionControl: false }).setView([USER.lat, USER.lon], 16);
   useBaseLayer(map);
-  L.control.zoom({ position: "topright" }).addTo(map);
   markers = L.layerGroup().addTo(map);
   vehLayer = L.layerGroup().addTo(map);
   me = L.marker([USER.lat, USER.lon], {
@@ -180,6 +179,9 @@ function startVehicles(): void {
   vehTimer = window.setInterval(tick, 1000);
   tick();
 }
+
+/** Boutons + et − du panneau d'outils (au même style que Réglages et Position) */
+export const zoomBy = (d: 1 | -1): void => { if (map) (d > 0 ? map.zoomIn() : map.zoomOut()); };
 
 export function recenter(): void {
   map?.setView([USER.lat, USER.lon], Math.max(map.getZoom(), 16));

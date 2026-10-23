@@ -24,7 +24,7 @@ import { bikeToPoi, launchNav, walkToPoi } from "./flow";
 import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
-import { mountLiveMap, recenter } from "./livemap";
+import { mountLiveMap, recenter, zoomBy } from "./livemap";
 
 const app = document.getElementById("app") as HTMLElement;
 
@@ -238,6 +238,8 @@ app.addEventListener("click", e => {
     case "msgs": S.overlay = { k: "msgs" }; break;
     case "favs": S.overlay = { k: "favs" }; break;
     case "locate": recenter(); toast("Position centrée"); return;
+    case "zoomIn": zoomBy(1); return;
+    case "zoomOut": zoomBy(-1); return;
     case "account": toast("Mon compte : bientôt disponible"); return;
     case "prefs": S.overlay = { k: "settings" }; break;
   }

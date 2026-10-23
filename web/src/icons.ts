@@ -24,6 +24,8 @@ export const I = {
   taxi:'<path d="M5 15 7 9h10l2 6v4H5zM7 19v2M17 19v2M9 6h6"/>',
   star:'<path d="m12 3 2.800 5.700 6.200.9-4.500 4.400 1 6.200L12 17.200 6.500 20.200l1-6.200L3 9.600l6.200-.9z"/>',
   walk:'<circle cx="13" cy="4" r="2"/><path d="m9 21 2.5-6.5L14 17v4M8 11l2.5-3 3.5 1 2 3 2.5 1M11.5 14.5 10.5 8"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  minus:'<path d="M5 12h14"/>',
   swap:'<path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/>',
   target:'<circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.500"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
   phone:'<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
