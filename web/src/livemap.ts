@@ -218,13 +218,15 @@ function syncVehicles(): void {
     seen.add(v.id);
     let m = vehMarkers.get(v.id);
     if (!m) {
-      m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}` })
+      m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}${v.w ? " · au terminus" : ""}${v.n ? ` · véhicule ${v.n}` : ""}` })
         .on("click", () => { S.overlay = { k: "veh", id: v.id }; render(); })
         .addTo(vehLayer);
       m.getElement()?.setAttribute("data-vid", v.id);   // pour scripts/check-map.mjs
+      m.getElement()?.classList.toggle("vwaiting", !!v.w);
       vehMarkers.set(v.id, m);
     } else {
       m.setLatLng(p);
+      m.getElement()?.classList.toggle("vwaiting", !!v.w);   // en attente au terminus, puis en route
       // la flèche suit les virages du tracé, sans recréer l'icône
       const arrow = m.getElement()?.querySelector<HTMLElement>(".va");
       if (arrow) arrow.style.transform = `rotate(${h}deg)`;

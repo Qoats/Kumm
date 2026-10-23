@@ -53,10 +53,11 @@ for (const [name, st] of views) {
   const after = await p.evaluate(() => {
     const out = [];
     const walk = el => { for (const c of el.children) { if (c.classList.contains("leaflet-container")) continue;
-      const cs = getComputedStyle(c); if ((c.scrollHeight > c.clientHeight + 1 && /auto|scroll/.test(cs.overflowY)) || (c.scrollWidth > c.clientWidth + 1 && /auto|scroll/.test(cs.overflowX))) out.push({ top: c.scrollTop, left: c.scrollLeft }); walk(c); } };
+      const cs = getComputedStyle(c); if ((c.scrollHeight > c.clientHeight + 1 && /auto|scroll/.test(cs.overflowY)) || (c.scrollWidth > c.clientWidth + 1 && /auto|scroll/.test(cs.overflowX))) out.push({ top: c.scrollTop, left: c.scrollLeft, maxTop: c.scrollHeight - c.clientHeight, maxLeft: c.scrollWidth - c.clientWidth }); walk(c); } };
     walk(document.getElementById("app")); return out;
   });
-  const res = set.map((z, i) => { const a = after[i]; const ok = a && Math.abs(a.top - z.top) <= 2 && Math.abs(a.left - z.left) <= 2; if (!ok) bad++; return `${z.name} ${z.top || z.left}→${a ? (a.top || a.left) : "?"} ${ok ? "✓" : "✗"}`; });
+  const res = set.map((z, i) => { const a = after[i]; // une zone tout en bas de son contenu (le contenu en direct a raccourci entre deux redessins) n'est pas une erreur
+    const ok = a && (Math.abs(a.top - z.top) <= 2 || a.top >= a.maxTop - 2) && (Math.abs(a.left - z.left) <= 2 || a.left >= a.maxLeft - 2); if (!ok) bad++; return `${z.name} ${z.top || z.left}→${a ? (a.top || a.left) : "?"} ${ok ? "✓" : "✗"}`; });
   console.log(`${name.padEnd(26)} ${res.length ? res.join(" | ") : "(aucune zone défilante)"}`);
 }
 console.log(`\n${bad ? bad + " zone(s) qui bougent" : "Aucune zone ne bouge"} | erreurs JS : ${errs.length ? errs : "aucune"}`);

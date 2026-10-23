@@ -20,6 +20,10 @@ export interface Vehicle {
   next: [string, number][];
   /** tracé de la ligne entre a et b ; absent : ligne droite */
   p?: [number, number][];
+  /** numéro du véhicule estimé par Kumm (« B-4 ») : la CTS ne publie pas les numéros réels */
+  n?: string;
+  /** à quai au terminus, en attente du départ de sa prochaine course */
+  w?: boolean;
 }
 
 export const VEHICLES = new Map<string, Vehicle>();

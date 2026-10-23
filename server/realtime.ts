@@ -132,7 +132,11 @@ async function refresh(): Promise<void> {
     const r = await fetchCts(BASE, AUTH, "estimated-timetable", "?RequestorRef=" + encodeURIComponent(REQUESTOR));
     if (r.status !== 200) throw new Error("HTTP " + r.status);
     const p = parseEstimatedTimetable(r.body);
-    byCode = p.byCode; courses = p.list; validUntil = p.validUntil; loadedAt = Date.now(); lastError = "";
+    // la CTS retire une course dès son arrivée au terminus : on la garde 45 min, pour savoir quel véhicule y attend
+    // la course suivante (vehicles.ts, numéros de véhicules estimés)
+    const now = Date.now(), ids = new Set(p.list.map(c => c.id));
+    const recent = courses.filter(c => !ids.has(c.id) && c.calls[c.calls.length - 1].arr > now - 45 * 60_000);
+    byCode = p.byCode; courses = [...p.list, ...recent]; validUntil = p.validUntil; loadedAt = now; lastError = "";
     for (const c of p.list) if (c.mode) for (const call of c.calls) (quayModes.get(call.code) ?? quayModes.set(call.code, new Set()).get(call.code)!).add(c.mode);
     Object.assign(counts, { courses: p.courses, passages: p.passages, quais: p.byCode.size });
     if (counts.chargements++ === 0) console.log(`Passages du réseau chargés : ${p.courses} courses, ${p.byCode.size} quais`);
