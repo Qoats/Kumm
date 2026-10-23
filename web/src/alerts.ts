@@ -35,14 +35,16 @@ export function saveAlerts(p: AlertPrefs): void {
 export const followed = (m: TrafficMsg, p: AlertPrefs): boolean =>
   (m.channel === "disruption" || p.works) && (p.lines.includes("*") || m.lines.some(l => p.lines.includes(l)));
 
-const push = async () => (await import("@capacitor/push-notifications")).PushNotifications;
+/* Le module, pas l'extension elle-même : l'objet PushNotifications répond à toutes les méthodes, y compris « then »,
+   et une fonction async qui le renverrait directement ne se terminerait jamais (await l'appellerait comme une promesse). */
+const pushModule = () => import("@capacitor/push-notifications");
 
 /** Demande l'autorisation d'afficher des notifications ; true si accordée */
 export async function askPermission(): Promise<boolean> {
   try {
     if (NATIVE) {
       if (!PUSH_READY) return false;
-      const P = await push();
+      const P = (await pushModule()).PushNotifications;
       const r = await P.requestPermissions();
       if (r.receive !== "granted") return false;
       // canal Android « Alertes trafic » (son, bannière) : utilisé par le serveur pour chaque alerte
@@ -56,7 +58,7 @@ export async function askPermission(): Promise<boolean> {
 
 /** Jeton Firebase du téléphone (nouvel enregistrement à chaque démarrage : Firebase peut le changer) */
 async function pushToken(): Promise<string> {
-  const P = await push();
+  const P = (await pushModule()).PushNotifications;
   return new Promise<string>((resolve, reject) => {
     const to = setTimeout(() => reject(new Error("pas de réponse de Firebase")), 15_000);
     void P.addListener("registration", t => { clearTimeout(to); try { localStorage.setItem(TOKEN_KEY, t.value); } catch { /* ignoré */ } resolve(t.value); });
@@ -105,5 +107,5 @@ export function checkAlerts(p: AlertPrefs, messages: TrafficMsg[]): void {
 /** Notification touchée (application fermée ou ouverte) : ouvrir les infos trafic */
 export function onAlertTap(open: () => void): void {
   if (!NATIVE || !PUSH_READY) return;
-  void push().then(P => P.addListener("pushNotificationActionPerformed", () => open())).catch(() => {});
+  void pushModule().then(m => m.PushNotifications.addListener("pushNotificationActionPerformed", () => open())).catch(() => {});
 }

@@ -287,6 +287,13 @@ async function changeAlerts(what: string): Promise<void> {
   toast(now ? `Alertes activées · ${now} perturbation${now > 1 ? "s" : ""} déjà en cours sur vos lignes` : "Alertes activées");
 }
 
+/** Premier lancement de l'application : propose tout de suite les alertes (fenêtre d'autorisation d'Android), une seule fois */
+function offerAlertsOnce(): void {
+  if (!NATIVE || !PUSH_READY || S.alerts.enabled) return;
+  try { if (localStorage.getItem("alertsOffered")) return; localStorage.setItem("alertsOffered", "1"); } catch { return; }
+  void changeAlerts("toggle");
+}
+
 /** ⇅ : la destination devient le départ et inversement (« Ma position » passe en destination) */
 function swapTrip(): void {
   const t = S.trip;
@@ -389,7 +396,7 @@ async function initReal(): Promise<void> {
   // alertes : réglages renvoyés au programme d'arrière-plan à chaque démarrage ; toucher une notification ouvre les infos trafic
   if (S.alerts.enabled) syncAlerts(S.alerts).catch(e => console.warn("Alertes trafic :", e));
   onAlertTap(() => { S.overlay = { k: "msgs" }; render(); });
-  void refreshMessages();
+  void refreshMessages().finally(offerAlertsOnce);
   setInterval(() => { if (!document.hidden) void refreshMessages(); }, 5 * 60_000);
   // modes des lignes (tram / bus / TER) : améliore le classement des arrêts dès qu'ils arrivent
   void loadLineInfo().then(info => { Object.assign(LINE_MODES, info.modes); Object.assign(LINE_NAMES, info.names); render(); }).catch(e => console.warn("lines-discovery indisponible :", e));
