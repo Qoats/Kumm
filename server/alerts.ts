@@ -155,13 +155,21 @@ async function round(load: () => Promise<TrafficMessage[]>): Promise<void> {
 }
 
 export function startAlerts(load: () => Promise<TrafficMessage[]>): void {
-  try {
-    if (fs.existsSync(KEY_FILE)) {
-      const a = JSON.parse(fs.readFileSync(KEY_FILE, "utf8")) as Partial<ServiceAccount>;
+  // raison précise quand la clé n'est pas utilisable (fichier absent, illisible par le serveur, mauvais fichier)
+  let why = "pas de secrets/firebase.json";
+  if (fs.existsSync(KEY_FILE)) {
+    try {
+      const a = JSON.parse(fs.readFileSync(KEY_FILE, "utf8")) as Partial<ServiceAccount> & { type?: string };
       if (a.project_id && a.client_email && a.private_key) account = a as ServiceAccount;
+      else why = "secrets/firebase.json n'est pas une clé de compte de service (Firebase → Paramètres → Comptes de service → Générer une nouvelle clé privée)";
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      why = code === "EACCES"
+        ? `secrets/firebase.json illisible par le serveur (utilisateur ${process.getuid?.() ?? "?"}) : sudo chown ${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000} secrets/firebase.json`
+        : "secrets/firebase.json illisible : " + (e instanceof Error ? e.message : String(e));
     }
-  } catch (e) { console.warn("Alertes : clé Firebase illisible :", e instanceof Error ? e.message : e); }
-  if (!account) { console.log("Alertes push : désactivées (pas de secrets/firebase.json)"); return; }
+  }
+  if (!account) { console.log(`Alertes push : désactivées (${why})`); return; }
   for (const [t, s] of Object.entries(readJson<Record<string, Sub>>(SUBS_FILE, {}))) subs.set(t, s);
   seen = new Set(readJson<string[]>(SEEN_FILE, []));
   seenReady = seen.size > 0;
