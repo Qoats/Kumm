@@ -53,6 +53,8 @@ let lastOverlay = "";
 
 let lastOvKey = "";
 const SIDE_SCROLL = [".layers", ".chips", ".tmodes"];
+/** listes qui défilent verticalement dans un panneau (« À proximité ») : elles gardent leur position après un redessin */
+const DOWN_SCROLL = ["#nearlist"];
 
 let lastPage = "";
 
@@ -84,6 +86,7 @@ function draw(): void {
   const ovTop = ovKey && ovKey === lastOvKey ? document.querySelector<HTMLElement>("#app > .overlay main")?.scrollTop ?? 0 : 0;
   // rangées qui défilent de côté (catégories de la carte, lignes, onglets) : elles gardent leur position après un redessin
   const sideways = SIDE_SCROLL.map(sel => document.querySelector<HTMLElement>(sel)?.scrollLeft ?? 0);
+  const downward = DOWN_SCROLL.map(sel => document.querySelector<HTMLElement>(sel)?.scrollTop ?? 0);
   const active = document.activeElement as HTMLInputElement | null;
   const act = active?.id, pos = active?.selectionStart ?? null;
 
@@ -112,6 +115,8 @@ function draw(): void {
   const tslot = document.getElementById("tripmap-slot");
   if (tslot) mountTripMap(tslot);
   restoreSlots();
+  // après restoreSlots : la liste a retrouvé son contenu, donc sa hauteur
+  DOWN_SCROLL.forEach((sel, i) => { const el = document.querySelector<HTMLElement>(sel); if (el && downward[i]) el.scrollTop = downward[i]; });
   void loadDeps();
 }
 hooks.render = draw;
