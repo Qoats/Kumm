@@ -53,8 +53,14 @@ function useBaseLayer(m: L.Map): void {
   base.bringToBack();
 }
 
-const MAX_STOPS = 300;
-const MAX_POIS = 200;
+/* Niveaux de détail (comme un plan en ligne) : de près des icônes, plus loin de simples points dessinés sur un seul canevas
+   (beaucoup plus léger que des centaines d'éléments de page), de très loin seulement les stations de tram et les P+R. */
+const ICON_ZOOM = 16, DOT_ZOOM = 14;
+const MAX_ICONS = 160, MAX_DOTS = 2500;
+let dots: L.Canvas | null = null;
+const shown = new Map<string, L.Layer>();
+let shownMode = "";
+let zooming = false;
 
 const icon = (kind: Layer, size: number): L.DivIcon =>
   L.divIcon({ html: markerIcon(kind, size), className: "lm-icon", iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
@@ -69,6 +75,10 @@ function create(): void {
   useBaseLayer(map);
   markers = L.layerGroup().addTo(map);
   vehLayer = L.layerGroup().addTo(map);
+  dots = L.canvas({ padding: 0.3 });
+  // pendant l'animation du zoom, on ne déplace pas les véhicules (sinon saccades)
+  map.on("zoomstart", () => { zooming = true; });
+  map.on("zoomend", () => { zooming = false; });
   me = L.marker([USER.lat, USER.lon], {
     icon: L.divIcon({ html: '<div class="me-dot"></div>', className: "lm-icon", iconSize: [22, 22], iconAnchor: [11, 11] }),
     interactive: false, zIndexOffset: 1000
@@ -78,36 +88,42 @@ function create(): void {
   (window as unknown as { __kummMap?: L.Map }).__kummMap = map;
 }
 
-/** Affiche seulement les repères visibles à l'écran (la liste complète compte des milliers d'arrêts) */
+/** Affiche seulement les repères visibles à l'écran (la liste complète compte des milliers d'arrêts) ;
+   ne crée ou ne retire que ce qui change, au lieu de tout redessiner à chaque déplacement */
 function sync(): void {
-  if (!map || !markers) return;
-  const b = map.getBounds().pad(0.25);
-  const key = [b.getSouth().toFixed(4), b.getWest().toFixed(4), b.getNorth().toFixed(4), b.getEast().toFixed(4), S.filter,
+  if (!map || !markers || !dots) return;
+  const z = map.getZoom();
+  const mode = z >= ICON_ZOOM ? "icons" : z >= DOT_ZOOM ? "dots" : "far";
+  const b = map.getBounds().pad(mode === "icons" ? 0.25 : 0.1);
+  const key = [b.getSouth().toFixed(4), b.getWest().toFixed(4), b.getNorth().toFixed(4), b.getEast().toFixed(4), mode, S.filter,
     Object.values(S.layers).map(v => (v ? 1 : 0)).join(""), STOPS.length, POIS.length].join("|");
   if (key === lastKey) return;
   lastKey = key;
-  markers.clearLayers();
+  if (mode !== shownMode) { markers.clearLayers(); shown.clear(); shownMode = mode; }
 
-  let n = 0;
+  const want = new Map<string, () => L.Layer>();
+  const max = mode === "icons" ? MAX_ICONS : MAX_DOTS;
+  const place = (id: string, lat: number, lon: number, kind: Layer, title: string, open: () => void): void => {
+    if (want.size >= max || !b.contains([lat, lon])) return;
+    want.set(id, () => {
+      const layer = mode === "icons"
+        ? L.marker([lat, lon], { icon: icon(kind, 30), title, keyboard: false })
+        : L.circleMarker([lat, lon], { renderer: dots!, radius: mode === "far" ? 4 : 5, color: "#fff", weight: 1.5, fillColor: KINDS[kind].color, fillOpacity: 1 });
+      return layer.on("click", open);
+    });
+  };
   for (const s of STOPS) {
-    if (n >= MAX_STOPS) break;
-    if (!b.contains([s.lat, s.lon])) continue;
     const k = kindOfStop(s);
     if (!S.layers[k] || (S.filter === "tram" && k !== "tram") || (S.filter === "bus" && k !== "bus")) continue;
-    L.marker([s.lat, s.lon], { icon: icon(k, 30), title: `${KINDS[k].label} · ${s.name}`, keyboard: false })
-      .on("click", () => { S.overlay = { k: "stop", id: s.id }; render(); })
-      .addTo(markers);
-    n++;
+    if (mode === "far" && k !== "tram") continue;
+    place("s:" + s.id, s.lat, s.lon, k, `${KINDS[k].label} · ${s.name}`, () => { S.overlay = { k: "stop", id: s.id }; render(); });
   }
-  let m = 0;
   for (const p of POIS) {
-    if (m >= MAX_POIS) break;
-    if (!b.contains([p.lat, p.lon]) || !S.layers[p.kind]) continue;
-    L.marker([p.lat, p.lon], { icon: icon(p.kind, 30), title: `${KINDS[p.kind].label} · ${p.name}`, keyboard: false })
-      .on("click", () => { S.overlay = { k: "poi", id: p.id }; render(); })
-      .addTo(markers);
-    m++;
+    if (!S.layers[p.kind] || (mode === "far" && p.kind !== "pr")) continue;
+    place("p:" + p.id, p.lat, p.lon, p.kind, `${KINDS[p.kind].label} · ${p.name}`, () => { S.overlay = { k: "poi", id: p.id }; render(); });
   }
+  for (const [id, layer] of shown) if (!want.has(id)) { markers.removeLayer(layer); shown.delete(id); }
+  for (const [id, make] of want) if (!shown.has(id)) { const l = make(); l.addTo(markers); shown.set(id, l); }
 }
 
 export function mountLiveMap(slot: HTMLElement): void {
@@ -144,12 +160,14 @@ const vehIcon = (line: string, h: number): L.DivIcon => L.divIcon({
 function syncVehicles(): void {
   if (!map || !vehLayer) return;
   const b = map.getBounds().pad(0.3), seen = new Set<string>();
-  const show = map.getZoom() >= 13;
+  if (zooming) return;
+  const show = map.getZoom() >= DOT_ZOOM;
+  let count = 0;
   for (const v of show ? VEHICLES.values() : []) {
     const k = vehicleKind(v);
     if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
     const p = vehiclePos(v), h = Math.round(vehicleHeading(v));
-    if (!b.contains(p)) continue;
+    if (!b.contains(p) || ++count > 150) continue;
     seen.add(v.id);
     let m = vehMarkers.get(v.id);
     if (!m) {
