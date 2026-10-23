@@ -24,6 +24,29 @@ export function distToRoute(p: LL, coords: [number, number][]): number {
   return coords.length === 1 ? haversine(p, { lon: coords[0][0], lat: coords[0][1] }) : best;
 }
 
+/** Point du tracé [lon, lat][] le plus proche de p : indice du segment et point projeté (pour n'afficher que ce qui reste) */
+export function nearestOnRoute(p: LL, coords: [number, number][]): { i: number; point: [number, number] } {
+  if (coords.length < 2) return { i: 0, point: coords[0] ?? [p.lon, p.lat] };
+  const k = Math.cos(rad(p.lat));
+  let best = Infinity, bi = 0, bp: [number, number] = coords[0];
+  for (let i = 0; i < coords.length - 1; i++) {
+    const [ax, ay] = coords[i], [bx, by] = coords[i + 1];
+    const dx = (bx - ax) * k, dy = by - ay, l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, (((p.lon - ax) * k) * dx + (p.lat - ay) * dy) / l2)) : 0;
+    const qx = ax + t * (bx - ax), qy = ay + t * (by - ay);
+    const d = ((p.lon - qx) * k) ** 2 + (p.lat - qy) ** 2;
+    if (d < best) { best = d; bi = i; bp = [qx, qy]; }
+  }
+  return { i: bi, point: bp };
+}
+
+/** Direction de a vers b, en degrés (0 = nord, 90 = est) */
+export function bearing(a: LL, b: LL): number {
+  const y = Math.sin(rad(b.lon - a.lon)) * Math.cos(rad(b.lat));
+  const x = Math.cos(rad(a.lat)) * Math.sin(rad(b.lat)) - Math.sin(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.cos(rad(b.lon - a.lon));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
 /** Distance cumulée (m) le long du tracé, un point par sommet */
 export function cumulative(coords: [number, number][]): number[] {
   const out = [0];

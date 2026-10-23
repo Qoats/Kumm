@@ -9,7 +9,7 @@ import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFa
 import type { Filter, Tab } from "./store";
 import {
   debugBox, depCards, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayStop, screenBuy, screenHome,
-  screenLines, screenNearby, screenSearch, screenTrips, tripsDemo
+  screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc } from "./util";
 import { Capacitor } from "@capacitor/core";
@@ -56,6 +56,7 @@ function draw(): void {
 
   app.innerHTML = body + ov +
     `<nav>${NAV.map(n => `<button data-tab="${n[0]}" class="${t === n[0] || (n[0] === "search" && t === "lines") ? "on" : ""}"><span class="ni">${ic(n[2])}</span>${n[1]}</button>`).join("")}</nav>` +
+    whenSheet() +
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
 
@@ -151,7 +152,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-sel],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-sel],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -181,6 +182,19 @@ app.addEventListener("click", e => {
   }
   if (d.mode) { if (S.trip.mode !== d.mode) S.trip.sel = 0; S.trip.mode = d.mode as "walk" | "bike" | "transit"; render(); return; }
   if (d.sel !== undefined) { S.trip.sel = Number(d.sel); render(); return; }
+  if (d.wk && S.trip.whenDraft) {
+    const w = S.trip.whenDraft;
+    w.kind = d.wk as typeof w.kind;
+    // par défaut : les 5 prochaines minutes rondes (ex. 17h02 → 17h05)
+    if (w.kind !== "now" && w.at < Date.now()) w.at = Math.ceil(Date.now() / 300_000) * 300_000;
+    render(); return;
+  }
+  if (d.wq && S.trip.whenDraft) {
+    const w = S.trip.whenDraft, base = Math.max(w.at, Date.now());
+    if (d.wq === "t8") { const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(8, 0, 0, 0); w.at = t.getTime(); }
+    else w.at = base + Number(d.wq) * 60_000;
+    render(); return;
+  }
   if (d.poibike) { void bikeToPoi(d.poibike); return; }
   if (d.poitrip) {
     const p = POIS.find(x => x.id === d.poitrip);
@@ -217,6 +231,9 @@ app.addEventListener("click", e => {
     case "closeOverlay": S.overlay = null; break;
     case "tabHome": S.tab = S.tab === "lines" ? "search" : "home"; break;
     case "swap": swapTrip(); break;
+    case "when": S.trip.whenDraft = { ...S.trip.when, at: S.trip.when.at || Math.ceil(Date.now() / 300_000) * 300_000 }; break;
+    case "whenClose": S.trip.whenDraft = null; break;
+    case "whenOk": if (S.trip.whenDraft) S.trip.when = S.trip.whenDraft; S.trip.whenDraft = null; S.trip.sel = 0; break;
     case "sheet": if (S.swiped) return; S.sheet = !S.sheet; break;
     case "msgs": S.overlay = { k: "msgs" }; break;
     case "favs": S.overlay = { k: "favs" }; break;
@@ -272,20 +289,13 @@ app.addEventListener("input", e => {
   }
 });
 
-/* heure du trajet : « Partir maintenant », « Partir à… », « Arriver avant… » */
+/* heure du trajet : champs date et heure du panneau (le choix n'est appliqué qu'avec « Valider ») */
 app.addEventListener("change", e => {
-  const t = e.target as HTMLInputElement | HTMLSelectElement;
-  const w = S.trip.when;
-  if (t.id === "twkind") {
-    w.kind = t.value as typeof w.kind;
-    // par défaut : les 5 prochaines minutes rondes (ex. 17h02 → 17h05)
-    if (w.kind !== "now" && w.at < Date.now()) w.at = Math.ceil(Date.now() / 300_000) * 300_000;
-    render();
-  }
-  if (t.id === "twat") {
-    const ms = new Date(t.value).getTime();
-    if (!Number.isNaN(ms)) { w.at = ms; render(); }
-  }
+  const t = e.target as HTMLInputElement, w = S.trip.whenDraft;
+  if (!w || (t.id !== "wdate" && t.id !== "wtime")) return;
+  const date = (document.getElementById("wdate") as HTMLInputElement | null)?.value, time = (document.getElementById("wtime") as HTMLInputElement | null)?.value;
+  const ms = date && time ? new Date(`${date}T${time}`).getTime() : NaN;
+  if (!Number.isNaN(ms)) { w.at = ms; render(); }
 });
 
 app.addEventListener("focusin", e => {
@@ -383,6 +393,7 @@ if (Capacitor.isNativePlatform()) {
   void CapApp.addListener("backButton", () => {
     if (document.getElementById("navlayer")) stopNav();
     else if (S.modal) { S.modal = null; render(); }
+    else if (S.trip.whenDraft) { S.trip.whenDraft = null; render(); }
     else if (S.overlay) { S.overlay = null; render(); }
     else if (S.tab !== "home") { S.tab = "home"; render(); }
     else void CapApp.exitApp();

@@ -23,7 +23,9 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
-  "connect-src 'self'",
+  // carte 3D du guidage : style, tuiles vectorielles, polices et icônes d'OpenFreeMap ; MapLibre dessine dans un « worker »
+  "connect-src 'self' https://tiles.openfreemap.org",
+  "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",

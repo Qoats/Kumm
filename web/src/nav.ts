@@ -1,11 +1,10 @@
-import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { WalkRoute } from "../../shared/types";
-import { cumulative, distToRoute, fmtDist, fmtMin, haversine, pointAt } from "./geo";
+import { bearing, cumulative, distToRoute, fmtDist, fmtMin, haversine, nearestOnRoute, pointAt } from "./geo";
 import type { LL } from "./geo";
+import { createNavView } from "./navmap";
+import type { NavView } from "./navmap";
 import { arrowFor, fetchWalk } from "./walk";
-import { accentColor } from "./themes";
-import { makeBaseLayer } from "./tiles";
 import { esc } from "./util";
 
 export interface NavAction { label: string; run: () => void }
@@ -55,17 +54,26 @@ export function startNav(o: NavOptions): void {
   const $ = <T extends HTMLElement>(id: string): T => layer.querySelector<T>("#" + id) as T;
 
   const first = route.coords[0];
-  const map = L.map($("nv-map"), { zoomControl: false }).setView([first[1], first[0]], 17);
-  makeBaseLayer().addTo(map);
-  const latlngs = (c: [number, number][]): L.LatLngTuple[] => c.map(([lo, la]) => [la, lo]);
-  const line = L.polyline(latlngs(route.coords), { color: "#1B6EC2", weight: 7, opacity: 0.9 }).addTo(map);
-  L.circleMarker([o.dest.lat, o.dest.lon], { radius: 9, color: "#fff", weight: 3, fillColor: accentColor(), fillOpacity: 1 }).addTo(map);
-  const me = L.circleMarker([first[1], first[0]], { radius: 9, color: "#fff", weight: 3, fillColor: "#4A90E2", fillOpacity: 1 }).addTo(map);
-  map.fitBounds(line.getBounds(), { padding: [50, 50] });
-  setTimeout(() => map.invalidateSize(), 50);
-  // la carte suit la position ; si on la déplace au doigt, elle s'arrête jusqu'à « Recentrer »
-  let follow = true, lastPos: LL | null = null;
-  map.on("dragstart", () => { follow = false; $("nv-recenter").hidden = false; });
+  // carte 3D (ou 2D de repli), créée en arrière-plan : les consignes s'affichent sans l'attendre
+  let view: NavView | null = null, stopped = false, lastPos: LL | null = null, lastBearing: number | null = null;
+  void createNavView($("nv-map"), route.coords, o.dest).then(({ view: v, mode }) => {
+    if (stopped) { v.destroy(); return; }
+    view = v;
+    layer.dataset.mode = mode;
+    v.onUserMove(() => { v.setFollow(false); $("nv-recenter").hidden = false; });
+    if (lastPos) showOnMap(lastPos);
+  });
+  /** Position sur la carte : la ligne bleue ne garde que ce qui reste à parcourir, la carte s'oriente dans le sens du trajet */
+  function showOnMap(p: LL): void {
+    if (!view) return;
+    const near = wasOnRoute ? nearestOnRoute(p, route.coords) : null;
+    if (near) {
+      const a = route.coords[near.i], b = route.coords[near.i + 1] ?? a;
+      lastBearing = bearing({ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] });
+      view.setRemaining([near.point, ...route.coords.slice(near.i + 1)]);
+    }
+    view.setPosition(p, lastBearing);
+  }
   /** Heure d'arrivée estimée, à l'heure de Strasbourg */
   const arrival = (sec: number): string => new Date(Date.now() + sec * 1000).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
 
@@ -105,7 +113,6 @@ export function startNav(o: NavOptions): void {
 
   function onPos(p: LL): void {
     if (finished) return;
-    me.setLatLng([p.lat, p.lon]);
     lastPos = p;
     const dRoute = distToRoute(p, route.coords);
     if (dRoute < 150) wasOnRoute = true;
@@ -115,7 +122,7 @@ export function startNav(o: NavOptions): void {
       $("nv-dist").textContent = fmtDist(haversine(p, { lon: route.coords[0][0], lat: route.coords[0][1] }));
       return;
     }
-    if (follow) map.panTo([p.lat, p.lon], { animate: true });
+    showOnMap(p);
     const steps = route.steps;
     while (idx < steps.length - 1 && haversine(p, steps[idx]) < 25) idx++;
     const next = steps[idx];
@@ -139,7 +146,7 @@ export function startNav(o: NavOptions): void {
       $("nv-text").textContent = "Recalcul de l’itinéraire…";
       fetchWalk(p, o.dest).then(r => {
         route = r; cum = cumulative(r.coords); idx = Math.min(1, r.steps.length - 1); spoken.clear(); offCount = 0;
-        line.setLatLngs(latlngs(r.coords));
+        view?.setRemaining(r.coords);
       }).catch(() => { /* on garde l'ancien tracé */ }).finally(() => { rerouting = false; });
     }
   }
@@ -168,15 +175,17 @@ export function startNav(o: NavOptions): void {
   $("nv-snd").onclick = () => { sound = !sound; $("nv-snd").textContent = sound ? "🔊" : "🔇"; if (!sound) window.speechSynthesis?.cancel(); };
   $("nv-quit").onclick = stopNav;
   $("nv-recenter").onclick = () => {
-    follow = true; $("nv-recenter").hidden = true;
-    if (lastPos) map.setView([lastPos.lat, lastPos.lon], Math.max(map.getZoom(), 17), { animate: true });
+    $("nv-recenter").hidden = true;
+    view?.setFollow(true);
+    if (lastPos) showOnMap(lastPos);
   };
 
   current = () => {
     window.clearInterval(simTimer);
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     window.speechSynthesis?.cancel();
-    map.remove();
+    stopped = true;
+    view?.destroy();
     layer.remove();
   };
 }

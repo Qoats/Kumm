@@ -309,6 +309,38 @@ function tripList(): string {
   return `<small class="src" style="display:block;margin-bottom:10px">${why}</small>` + (t.fallback ?? calculating);
 }
 
+/** « Partir maintenant », « Partir à 08:00 », « Arriver avant 08:00 · demain » */
+function whenLabel(w: { kind: "now" | "depart" | "arrive"; at: number }): string {
+  if (w.kind === "now") return "Partir maintenant";
+  const d = new Date(w.at), now = new Date();
+  const hmTxt = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - day) / 864e5);
+  const when = diff === 0 ? "" : diff === 1 ? " · demain" : ` · ${d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}`;
+  return `${w.kind === "arrive" ? "Arriver avant" : "Partir à"} ${hmTxt}${when}`;
+}
+
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+/** Panneau du bas : heure du trajet en transports (affiché par-dessus l'écran, voir main.ts) */
+export function whenSheet(): string {
+  const w = S.trip.whenDraft;
+  if (!w) return "";
+  const d = new Date(w.at);
+  const kinds = [["now", "Maintenant"], ["depart", "Partir à"], ["arrive", "Arriver avant"]] as const;
+  return `<div class="wback" data-act="whenClose"></div><div class="wsheet" role="dialog" aria-label="Heure du trajet">
+    <b class="wtitle">Heure du trajet</b>
+    <div class="wtabs">${kinds.map(([k, l]) => `<button data-wk="${k}" class="${w.kind === k ? "on" : ""}">${l}</button>`).join("")}</div>
+    ${w.kind === "now" ? `<p class="wnow">Trajets au départ dès maintenant, avec les horaires en temps réel.</p>` : `
+    <div class="wpick">
+      <input id="wdate" type="date" value="${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}" aria-label="Date">
+      <input id="wtime" type="time" value="${pad2(d.getHours())}:${pad2(d.getMinutes())}" aria-label="Heure">
+    </div>
+    <div class="wquick"><button data-wq="15">+15 min</button><button data-wq="60">+1 h</button><button data-wq="t8">Demain 8h</button></div>`}
+    <button class="go wok" data-act="whenOk">Valider</button>
+  </div>`;
+}
+
 export function screenTrips(): string {
   const t = S.trip, mock = CONFIG.USE_MOCK;
   const pin = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z" fill="#E8402F"/><circle cx="12" cy="10" r="2.6" fill="#fff"/></svg>';
@@ -330,11 +362,7 @@ export function screenTrips(): string {
   const modes: { id: "transit" | "walk" | "bike"; icon: IconName; label: string }[] = [
     { id: "transit", icon: "tram", label: "Transports" }, { id: "walk", icon: "walk", label: "À pied" }, { id: "bike", icon: "bike", label: "Vélo" }
   ];
-  const w = t.when;
-  const local = (ms: number): string => { const d = new Date(ms), p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
-  const whenRow = t.mode !== "transit" ? "" : `<div class="twhen">${ic("clock")}
-    <select id="twkind" aria-label="Heure du trajet">${([["now", "Partir maintenant"], ["depart", "Partir à…"], ["arrive", "Arriver avant…"]] as const).map(([v, l]) => `<option value="${v}"${w.kind === v ? " selected" : ""}>${l}</option>`).join("")}</select>
-    ${w.kind !== "now" ? `<input id="twat" type="datetime-local" value="${local(w.at)}" aria-label="Date et heure">` : ""}</div>`;
+  const whenRow = t.mode !== "transit" ? "" : `<div class="twhen"><button class="twchip" data-act="when">${ic("clock")}<span>${esc(whenLabel(t.when))}</span><b>▾</b></button></div>`;
   const tabs = `<div class="tmodes">${modes.map(m => `<button data-mode="${m.id}" class="${t.mode === m.id ? "on" : ""}" aria-label="${m.label}">${ic(m.icon)}<span>${modeDuration(m.id)}</span></button>`).join("")}</div>`;
   return form + tabs + whenRow + `<div class="tmap"><div id="tripmap-slot"></div><span class="osm">© OpenStreetMap</span></div><div class="pad tlist">${tripList()}</div>`;
 }
@@ -443,7 +471,7 @@ export function overlaySettings(): string {
     <button class="row-switch" data-darkmap="1"><span>Carte sombre avec les thèmes sombres</span><span class="switch ${p.darkMap ? "on" : ""}"></span></button>
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
-      <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro ; gares TER : CTS<br>Application indépendante, non affiliée à la CTS ni à l’Eurométropole</div></div>
+      <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro ; gares TER : CTS<br>Application indépendante, non affiliée à la CTS ni à l’Eurométropole</div></div>
     <button class="ghost" data-reset="1">Rétablir les réglages d’origine</button>
   </div></main></div>`;
 }
