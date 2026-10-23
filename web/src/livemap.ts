@@ -169,17 +169,21 @@ const vehIcon = (line: string, h: number): L.DivIcon => L.divIcon({
 
 /** Place les véhicules visibles (catégories et filtre Tram / Bus respectés) ; appelé chaque seconde */
 /**
- * Véhicule à quai ou tout près d'une station : décalé sur le côté (à droite de son sens de marche, comme sur un quai)
- * pour ne pas cacher l'icône de la station. Le décalage grandit en douceur à l'approche, sans saut.
+ * Véhicule à quai ou tout près d'une station : il reste sur sa voie (déplacé seulement dans son sens de marche) et s'arrête
+ * juste avant l'icône de la station, puis passe juste après au départ. Les deux sens se placent ainsi de part et d'autre
+ * de la station, sans la cacher et sans sortir du tracé (près d'une station, la voie est droite à cette échelle).
  */
 function besideStops(m: L.Map, p: L.LatLngTuple, h: number, stops: L.Point[], min: number): L.LatLngTuple {
-  const pt = m.latLngToContainerPoint(p), reach = min * 1.8;
+  const pt = m.latLngToContainerPoint(p), reach = min * 2.5;
   let near: L.Point | null = null, best = reach;
   for (const s of stops) { const d = s.distanceTo(pt); if (d < best) { best = d; near = s; } }
   if (!near) return p;
-  const t = 1 - best / reach, push = min * t * t * (3 - 2 * t);   // courbe douce : 0 au loin, « min » sur la station
-  const r = (h * Math.PI) / 180, side = L.point(Math.cos(r), Math.sin(r));   // perpendiculaire droite du cap (0° = nord)
-  const q = m.containerPointToLatLng(pt.add(side.multiplyBy(push)));
+  const r = (h * Math.PI) / 180, dir = L.point(Math.sin(r), -Math.cos(r));   // sens de marche à l'écran (0° = nord)
+  const rel = pt.subtract(near), u = rel.x * dir.x + rel.y * dir.y;          // position le long de la voie, par rapport à la station
+  if (Math.abs(u) >= reach) return p;
+  // avant la station : de -reach à -min ; après : de +min à +reach (rien ne change au-delà de « reach »)
+  const u2 = (u < 0 ? -min : min) + (u / reach) * (reach - min);
+  const q = m.containerPointToLatLng(pt.add(dir.multiplyBy(u2 - u)));
   return [q.lat, q.lng];
 }
 
