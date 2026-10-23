@@ -54,7 +54,17 @@ let lastOverlay = "";
 let lastOvKey = "";
 const SIDE_SCROLL = [".layers", ".chips", ".tmodes"];
 
+let lastPage = "";
+
 function draw(): void {
+  // pages plein écran (mise à jour obligatoire, puis présentation du premier lancement) : rien n'est dessiné derrière,
+  // et la page n'est redessinée que si elle change (pas de clignotement entre deux étapes)
+  const page = S.upd ? updateView(S.upd, VERSION) : S.onb ? onboardingView(S.onb.steps, S.onb.i, S.onb.refused) : "";
+  if (page) {
+    if (page !== lastPage) { app.innerHTML = page; lastPage = page; }
+    return;
+  }
+  lastPage = "";
   const t = S.tab;
   let body: string;
   if (t === "home") body = header() + `<main>${screenHome()}</main>`;
@@ -81,9 +91,7 @@ function draw(): void {
     `<nav>${NAV.map(n => `<button data-tab="${n[0]}" class="${t === n[0] || (n[0] === "search" && t === "lines") ? "on" : ""}"><span class="ni">${ic(n[2])}</span>${n[1]}</button>`).join("")}</nav>` +
     whenSheet() +
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
-    (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "") +
-    // pages plein écran : mise à jour obligatoire (prioritaire), puis présentation du premier lancement
-    (S.upd ? updateView(S.upd, VERSION) : S.onb ? onboardingView(S.onb.steps, S.onb.i, S.onb.refused) : "");
+    (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
 
   const m = document.querySelector<HTMLElement>("#app > main");
   if (m && !o) m.scrollTop = top;
