@@ -3,7 +3,7 @@ dist
 android
 .env
 .git
-site
+vitrine
 secrets
 state
 apk

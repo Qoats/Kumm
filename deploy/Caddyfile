@@ -1,6 +1,6 @@
 # Caddy : obtient et renouvelle seul les certificats HTTPS. Chaque nom ci-dessous doit pointer vers ce serveur (DNS).
 
-# --- Site vitrine : kumm.fr (fichiers du dossier « site ») ---
+# --- Site vitrine : kumm.fr (fichiers du dossier « vitrine ») ---
 kumm.fr {
 	root * /srv/site
 	encode zstd gzip

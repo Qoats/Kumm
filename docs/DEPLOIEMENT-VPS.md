@@ -1,6 +1,6 @@
 # Mettre Kumm en ligne sur votre VPS (kumm.fr)
 
-Résultat : `https://kumm.fr` affiche le site vitrine (dossier `site/`) et **`https://app.kumm.fr` sert l'application et le serveur** (l'adresse que l'APK Android utilisera), avec certificats HTTPS automatiques, redémarrage automatique et mises à jour en une commande. Pourquoi deux adresses : le nom principal reste libre pour un site de présentation, la politique de confidentialité, les mentions légales ou tout autre site (voir « Héberger d'autres sites » plus bas).
+Résultat : `https://kumm.fr` affiche le site vitrine (dossier `vitrine/`) et **`https://app.kumm.fr` sert l'application et le serveur** (l'adresse que l'APK Android utilisera), avec certificats HTTPS automatiques, redémarrage automatique et mises à jour en une commande. Pourquoi deux adresses : le nom principal reste libre pour un site de présentation, la politique de confidentialité, les mentions légales ou tout autre site (voir « Héberger d'autres sites » plus bas).
 Le jeton CTS reste dans un fichier `.env` **sur le serveur** (jamais dans GitHub ni dans l'application).
 
 Ce qu'il vous faut : l'adresse IP du VPS, un accès SSH (utilisateur et mot de passe ou clé) et l'accès au DNS de kumm.fr chez votre bureau d'enregistrement.
@@ -111,7 +111,7 @@ Oui, c'est possible, et le VPS (6 vCPU, 12 Go) a largement la place. Le principe
    - application tournant dans un autre conteneur : `blog.kumm.fr { reverse_proxy autre-service:PORT }`, avec ce service ajouté dans `docker-compose.yml`.
 3. `docker compose up -d` : Caddy obtient seul le certificat du nouveau nom.
 À savoir : un site de fichiers fixes ne demande presque aucun entretien. Un site « dynamique » (WordPress, base de données…) demande des mises à jour de sécurité régulières ; chaque site public augmente la surface d'attaque du serveur qui porte aussi Kumm. Pour une adresse e-mail en `@kumm.fr`, prenez plutôt un service de messagerie dédié que d'installer un serveur de mail sur ce VPS (la délivrabilité des messages y est difficile).
-Le site vitrine fourni (`site/index.html`) est une page unique, sans service externe ; ajoutez-y vos pages (mentions légales, politique de confidentialité, contact) en copiant des fichiers dans `site/` : ils sont servis immédiatement, sans redémarrage.
+Le site vitrine fourni (`vitrine/index.html`) est une page unique, sans service externe ; ajoutez-y vos pages (mentions légales, politique de confidentialité, contact) en copiant des fichiers dans `vitrine/` : ils sont servis immédiatement, sans redémarrage.
 
 ## 12. Ensuite : se passer des services partagés
 Votre VPS (6 vCPU, 12 Go) peut héberger les services gratuits dont dépend Kumm, pour ne plus dépendre d'infrastructures communautaires : **calcul de marche à pied** (OSRM ou Valhalla avec les données OpenStreetMap d'Alsace), **calcul des trajets** (MOTIS avec les horaires GTFS de la CTS, si votre accord le permet) et **tuiles de carte**. Le serveur est déjà prêt à les utiliser (variables `GEO_WALK_BASE`, `TRANSIT_BASE`, `TILE_BASE`) ; voir `MISE-EN-LIGNE.md`.

@@ -34,7 +34,7 @@ services:
       - "443:443/udp"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./site:/srv/site:ro     # site vitrine (kumm.fr)
+      - ./vitrine:/srv/site:ro  # site vitrine (kumm.fr), dossier « vitrine » du dépôt
       - caddy_data:/data        # certificats : à conserver
       - caddy_config:/config
     depends_on:
