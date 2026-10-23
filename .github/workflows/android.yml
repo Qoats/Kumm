@@ -3,6 +3,7 @@
 # Avant : indiquez l'adresse de votre serveur, soit dans le fichier web/.env.android,
 #         soit dans Settings → Secrets and variables → Actions → Variables → KUMM_API_BASE.
 # Signature (pour installer chaque version par-dessus la précédente) : secrets KUMM_KEYSTORE_B64 et KUMM_KEYSTORE_PASSWORD.
+# Alertes trafic (Firebase) : secret GOOGLE_SERVICES_JSON.
 name: APK Android
 
 on:
@@ -39,20 +40,24 @@ jobs:
       - run: npm ci
 
       # Le projet Android (dossier android/) n'est pas dans le dépôt : il est créé ici à partir de capacitor.config.ts
+      # Alertes trafic (Firebase) : avec le secret GOOGLE_SERVICES_JSON (contenu du fichier google-services.json de la
+      # console Firebase), l'application reçoit les notifications push ; sans lui, l'option est indiquée comme indisponible.
       - name: Projet Android
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then export VITE_PUSH=1; echo "Firebase : configuré"; else echo "::warning::Pas de secret GOOGLE_SERVICES_JSON : alertes trafic indisponibles dans cet APK."; fi
           npx vite build --mode android
           if [ ! -d android ]; then npx cap add android; fi
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json; fi
           # icône et écran de démarrage Kumm (au lieu de ceux de Capacitor) ; fond vert de l'écran de démarrage (Android 12+)
           cp -r android-res/. android/app/src/main/res/
-          # alertes trafic (module Background Runner) : sa bibliothèque JavaScript native, et pas de localisation en arrière-plan
-          GRADLE=android/app/build.gradle
-          grep -q "background-runner" "$GRADLE" || sed -i "s|dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'|dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'\n        dirs '../../node_modules/@capacitor/background-runner/android/src/main/libs', 'libs'|" "$GRADLE"
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          grep -q "xmlns:tools" "$MANIFEST" || sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">|' "$MANIFEST"
-          grep -q "ACCESS_BACKGROUND_LOCATION" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />|' "$MANIFEST"
           STYLES=android/app/src/main/res/values/styles.xml
           grep -q windowSplashScreenBackground "$STYLES" || sed -i 's|<item name="android:background">@drawable/splash</item>|<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">#136342</item>|' "$STYLES"
+          # position (« À proximité », « Ma position », guidage) et icône blanche des notifications dans la barre d'état
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          grep -q "ACCESS_FINE_LOCATION" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />|' "$MANIFEST"
+          grep -q "default_notification_icon" "$MANIFEST" || sed -i 's|</application>|    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_kumm" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="alertes" />\n    </application>|' "$MANIFEST"
           npx cap sync android
 
       # Numéro de version : versionCode croissant (numéro d'exécution du workflow), versionName = version de package.json.

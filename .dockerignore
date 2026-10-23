@@ -4,3 +4,5 @@ android
 .env
 .git
 site
+secrets
+state

@@ -19,6 +19,8 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/data ./data
+# état des alertes (abonnements) : volume Docker ; clé Firebase : dossier secrets/ du serveur, monté en lecture seule
+RUN mkdir -p /app/state /app/secrets && chown node:node /app/state
 USER node
 EXPOSE 3000
 # Docker signale « unhealthy » si le serveur ne répond plus (visible avec « docker compose ps ») ; un plantage, lui, redémarre automatiquement

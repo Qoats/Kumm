@@ -16,6 +16,8 @@ import { serveStatic } from "./static.js";
 import { serveTile } from "./tiles.js";
 import { parseGeneralMessages } from "./messages.js";
 import { vehiclesAt } from "./vehicles.js";
+import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
+import type { TrafficMessage } from "./messages.js";
 import { realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
 import type { CtsResult } from "./cts.js";
 
@@ -189,6 +191,26 @@ async function trafficMessages(): Promise<CtsResult> {
   return { status: 200, type: "application/json; charset=utf-8", body: JSON.stringify({ items: parseGeneralMessages(r.body) }) };
 }
 
+/** Infos trafic pour la surveillance des alertes (même source que /api/messages, gardée 55 s) */
+let msgMemo: { at: number; items: TrafficMessage[] } = { at: 0, items: [] };
+async function currentMessages(): Promise<TrafficMessage[]> {
+  if (Date.now() - msgMemo.at < 55_000) return msgMemo.items;
+  const r = await trafficMessages();
+  if (r.status !== 200) throw new Error("HTTP " + r.status);
+  msgMemo = { at: Date.now(), items: (JSON.parse(r.body) as { items: TrafficMessage[] }).items };
+  return msgMemo.items;
+}
+
+/** Corps d'une requête POST (4 Ko au plus) */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let size = 0; const parts: Buffer[] = [];
+    req.on("data", (c: Buffer) => { size += c.length; if (size > 4096) { reject(new Error("trop long")); req.destroy(); } else parts.push(c); });
+    req.on("end", () => resolve(Buffer.concat(parts).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
 /** Charge à l'avance la liste des arrêts et des lignes (gardées en mémoire), puis la renouvelle avant qu'elle n'expire */
 /** Après un échec (CTS injoignable, jeton pas encore actif…), nouvel essai une minute plus tard plutôt qu'au prochain renouvellement (50 min) */
 let prefetchRetry: NodeJS.Timeout | null = null;
@@ -232,6 +254,7 @@ function health(res: ServerResponse): Promise<void> {
     cache: { entrees: cacheSize(), max: CACHE_MAX, hits: cacheStats.hits, miss: cacheStats.misses, secours: cacheStats.stale, evinces: cacheStats.evicted },
     cts: { en_pause: paused.paused, secondes: paused.paused ? paused.seconds : 0, appels_derniere_minute: ctsCallsLastMinute(), plafond_par_minute: CTS_BUDGET_PER_MIN, refuses_plafond: stats.budgetRefused, arrets_connus: knownRefs?.size ?? null, arrets_inconnus_demandes: stats.unknownRefs, arrets_inconnus_refuses: stats.unknownRefused },
     reseau_en_memoire: { ...realtimeStatus(), arrets_servis_depuis_la_memoire: stats.snapshotServed },
+    alertes: alertsStatus(),
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });
   res.setHeader("Cache-Control", "no-store");
@@ -256,8 +279,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   securityHeaders(req, res);
   const origin = req.headers.origin;
   if (origin && ORIGINS.includes(origin)) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
-  if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS", "Access-Control-Max-Age": "86400" }); return void res.end(); }
-  if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "text/plain", "Méthode non autorisée");
+  if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-App-Key", "Access-Control-Max-Age": "86400" }); return void res.end(); }
+  // seule écriture possible : l'abonnement aux alertes trafic
+  const isPost = req.method === "POST" && url.pathname === "/api/alerts";
+  if (req.method !== "GET" && req.method !== "HEAD" && !isPost) return send(res, 405, "text/plain", "Méthode non autorisée");
 
   const p = url.pathname;
   if (p === "/health") return health(res);
@@ -273,6 +298,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return void res.end("Trop de requêtes : réessayez dans une minute");
   }
 
+  if (isPost) {
+    let body: unknown;
+    try { body = JSON.parse(await readBody(req)); } catch { return send(res, 400, "text/plain", "Requête invalide"); }
+    const r = subscribe(body);
+    return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
+  }
   if (p.startsWith("/api/")) return api(res, url);
   if (p.startsWith("/geo/")) return geo(res, url);
   if (p === "/poi/velhop") return cached(res, "poi:velhop", 60, 600, async () => poiResult(await velhop()));
@@ -316,5 +347,6 @@ server.listen(PORT, () => {
   console.log(`Kumm ${VERSION} : http://localhost:${PORT}`);
   void prefetch();
   startRealtime();
+  startAlerts(currentMessages);
   setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
 });

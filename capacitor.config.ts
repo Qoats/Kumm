@@ -1,4 +1,4 @@
-/// <reference types="@capacitor/background-runner" />
+/// <reference types="@capacitor/push-notifications" />
 import fs from "node:fs";
 import type { CapacitorConfig } from "@capacitor/cli";
 
@@ -17,8 +17,8 @@ const config: CapacitorConfig = {
   server: { androidScheme: "https" },
   android: { allowMixedContent: apiBase().startsWith("http://") },
   plugins: {
-    // alertes trafic : web/public/runners/alerts.js, lancé par Android environ toutes les 15 minutes (minimum imposé)
-    BackgroundRunner: { label: "fr.kumm.alerts", src: "runners/alerts.js", event: "checkAlerts", repeat: true, interval: 15, autoStart: true }
+    // alertes trafic (Firebase) : notification affichée même quand l'application est ouverte
+    PushNotifications: { presentationOptions: ["sound", "alert"] }
   }
 };
 

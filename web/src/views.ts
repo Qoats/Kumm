@@ -19,7 +19,7 @@ import type { PlanCtx } from "./trip";
 import type { LL } from "./geo";
 import { esc } from "./util";
 import { VEHICLES, serverNow } from "./vehicles";
-import { NATIVE } from "./alerts";
+import { NATIVE, PUSH_READY } from "./alerts";
 
 /* ============ COMPOSANTS ============ */
 export const lineChip = (l: string, sm = false): string => {
@@ -496,7 +496,7 @@ function alertSettings(): string {
     <div class="sub" style="font-size:13px;margin:14px 0 4px">Lignes suivies</div>
     <div class="alines">${chips}</div>
     <small class="src" style="display:block;margin-top:8px">${NATIVE
-      ? "Vérification environ toutes les 15 minutes, même application fermée. Certains téléphones (Xiaomi, Huawei, Samsung…) bloquent les tâches en arrière-plan : si les alertes n'arrivent pas, autorisez Kumm dans les réglages de batterie du téléphone."
+      ? "Notifications envoyées par le serveur Kumm dès qu'une perturbation est publiée par la CTS (en général moins de 2 minutes), même application fermée."
       : "Version web : les alertes n'arrivent que tant que la page est ouverte. Avec l'application Android, elles arrivent à tout moment."}</small>`;
 }
 const check = (): string => '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>';
@@ -516,7 +516,7 @@ export function overlaySettings(): string {
     <div class="sub">Carte</div>
     <button class="row-switch" data-darkmap="1"><span>Carte sombre avec les thèmes sombres</span><span class="switch ${p.darkMap ? "on" : ""}"></span></button>
     <div class="sub">Alertes trafic</div>
-    <button class="row-switch" data-alerts="toggle"><span>Me prévenir des perturbations<br><small style="color:var(--mute)">Une notification pour chaque nouvel incident sur les lignes suivies</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
+    <button class="row-switch" data-alerts="toggle"><span>Me prévenir des perturbations<br><small style="color:var(--mute)">${NATIVE && !PUSH_READY ? "Indisponible dans cette version de l'application" : "Une notification pour chaque nouvel incident sur les lignes suivies"}</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
     ${S.alerts.enabled ? alertSettings() : ""}
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>

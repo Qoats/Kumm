@@ -25,7 +25,7 @@ import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { mountLiveMap, recenter, zoomBy } from "./livemap";
-import { askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
+import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
 
 const app = document.getElementById("app") as HTMLElement;
 
@@ -193,7 +193,9 @@ app.addEventListener("click", e => {
     const a = S.alerts;
     if (d.aline === "*") a.lines = a.lines.includes("*") ? [] : ["*"];
     else { const l = a.lines.filter(x => x !== "*"); a.lines = l.includes(d.aline) ? l.filter(x => x !== d.aline) : [...l, d.aline]; }
-    saveAlerts(a); void syncAlerts(a); render(); return;
+    saveAlerts(a); render();
+    if (a.enabled) syncAlerts(a).catch(e => toast(e instanceof Error ? e.message : "Alertes indisponibles"));
+    return;
   }
   if (d.wk && S.trip.whenDraft) {
     const w = S.trip.whenDraft;
@@ -262,8 +264,13 @@ app.addEventListener("click", e => {
 /** Alertes trafic : activation (avec l'autorisation du téléphone), désactivation, travaux */
 async function changeAlerts(what: string): Promise<void> {
   const a = S.alerts;
-  if (what === "works") { a.works = !a.works; saveAlerts(a); await syncAlerts(a); render(); return; }
-  if (a.enabled) { a.enabled = false; saveAlerts(a); await syncAlerts(a); render(); toast("Alertes trafic désactivées"); return; }
+  const apply = async (seen?: string[]): Promise<boolean> => {
+    try { await syncAlerts(a, seen); return true; }
+    catch (e) { toast(e instanceof Error ? e.message : "Alertes indisponibles pour le moment"); return false; }
+  };
+  if (what === "works") { a.works = !a.works; saveAlerts(a); await apply(); render(); return; }
+  if (a.enabled) { a.enabled = false; saveAlerts(a); await apply(); render(); toast("Alertes trafic désactivées"); return; }
+  if (NATIVE && !PUSH_READY) { toast("Alertes indisponibles dans cette version de l'application"); return; }
   if (!(await askPermission())) { toast("Notifications refusées : autorisez-les pour Kumm dans les réglages du téléphone"); return; }
   if (!a.lines.length) {
     // par défaut : les lignes des arrêts favoris, sinon les trams
@@ -271,9 +278,10 @@ async function changeAlerts(what: string): Promise<void> {
     a.lines = fromFavs.length ? fromFavs : ["A", "B", "C", "D", "E", "F"];
   }
   a.enabled = true;
-  saveAlerts(a);
+  toast("Activation des alertes…");
   // les perturbations déjà en cours ne sont pas annoncées : seulement les nouvelles
-  await syncAlerts(a, MESSAGES.map(m => m.id));
+  if (!(await apply(MESSAGES.map(m => m.id)))) { a.enabled = false; render(); return; }
+  saveAlerts(a);
   render();
   const now = MESSAGES.filter(m => followed(m, a)).length;
   toast(now ? `Alertes activées · ${now} perturbation${now > 1 ? "s" : ""} déjà en cours sur vos lignes` : "Alertes activées");
@@ -379,7 +387,7 @@ async function refreshMessages(): Promise<void> {
 
 async function initReal(): Promise<void> {
   // alertes : réglages renvoyés au programme d'arrière-plan à chaque démarrage ; toucher une notification ouvre les infos trafic
-  if (S.alerts.enabled) void syncAlerts(S.alerts);
+  if (S.alerts.enabled) syncAlerts(S.alerts).catch(e => console.warn("Alertes trafic :", e));
   onAlertTap(() => { S.overlay = { k: "msgs" }; render(); });
   void refreshMessages();
   setInterval(() => { if (!document.hidden) void refreshMessages(); }, 5 * 60_000);

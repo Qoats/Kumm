@@ -62,8 +62,12 @@ L'APK est l'application Kumm dans un habillage Android (Capacitor). Elle ne cont
 ### 3. Installer sur le téléphone
 Copiez `app-debug.apk` sur le téléphone, ouvrez-le et autorisez « installer des applications inconnues » quand Android le demande. Au premier lancement, acceptez la localisation.
 
-### Alertes trafic (notifications)
-Réglages → « Alertes trafic » : une notification pour chaque nouvelle perturbation sur les lignes choisies (option : travaux et changements prévus). Sur Android, `web/public/runners/alerts.js` (module Capacitor Background Runner) vérifie `/api/messages` environ toutes les 15 minutes, même application fermée, sans service de notifications push (pas de Firebase). Certains téléphones bloquent les tâches en arrière-plan : voir dontkillmyapp.com. Le workflow retire la permission de localisation en arrière-plan que ce module demande par défaut. Version web : notifications du navigateur, seulement tant que la page est ouverte.
+### Alertes trafic (notifications push, Firebase)
+Réglages → « Alertes trafic » : une notification pour chaque nouvelle perturbation sur les lignes choisies (option : travaux et changements prévus).
+- **Serveur** (`server/alerts.ts`) : surveille les infos trafic chaque minute et envoie les nouvelles perturbations par Firebase Cloud Messaging aux téléphones abonnés (`POST /api/alerts`). Clé du compte de service Firebase dans `secrets/firebase.json` sur le serveur (jamais dans le dépôt ni dans l'image) ; abonnements gardés dans le volume Docker `kumm_state`. État visible dans `/health` (rubrique `alertes`).
+- **Application** : secret GitHub `GOOGLE_SERVICES_JSON` (contenu du fichier `google-services.json`) pour compiler l'APK avec Firebase ; sans lui, l'option est indiquée comme indisponible.
+- **Version web** : notifications du navigateur, seulement tant que la page est ouverte.
+Mise en place pas à pas : `docs/DEPLOIEMENT-VPS.md`, section « Alertes trafic ».
 
 ### Icône et écran de démarrage
 Les icônes Android (toutes tailles, icône adaptative Android 8+) et l'écran de démarrage sont dans `android-res/`, dessinés d'après le logo par `python3 scripts/build-android-icons.py` (Pillow). Le workflow les copie dans le projet Android ; en local, après `npx cap add android` : `cp -r android-res/. android/app/src/main/res/`.

@@ -1,11 +1,11 @@
 /**
  * Alertes trafic : notification pour chaque nouvelle perturbation sur les lignes suivies.
- * - Application Android : un petit programme (web/public/runners/alerts.js) vérifie environ toutes les 15 minutes,
- *   même application fermée ; on lui transmet les réglages et on le lance aussi à chaque mise à jour des infos trafic.
+ * - Application Android : notifications push (Firebase). Le téléphone s'enregistre auprès de Firebase, puis envoie
+ *   son jeton et ses lignes au serveur Kumm (POST /api/alerts) ; c'est le serveur qui surveille la CTS et envoie.
  * - Version web : notifications du navigateur, seulement tant que la page est ouverte.
  */
 import { Capacitor } from "@capacitor/core";
-import { API_BASE, APP_KEY } from "./config";
+import { appHeaders, url } from "./config";
 import type { TrafficMsg } from "./data";
 
 export interface AlertPrefs {
@@ -16,8 +16,10 @@ export interface AlertPrefs {
   lines: string[];
 }
 
-const KEY = "alerts", SEEN = "alertsSeen", LABEL = "fr.kumm.alerts";
+const KEY = "alerts", SEEN = "alertsSeen", TOKEN_KEY = "pushToken";
 export const NATIVE = Capacitor.isNativePlatform();
+/** Firebase est configuré dans cette application (fichier google-services.json fourni à la compilation) */
+export const PUSH_READY = import.meta.env["VITE_PUSH"] === "1";
 
 export function loadAlerts(): AlertPrefs {
   try {
@@ -33,37 +35,59 @@ export function saveAlerts(p: AlertPrefs): void {
 export const followed = (m: TrafficMsg, p: AlertPrefs): boolean =>
   (m.channel === "disruption" || p.works) && (p.lines.includes("*") || m.lines.some(l => p.lines.includes(l)));
 
-const runner = async () => (await import("@capacitor/background-runner")).BackgroundRunner;
+const push = async () => (await import("@capacitor/push-notifications")).PushNotifications;
 
 /** Demande l'autorisation d'afficher des notifications ; true si accordée */
 export async function askPermission(): Promise<boolean> {
   try {
     if (NATIVE) {
-      const r = (await (await runner()).requestPermissions({ apis: ["notifications"] })) as { notifications?: string };
-      return r.notifications === "granted";
+      if (!PUSH_READY) return false;
+      const P = await push();
+      const r = await P.requestPermissions();
+      if (r.receive !== "granted") return false;
+      // canal Android « Alertes trafic » (son, bannière) : utilisé par le serveur pour chaque alerte
+      await P.createChannel({ id: "alertes", name: "Alertes trafic", description: "Perturbations sur vos lignes", importance: 4, visibility: 1 }).catch(() => {});
+      return true;
     }
     if (!("Notification" in window)) return false;
     return (Notification.permission === "granted") || (await Notification.requestPermission()) === "granted";
   } catch { return false; }
 }
 
-/** Transmet les réglages au programme d'arrière-plan ; seen : messages en cours à ne pas annoncer (à l'activation) */
-export async function syncAlerts(p: AlertPrefs, seen?: string[]): Promise<void> {
-  if (seen) { try { localStorage.setItem(SEEN, JSON.stringify(seen)); } catch { /* ignoré */ } }
-  if (!NATIVE) return;
-  try {
-    await (await runner()).dispatchEvent({ label: LABEL, event: "kummConfig", details: { ...p, apiBase: API_BASE, appKey: APP_KEY, ...(seen ? { seen } : {}) } });
-  } catch (e) { console.warn("Alertes trafic : réglages non transmis", e); }
+/** Jeton Firebase du téléphone (nouvel enregistrement à chaque démarrage : Firebase peut le changer) */
+async function pushToken(): Promise<string> {
+  const P = await push();
+  return new Promise<string>((resolve, reject) => {
+    const to = setTimeout(() => reject(new Error("pas de réponse de Firebase")), 15_000);
+    void P.addListener("registration", t => { clearTimeout(to); try { localStorage.setItem(TOKEN_KEY, t.value); } catch { /* ignoré */ } resolve(t.value); });
+    void P.addListener("registrationError", e => { clearTimeout(to); reject(new Error(e.error)); });
+    void P.register();
+  });
 }
 
-/** Après une mise à jour des infos trafic : notifie les nouvelles perturbations des lignes suivies */
-export function checkAlerts(p: AlertPrefs, messages: TrafficMsg[]): void {
-  if (!p.enabled) return;
-  if (NATIVE) {
-    // le programme d'arrière-plan fait la vérification (et tient la liste des messages déjà annoncés)
-    void runner().then(r => r.dispatchEvent({ label: LABEL, event: "checkAlerts", details: {} })).catch(() => {});
-    return;
+/** Envoie l'abonnement (ou la désinscription) au serveur Kumm ; lève une erreur lisible en cas de refus */
+async function sendSubscription(body: Record<string, unknown>): Promise<void> {
+  const r = await fetch(url("/api/alerts"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) {
+    const j = (await r.json().catch(() => ({}))) as { message?: string };
+    throw new Error(r.status === 503 ? "Le serveur Kumm n'est pas encore configuré pour les alertes (Firebase)" : (j.message ?? "HTTP " + r.status));
   }
+}
+
+/** Applique les réglages : abonnement au serveur (application) ; seen : messages en cours à ne pas annoncer (web) */
+export async function syncAlerts(p: AlertPrefs, seen?: string[]): Promise<void> {
+  if (seen) { try { localStorage.setItem(SEEN, JSON.stringify(seen)); } catch { /* ignoré */ } }
+  if (!NATIVE || !PUSH_READY) return;
+  if (p.enabled) await sendSubscription({ token: await pushToken(), enabled: true, works: p.works, lines: p.lines });
+  else {
+    const saved = localStorage.getItem(TOKEN_KEY);
+    if (saved) await sendSubscription({ token: saved, enabled: false });
+  }
+}
+
+/** Après une mise à jour des infos trafic (version web) : notifie les nouvelles perturbations des lignes suivies */
+export function checkAlerts(p: AlertPrefs, messages: TrafficMsg[]): void {
+  if (!p.enabled || NATIVE) return;   // application : c'est le serveur qui envoie les notifications
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   let seen: string[] = [];
   try { seen = JSON.parse(localStorage.getItem(SEEN) ?? "[]") as string[]; } catch { /* rien */ }
@@ -78,8 +102,8 @@ export function checkAlerts(p: AlertPrefs, messages: TrafficMsg[]): void {
   try { localStorage.setItem(SEEN, JSON.stringify(messages.map(m => m.id))); } catch { /* ignoré */ }
 }
 
-/** Touche d'une notification (Android) : ouvrir les infos trafic */
+/** Notification touchée (application fermée ou ouverte) : ouvrir les infos trafic */
 export function onAlertTap(open: () => void): void {
-  if (!NATIVE) return;
-  void runner().then(r => r.addListener("backgroundRunnerNotificationReceived", () => open())).catch(() => {});
+  if (!NATIVE || !PUSH_READY) return;
+  void push().then(P => P.addListener("pushNotificationActionPerformed", () => open())).catch(() => {});
 }

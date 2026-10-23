@@ -116,6 +116,18 @@ Le site vitrine fourni (`site/index.html`) est une page unique, sans service ext
 ## 12. Ensuite : se passer des services partagés
 Votre VPS (6 vCPU, 12 Go) peut héberger les services gratuits dont dépend Kumm, pour ne plus dépendre d'infrastructures communautaires : **calcul de marche à pied** (OSRM ou Valhalla avec les données OpenStreetMap d'Alsace), **calcul des trajets** (MOTIS avec les horaires GTFS de la CTS, si votre accord le permet) et **tuiles de carte**. Le serveur est déjà prêt à les utiliser (variables `GEO_WALK_BASE`, `TRANSIT_BASE`, `TILE_BASE`) ; voir `MISE-EN-LIGNE.md`.
 
+## 13. Alertes trafic (notifications push, Firebase)
+1. **Projet Firebase** (gratuit) : https://console.firebase.google.com → « Créer un projet » (Google Analytics inutile).
+2. **Application Android** : dans le projet, « Ajouter une application » → Android → nom du package `fr.kumm.app` → télécharger **`google-services.json`**. Sur GitHub : Settings → Secrets and variables → Actions → **Secrets** → `GOOGLE_SERVICES_JSON` = tout le contenu du fichier. Recompiler l'APK.
+3. **Clé du serveur** : Paramètres du projet (roue dentée) → **Comptes de service** → « Générer une nouvelle clé privée » (fichier JSON). Sur le VPS :
+```
+mkdir -p ~/kumm/secrets && nano ~/kumm/secrets/firebase.json      # coller tout le contenu du fichier, Ctrl+O, Entrée, Ctrl+X
+chmod 600 ~/kumm/secrets/firebase.json
+cd ~/kumm && docker compose up -d --force-recreate kumm
+docker compose logs kumm | grep "Alertes push"                   # « actives (projet …) »
+```
+Cette clé permet d'envoyer des notifications à vos utilisateurs : ne la publiez jamais (le dossier `secrets/` est exclu du dépôt et de l'image).
+
 ## Dépannage rapide
 | Symptôme | Piste |
 |---|---|
