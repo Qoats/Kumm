@@ -25,6 +25,8 @@ import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { mountLiveMap, recenter, zoomBy } from "./livemap";
+import { CAN_UPDATE, checkUpdate, installUpdate } from "./update";
+import type { Release } from "./update";
 import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
 
 const app = document.getElementById("app") as HTMLElement;
@@ -63,7 +65,8 @@ function draw(): void {
     `<nav>${NAV.map(n => `<button data-tab="${n[0]}" class="${t === n[0] || (n[0] === "search" && t === "lines") ? "on" : ""}"><span class="ni">${ic(n[2])}</span>${n[1]}</button>`).join("")}</nav>` +
     whenSheet() +
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
-    (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
+    (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "") +
+    (S.updating !== null ? `<div class="updbar" role="status"><span>Téléchargement de la mise à jour… ${S.updating} %</span><i style="width:${S.updating}%"></i></div>` : "");
 
   const m = document.querySelector<HTMLElement>("#app > main");
   if (m && !o) m.scrollTop = top;
@@ -257,6 +260,7 @@ app.addEventListener("click", e => {
     case "zoomOut": zoomBy(-1); return;
     case "account": toast("Mon compte : bientôt disponible"); return;
     case "prefs": S.overlay = { k: "settings" }; break;
+    case "checkUpdate": void offerUpdate(true); return;
   }
   render();
 });
@@ -285,6 +289,41 @@ async function changeAlerts(what: string): Promise<void> {
   render();
   const now = MESSAGES.filter(m => followed(m, a)).length;
   toast(now ? `Alertes activées · ${now} perturbation${now > 1 ? "s" : ""} déjà en cours sur vos lignes` : "Alertes activées");
+}
+
+/* ---------- mises à jour de l'application (Android) : vérifiées au lancement, installées depuis l'application ---------- */
+let waitingPermission: Release | null = null;
+
+async function offerUpdate(manual: boolean): Promise<void> {
+  if (!CAN_UPDATE) { if (manual) toast("Mises à jour automatiques disponibles dans l'application Android"); return; }
+  let rel: Release | null;
+  try { rel = await checkUpdate(); } catch { if (manual) toast("Impossible de vérifier les mises à jour pour le moment"); return; }
+  if (!rel) { if (manual) toast(`Kumm est à jour (version ${VERSION})`); return; }
+  const r = rel;
+  S.modal = {
+    t: "Nouvelle version disponible",
+    p: `Kumm ${esc(r.version)} est prête à être installée (${(r.size / 1e6).toFixed(1).replace(".", ",")} Mo).`,
+    b: ["Plus tard", "Mettre à jour"], go: () => { void startUpdate(r); }
+  };
+  render();
+}
+
+async function startUpdate(rel: Release): Promise<void> {
+  if (S.updating !== null) return;
+  S.updating = 0; render();
+  try {
+    const r = await installUpdate(rel, pct => { if (pct !== S.updating) { S.updating = pct; render(); } });
+    S.updating = null;
+    if (r === "permission") {
+      // Android ouvre son réglage ; au retour dans Kumm, l'installation reprend toute seule
+      waitingPermission = rel;
+      S.modal = { t: "Une autorisation est nécessaire", p: "Activez « Autoriser depuis cette source » pour Kumm, puis revenez dans l'application : l'installation reprendra.", b: ["OK"] };
+    }
+    render();
+  } catch (e) {
+    S.updating = null; render();
+    toast(e instanceof Error && e.message ? e.message : "Échec de la mise à jour");
+  }
 }
 
 /** Premier lancement de l'application : propose tout de suite les alertes (fenêtre d'autorisation d'Android), une seule fois */
@@ -437,6 +476,15 @@ async function checkVersion(): Promise<void> {
   } catch { /* serveur injoignable : les écrans l'indiquent déjà */ }
 }
 if (!CONFIG.USE_MOCK) void checkVersion();
+// nouvelle version de l'application : proposée quelques secondes après le lancement (sans gêner l'affichage des horaires)
+if (!CONFIG.USE_MOCK && CAN_UPDATE) {
+  setTimeout(() => { if (!S.modal) void offerUpdate(false); }, 4000);
+  void CapApp.addListener("resume", () => {
+    if (!waitingPermission) return;
+    const rel = waitingPermission; waitingPermission = null;
+    S.modal = null; void startUpdate(rel);
+  });
+}
 
 /* Perte et retour de la connexion du téléphone */
 window.addEventListener("offline", () => toast("Vous êtes hors ligne"));

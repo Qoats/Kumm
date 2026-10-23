@@ -13,6 +13,7 @@ import { withinLimit } from "./limit.js";
 import { parkingsRelais, poiResult, velhop } from "./poi.js";
 import { recordRequest, stats } from "./stats.js";
 import { serveStatic } from "./static.js";
+import { serveUpdate, updateStatus } from "./updates.js";
 import { serveTile } from "./tiles.js";
 import { parseGeneralMessages } from "./messages.js";
 import { vehiclesAt } from "./vehicles.js";
@@ -255,6 +256,7 @@ function health(res: ServerResponse): Promise<void> {
     cts: { en_pause: paused.paused, secondes: paused.paused ? paused.seconds : 0, appels_derniere_minute: ctsCallsLastMinute(), plafond_par_minute: CTS_BUDGET_PER_MIN, refuses_plafond: stats.budgetRefused, arrets_connus: knownRefs?.size ?? null, arrets_inconnus_demandes: stats.unknownRefs, arrets_inconnus_refuses: stats.unknownRefused },
     reseau_en_memoire: { ...realtimeStatus(), arrets_servis_depuis_la_memoire: stats.snapshotServed },
     alertes: alertsStatus(),
+    apk: updateStatus(),
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });
   res.setHeader("Cache-Control", "no-store");
@@ -312,6 +314,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (!tileRefererAllowed(req)) { res.writeHead(403, { "Content-Type": "text/plain" }); return void res.end("Tuiles réservées à l'application"); }
     return serveTile(res, p);
   }
+  if (p === "/app/latest.json" || p === "/app/kumm.apk") return serveUpdate(req, res, p);
   if (p === "/diag" && ENABLE_DIAG) return diag(res);
   return serveStatic(res, p);
 }

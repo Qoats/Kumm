@@ -128,6 +128,19 @@ docker compose logs kumm | grep "Alertes push"                   # « actives (p
 ```
 Cette clé permet d'envoyer des notifications à vos utilisateurs : ne la publiez jamais (le dossier `secrets/` est exclu du dépôt et de l'image).
 
+## Mises à jour automatiques (serveur et application Android)
+Le script `deploy/kumm-update.sh` du dépôt, lancé toutes les 5 minutes par le minuteur `kumm-update.timer` :
+- met le serveur à jour depuis `main` (retour à l'ancienne version si la nouvelle ne répond pas) ;
+- copie dans `~/kumm/apk/` le dernier APK signé publié par GitHub (branche `apk`) : l'application le propose au lancement et l'installe elle-même.
+
+Une seule fois, pour que le minuteur utilise le script du dépôt (il suivra ensuite tout seul ses évolutions) :
+```
+printf '#!/usr/bin/env bash\nexec bash /home/kumm/kumm/deploy/kumm-update.sh\n' > ~/kumm-update.sh
+sudo systemctl start kumm-update.service && journalctl -u kumm-update -n 20     # « APK : version … disponible »
+```
+Publier une version pour les téléphones : Actions → « APK Android » → Run workflow (case « Proposer cette version aux téléphones » cochée).
+Vérification : `https://app.kumm.fr/app/latest.json`, ou la partie `apk` de `/health`.
+
 ## Dépannage rapide
 | Symptôme | Piste |
 |---|---|

@@ -14,7 +14,7 @@ export function clientIp(req: IncomingMessage): string {
   return req.socket.remoteAddress ?? "?";
 }
 
-export function withinLimit(req: IncomingMessage, bucket: "api" | "tiles", limit: number): boolean {
+export function withinLimit(req: IncomingMessage, bucket: "api" | "tiles" | "apk", limit: number): boolean {
   if (limit <= 0) return true;
   const key = `${bucket}|${clientIp(req)}`, now = Date.now();
   let h = hits.get(key);

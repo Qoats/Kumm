@@ -48,6 +48,8 @@ export interface State {
   askedLoc: boolean;
   swiped: boolean;
   toast: string;
+  /** téléchargement d'une mise à jour de l'application : pourcentage (null : aucun) */
+  updating: number | null;
 }
 
 export const STOPS: Stop[] = CONFIG.USE_MOCK ? [...MOCK_STOPS] : [];
@@ -66,7 +68,7 @@ export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now(
 
 export const S: State = {
   tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null,
-  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: ""
+  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", updating: null
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }
 

@@ -20,6 +20,7 @@ import type { LL } from "./geo";
 import { esc } from "./util";
 import { VEHICLES, serverNow } from "./vehicles";
 import { NATIVE, PUSH_READY } from "./alerts";
+import { CAN_UPDATE } from "./update";
 
 /* ============ COMPOSANTS ============ */
 export const lineChip = (l: string, sm = false): string => {
@@ -521,6 +522,7 @@ export function overlaySettings(): string {
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
       <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro ; gares TER : CTS<br>Application indépendante, non affiliée à la CTS ni à l’Eurométropole</div></div>
+    ${CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher une mise à jour</button>` : ""}
     <button class="ghost" data-reset="1">Rétablir les réglages d’origine</button>
   </div></main></div>`;
 }
