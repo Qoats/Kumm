@@ -168,17 +168,37 @@ const vehIcon = (line: string, h: number): L.DivIcon => L.divIcon({
 });
 
 /** Place les véhicules visibles (catégories et filtre Tram / Bus respectés) ; appelé chaque seconde */
+/**
+ * Véhicule à quai ou tout près d'une station : décalé sur le côté (à droite de son sens de marche, comme sur un quai)
+ * pour ne pas cacher l'icône de la station. Le décalage grandit en douceur à l'approche, sans saut.
+ */
+function besideStops(m: L.Map, p: L.LatLngTuple, h: number, stops: L.Point[], min: number): L.LatLngTuple {
+  const pt = m.latLngToContainerPoint(p), reach = min * 1.8;
+  let near: L.Point | null = null, best = reach;
+  for (const s of stops) { const d = s.distanceTo(pt); if (d < best) { best = d; near = s; } }
+  if (!near) return p;
+  const t = 1 - best / reach, push = min * t * t * (3 - 2 * t);   // courbe douce : 0 au loin, « min » sur la station
+  const r = (h * Math.PI) / 180, side = L.point(Math.cos(r), Math.sin(r));   // perpendiculaire droite du cap (0° = nord)
+  const q = m.containerPointToLatLng(pt.add(side.multiplyBy(push)));
+  return [q.lat, q.lng];
+}
+
 function syncVehicles(): void {
   if (!map || !vehLayer) return;
   const b = map.getBounds().pad(0.3), seen = new Set<string>();
   if (zooming) return;
+  // icônes des stations à l'écran (en pixels), pour que les véhicules ne les recouvrent pas
+  const mp = map, stopPts: L.Point[] = [];
+  for (const [id, layer] of shown) if (id.startsWith("s:")) stopPts.push(mp.latLngToContainerPoint((layer as L.Marker).getLatLng()));
+  const clearance = shownMode === "icons" ? 33 : 20;
   const show = map.getZoom() >= DOT_ZOOM;
   let count = 0;
   for (const v of show ? VEHICLES.values() : []) {
     const k = vehicleKind(v);
     if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
-    const p = vehiclePos(v), h = Math.round(vehicleHeading(v));
-    if (!b.contains(p) || ++count > 150) continue;
+    const h = Math.round(vehicleHeading(v)), raw = vehiclePos(v);
+    if (!b.contains(raw) || ++count > 150) continue;
+    const p = stopPts.length ? besideStops(mp, raw, h, stopPts, clearance) : raw;
     seen.add(v.id);
     let m = vehMarkers.get(v.id);
     if (!m) {
