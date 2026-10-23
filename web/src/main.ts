@@ -143,17 +143,23 @@ const matchesFilter = (s: { name: string }): boolean =>
 async function loadDeps(): Promise<void> {
   try {
     if (S.tab === "nearby" && !S.overlay) {
+      // les 12 arrêts les plus proches sont interrogés, et les 4 plus proches qui ont encore des passages sont affichés :
+      // le soir, l'arrêt de bus le plus proche n'a souvent plus rien, alors qu'un tram passe un peu plus loin
       const near = STOPS.filter(s => matchesFilter(s))
-        .sort((a, b) => Math.hypot(a.x - 170, a.y - 222) - Math.hypot(b.x - 170, b.y - 222)).slice(0, 4);
+        .sort((a, b) => Math.hypot(a.x - 170, a.y - 222) - Math.hypot(b.x - 170, b.y - 222)).slice(0, 12);
       const filter = S.filter;
       await fillSlot("nearlist", async () => {
         const res = await Promise.all(near.map(s => nextDepartures(s).then(ds => ds.map(d => ({ stop: s, d }))).catch(() => [] as StopDeparture[])));
         const all: StopDeparture[] = [];
-        for (const rows of res) {
+        let stops = 0;
+        for (const rows of res) {   // dans l'ordre de distance
           // les 2 premières lignes de chaque arrêt, avec toutes leurs directions (choisies dans la tuile)
-          const kept = rows.filter(({ d }) => filter === "all" || (filter === "tram") === isTram(d.line)).sort(sortByTime);
+          const now = Date.now();
+          const kept = rows.filter(({ d }) => (filter === "all" || (filter === "tram") === isTram(d.line)) && d.times.some(t => t > now - 30000)).sort(sortByTime);
+          if (!kept.length) continue;
           const lines = [...new Set(kept.map(r => r.d.line))].slice(0, 2);
           kept.filter(r => lines.includes(r.d.line)).forEach(r => all.push(r));
+          if (++stops >= 4) break;
         }
         return depCards(all);
       });
