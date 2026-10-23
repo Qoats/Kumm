@@ -1,6 +1,6 @@
 import type { Place, Stop, StopDeparture } from "../../shared/types";
 import { CONFIG, VERSION } from "./config";
-import { ALL_LINES, COLORS, DIRS, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
+import { ALL_LINES, COLORS, DIRS, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES } from "./themes";
@@ -437,7 +437,7 @@ export function overlayStop(id: string): string {
   if (!s) return "";
   const fav = S.fav.includes(id);
   return `<div class="overlay">${bar(s.name)}
-   <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700">${markerIcon(kindOfStop(s), 30)}${KINDS[kindOfStop(s)].label}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
+   <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
    <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div><div id="stopdeps"></div></div></main></div>`;
 }
 
@@ -468,6 +468,13 @@ export function depCards(list: StopDeparture[]): string {
       <div class="f"><span>${ic(lineKind(d.line) === "ter" ? "train" : isTram(d.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(d.dest)}</b></span></span><span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div></button>`);
   }
   return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
+}
+
+/** Onglets des départs d'un arrêt desservi par plusieurs modes */
+export function stopTabs(modes: readonly ("tram" | "bus" | "ter")[], cur: "tram" | "bus" | "ter" | null): string {
+  const lab = { tram: "Tram", bus: "Bus", ter: "Train" } as const, icn = { tram: "tram", bus: "bus", ter: "train" } as const;
+  return `<div class="seg stabs"><button data-smode="" class="${cur ? "" : "on"}">${ic("bus")}Tous</button>${modes.map(m =>
+    `<button data-smode="${m}" class="${cur === m ? "on" : ""}">${ic(icn[m])}${lab[m]}</button>`).join("")}</div>`;
 }
 
 /** Fiche d'un arrêt : infos trafic qui le concernent (un arrêt sans passage est souvent un arrêt non desservi) */

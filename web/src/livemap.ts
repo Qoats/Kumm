@@ -1,6 +1,6 @@
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { kindOfStop } from "./data";
+import { isHub, kindOfStop } from "./data";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { markerIcon } from "./markers";
@@ -114,9 +114,14 @@ function sync(): void {
   };
   for (const s of STOPS) {
     const k = kindOfStop(s);
-    if (!S.layers[k] || (S.filter === "tram" && k !== "tram") || (S.filter === "bus" && k !== "bus")) continue;
-    if (mode === "far" && k !== "tram") continue;
-    place("s:" + s.id, s.lat, s.lon, k, `${KINDS[k].label} · ${s.name}`, () => { S.overlay = { k: "stop", id: s.id }; render(); });
+    if (isHub(s)) {
+      // pôle d'échanges : visible dès que les trams, les bus ou les gares sont affichés, même de loin
+      if (!S.layers.tram && !S.layers.bus && !S.layers.ter) continue;
+    } else {
+      if (!S.layers[k] || (S.filter === "tram" && k !== "tram") || (S.filter === "bus" && k !== "bus")) continue;
+      if (mode === "far" && k !== "tram") continue;
+    }
+    place("s:" + s.id, s.lat, s.lon, k, `${isHub(s) ? "Gare" : KINDS[k].label} · ${s.name}`, () => { S.overlay = { k: "stop", id: s.id }; render(); });
   }
   for (const p of POIS) {
     if (!S.layers[p.kind] || (mode === "far" && p.kind !== "pr")) continue;

@@ -30,6 +30,9 @@ export const TRAM_STATIONS: string[] = [
   "Wolfisheim Henri Rendu", "Parc d'activités d'Eckbolsheim Zénith", "Bois Romain", "Eckelse", "Octroi", "Hohberg", "Gruber"
 ];
 
+/** Pôles d'échanges : une seule icône de gare sur la carte, et une fiche avec tous les départs (onglets Tous / Tram / Bus) */
+export const HUBS: string[] = ["Gare Centrale"];
+
 /** Gares dont le nom est distinctif : reconnues même sans le mot « gare » */
 export const TER_STATIONS: string[] = [
   "Strasbourg Ville", "Krimmeri Meinau", "Strasbourg Roethig", "Fegersheim Lipsheim", "Entzheim Aéroport"
@@ -53,6 +56,10 @@ const TER_SET = new Set(TER_STATIONS.map(key));
 const TER_TOWN_SET = new Set(TER_TOWNS.map(key));
 
 export const isTramStationName = (name: string): boolean => TRAM_SET.has(key(name));
+const HUB_SET = new Set(HUBS.map(key));
+export const isHubName = (name: string): boolean => HUB_SET.has(key(name));
+/** Clé de regroupement des quais : « Gare Centrale » et « Gare centrale » sont le même arrêt */
+export const stopKey = key;
 
 export function isTerStationName(name: string): boolean {
   const k = key(name);

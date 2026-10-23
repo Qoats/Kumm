@@ -367,3 +367,4 @@ a.box,.more a{text-decoration:none;color:inherit}
 .stopnote small{display:block;color:var(--mute);margin-top:2px;font-size:13.5px}
 .stopnote .sn-i{flex:none;width:24px;height:24px;border-radius:50%;background:#E8402F;color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px;margin-top:1px}
 .stopnote .sn-l{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.seg.stabs{padding:0 0 14px}

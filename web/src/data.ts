@@ -1,6 +1,7 @@
 import type { Poi, Stop } from "../../shared/types";
+import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
-import { isTerStationName, isTramStationName } from "./network";
+import { isHubName, isTerStationName, isTramStationName } from "./network";
 
 /* Centre de la carte (Homme de Fer) et échelle : 1° de longitude ≈ 8832 unités, 1° de latitude ≈ 13344 unités */
 export const CENTER = { lat: 48.5846, lon: 7.7507 };
@@ -40,10 +41,16 @@ export const lineKind = (l: string): Layer => (isRail(l) ? "ter" : isTram(l) ? "
  * jamais d'après les lignes de l'API. Une station de tram reste « tram » même si des bus s'y arrêtent.
  */
 export function stopKind(name: string): Layer {
+  if (isHubName(name)) return "ter";   // pôle d'échanges (gare) : icône de gare
   if (isTramStationName(name)) return "tram";
   if (isTerStationName(name)) return "ter";
   return "bus";
 }
+
+/** Pôle d'échanges (Gare Centrale) : desservi par les trams et les bus, affiché avec une icône de gare */
+export const isHub = (s: { name: string }): boolean => isHubName(s.name);
+/** Nom du type d'arrêt affiché dans sa fiche */
+export const stopLabel = (s: { name: string }): string => (isHub(s) ? "Gare · tram et bus" : KINDS[kindOfStop(s)].label);
 
 const kindCache = new Map<string, Layer>();
 export const kindOfStop = (s: { name: string }): Layer => {

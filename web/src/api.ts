@@ -3,6 +3,7 @@ import type { Departure, Poi, PoiKind, Stop } from "../../shared/types";
 import type { AnnotatedStopPoint, SiriStopMonitoring, SiriStopPoints } from "../../shared/cts-api";
 import { appHeaders, CONFIG, url } from "./config";
 import { DIRS, isTram, kindOfStop } from "./data";
+import { stopKey } from "./network";
 import { parseLineInfo } from "./lines";
 import type { LineInfo } from "./lines";
 import type { TrafficMsg } from "./data";
@@ -90,13 +91,17 @@ function logicalCode(s: AnnotatedStopPoint): string {
 }
 
 /** Liste des arrêts du réseau, quais regroupés par nom */
+const caps = (t: string): number => (t.match(/\p{Lu}/gu) ?? []).length;
+
 export async function loadStops(): Promise<Stop[]> {
   const j = await get<SiriStopPoints>("/stoppoints-discovery");
   interface Group { id: string; name: string; codes: Set<string>; quays: string[]; lat: number; lon: number; n: number; lines: Set<string> }
   const by: Record<string, Group> = {};
   for (const s of j.StopPointsDelivery.AnnotatedStopPointRef ?? []) {
     if (!s.Location) continue;
-    const g = (by[s.StopName] ??= { id: s.StopPointRef, name: s.StopName, codes: new Set(), quays: [], lat: 0, lon: 0, n: 0, lines: new Set() });
+    // « Gare Centrale » et « Gare centrale » : un seul arrêt (la CTS écrit parfois le même nom de deux façons)
+    const g = (by[stopKey(s.StopName)] ??= { id: s.StopPointRef, name: s.StopName, codes: new Set(), quays: [], lat: 0, lon: 0, n: 0, lines: new Set() });
+    if (caps(s.StopName) > caps(g.name)) g.name = s.StopName;
     g.codes.add(logicalCode(s));
     g.quays.push(s.StopPointRef);
     g.lat += Number(s.Location.Latitude);

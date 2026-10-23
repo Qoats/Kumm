@@ -11,7 +11,7 @@ import "@fontsource/plus-jakarta-sans/latin-800.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-800.css";
 import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
-import { COLORS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isTram, kindOfStop, lineLabel } from "./data";
+import { COLORS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
 import { loadLineInfo, loadMessages, loadPois, loadStops, nextDepartures } from "./api";
 import { KINDS } from "./kinds";
@@ -19,7 +19,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  debugBox, depCards, stopNotice, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
+  debugBox, depCards, stopNotice, stopTabs, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc } from "./util";
@@ -134,7 +134,7 @@ function restoreSlots(): void {
 
 const sortByTime = (a: StopDeparture, b: StopDeparture): number => a.d.times[0] - b.d.times[0];
 const matchesFilter = (s: { name: string }): boolean =>
-  S.filter === "all" || (S.filter === "tram" ? kindOfStop(s) === "tram" : kindOfStop(s) === "bus");
+  S.filter === "all" || isHub(s) || (S.filter === "tram" ? kindOfStop(s) === "tram" : kindOfStop(s) === "bus");
 
 async function loadDeps(): Promise<void> {
   try {
@@ -162,7 +162,12 @@ async function loadDeps(): Promise<void> {
       const s = stopById(S.overlay.id);
       if (s && document.getElementById("stopdeps")) {
         await fillSlot("stopdeps", async () => {
-          const h = depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime));
+          const all = (await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime);
+          // arrêt desservi par plusieurs modes (Gare Centrale, Homme de Fer…) : onglets Tous / Tram / Bus
+          const modes = (["tram", "bus", "ter"] as const).filter(m => all.some(x => lineKind(x.d.line) === m));
+          const cur = S.overlay?.k === "stop" && S.overlay.mode && modes.includes(S.overlay.mode) ? S.overlay.mode : null;
+          const tabs = modes.length > 1 ? stopTabs(modes, cur) : "";
+          const h = tabs + depCards(cur ? all.filter(x => lineKind(x.d.line) === cur) : all);
           // sans passage : souvent un arrêt non desservi (travaux, déviation) ; l'info trafic l'explique mieux que les détails techniques
           return stopNotice(s.name) + (h.includes('class="dep"') ? h : h + debugBox());
         });
@@ -180,7 +185,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -208,6 +213,7 @@ app.addEventListener("click", e => {
     if (r && PLAN?.dest) startNav({ title: `À vélo vers ${PLAN.dest.label}`, route: { distance: r.distance, duration: r.duration, coords: r.coords, steps: r.steps, mode: "bike" }, dest: PLAN.dest });
     return;
   }
+  if (d.smode !== undefined) { if (S.overlay?.k === "stop") { S.overlay = { ...S.overlay, mode: (d.smode || undefined) as "tram" | "bus" | "ter" | undefined }; } render(); return; }
   if (d.mode) { if (S.trip.mode !== d.mode) S.trip.sel = 0; S.trip.mode = d.mode as "walk" | "bike" | "transit"; render(); return; }
   if (d.sel !== undefined) { S.trip.sel = Number(d.sel); render(); return; }
   if (d.alerts) { void changeAlerts(d.alerts); return; }
