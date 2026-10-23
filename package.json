@@ -1,6 +1,6 @@
 {
   "name": "kumm",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.server.json --noEmit",
     "build:android": "vite build --mode android && cap sync android",
     "android:open": "cap open android",
-    "check:secrets": "node scripts/check-secrets.mjs"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "build:shapes": "node scripts/build-shapes.mjs"
   },
   "engines": {
     "node": ">=20.6"

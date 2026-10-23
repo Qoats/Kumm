@@ -18,6 +18,7 @@ ENV NODE_ENV=production PORT=3000
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/data ./data
 USER node
 EXPOSE 3000
 # Docker signale « unhealthy » si le serveur ne répond plus (visible avec « docker compose ps ») ; un plantage, lui, redémarre automatiquement

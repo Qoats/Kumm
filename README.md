@@ -99,6 +99,7 @@ Les fonds de carte viennent des serveurs publics d'OpenStreetMap, faits pour un 
 | Fonds de carte, marche à pied | © contributeurs OpenStreetMap (tuiles relayées par le serveur ; routage `routing.openstreetmap.de`) |
 | Adresses | Base Adresse Nationale (`api-adresse.data.gouv.fr`) |
 | Trajets avec correspondances | Transitous / MOTIS (`api.transitous.org`) |
+| Tracés des lignes (véhicules sur la carte) | © contributeurs OpenStreetMap (ODbL) : itinéraires CTS extraits par `npm run build:shapes` dans `data/shapes.json` (à relancer quand le réseau change) |
 | Carte 3D du guidage | OpenFreeMap (`tiles.openfreemap.org`, tuiles vectorielles OpenMapTiles, © contributeurs OpenStreetMap), affichée avec MapLibre GL ; repli sur la carte 2D si le téléphone ne sait pas l'afficher |
 Pas encore branchés : Flex'hop (zones de transport à la demande) ; les gares TER n'ont pas de position dans cette version.
 

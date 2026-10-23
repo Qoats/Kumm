@@ -16,6 +16,8 @@ export interface Vehicle {
   b: [number, number, number];
   h: number;
   next: [string, number][];
+  /** tracé de la ligne entre a et b ; absent : ligne droite */
+  p?: [number, number][];
 }
 
 export const VEHICLES = new Map<string, Vehicle>();
@@ -43,11 +45,47 @@ export function refreshVehicles(onUpdate: () => void): void {
     .finally(() => { loading = false; lastFetch = Date.now(); });
 }
 
-/** Position à l'instant t, entre l'arrêt quitté et le suivant */
+const rad = (d: number): number => (d * Math.PI) / 180;
+const len = (a: [number, number], b: [number, number]): number => Math.hypot((b[1] - a[1]) * Math.cos(rad(a[0])), b[0] - a[0]);
+/** Distances cumulées le long du tracé (calculées une fois par véhicule) */
+const cums = new WeakMap<Vehicle, number[]>();
+function cumOf(v: Vehicle, p: [number, number][]): number[] {
+  let c = cums.get(v);
+  if (!c) { c = [0]; for (let i = 1; i < p.length; i++) c.push(c[i - 1] + len(p[i - 1], p[i])); cums.set(v, c); }
+  return c;
+}
+
+/** Avancée sur le tronçon (0 = arrêt quitté, 1 = arrêt suivant) */
+function progress(v: Vehicle, t: number): number {
+  const t1 = v.a[2], t2 = v.b[2];
+  return t2 > t1 ? Math.max(0, Math.min(1, (t - t1) / (t2 - t1))) : 1;
+}
+
+/** Point du tracé à la fraction f, et indice du segment où il se trouve */
+function along(v: Vehicle, f: number): { pos: [number, number]; i: number } | null {
+  const p = v.p;
+  if (!p || p.length < 2) return null;
+  const c = cumOf(v, p), target = f * c[c.length - 1];
+  let i = 1;
+  while (i < c.length - 1 && c[i] < target) i++;
+  const k = c[i] > c[i - 1] ? (target - c[i - 1]) / (c[i] - c[i - 1]) : 0;
+  return { pos: [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * k, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * k], i };
+}
+
+/** Position à l'instant t : le long du tracé de la ligne s'il est connu, sinon en ligne droite entre les deux arrêts */
 export function vehiclePos(v: Vehicle, t = serverNow()): [number, number] {
-  const [la1, lo1, t1] = v.a, [la2, lo2, t2] = v.b;
-  const f = t2 > t1 ? Math.max(0, Math.min(1, (t - t1) / (t2 - t1))) : 1;
+  const f = progress(v, t), a = along(v, f);
+  if (a) return a.pos;
+  const [la1, lo1] = v.a, [la2, lo2] = v.b;
   return [la1 + (la2 - la1) * f, lo1 + (lo2 - lo1) * f];
+}
+
+/** Direction à l'instant t (degrés) : celle du tracé à cet endroit, pour que la flèche suive les virages */
+export function vehicleHeading(v: Vehicle, t = serverNow()): number {
+  const a = along(v, progress(v, t));
+  if (!a || !v.p) return v.h;
+  const p0 = v.p[a.i - 1], p1 = v.p[a.i];
+  return (Math.atan2((p1[1] - p0[1]) * Math.cos(rad(p0[0])), p1[0] - p0[0]) * 180 / Math.PI + 360) % 360;
 }
 
 export const vehicleKind = (v: Vehicle): "tram" | "bus" => (isTram(v.line) ? "tram" : "bus");

@@ -4,6 +4,7 @@
  * les deux selon l'heure. Ce n'est pas un GPS : un véhicule bloqué entre deux arrêts n'est recalé qu'à la mise à jour suivante.
  */
 import { snapshot } from "./realtime.js";
+import { pathBetween } from "./shapes.js";
 
 /** [latitude, longitude, heure en ms] */
 type At = [number, number, number];
@@ -20,6 +21,8 @@ export interface Vehicle {
   h: number;
   /** prochains arrêts : [nom, heure en ms] */
   next: [string, number][];
+  /** tracé de la ligne entre a et b ([latitude, longitude][]), absent si inconnu (ligne droite) */
+  p?: [number, number][];
 }
 
 const rad = (d: number): number => (d * Math.PI) / 180;
@@ -49,9 +52,11 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
         h = heading(s.p, n.p);
       }
       if (!a || !b) continue;
+      const p = a !== b && n ? pathBetween(c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : null;
       out.push({
         id: c.id, line: c.line, dest: c.dest, rt: c.realTime, a, b, h,
-        next: calls.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr])
+        next: calls.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr]),
+        ...(p ? { p } : {})
       });
       break;
     }

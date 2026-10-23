@@ -8,7 +8,7 @@ import { makeBaseLayer, wantsDarkMap } from "./tiles";
 import { POIS, S, STOPS, USER, render } from "./store";
 import { COLORS, lineLabel } from "./data";
 import { esc } from "./util";
-import { VEHICLES, refreshVehicles, vehicleKind, vehiclePos } from "./vehicles";
+import { VEHICLES, refreshVehicles, vehicleHeading, vehicleKind, vehiclePos } from "./vehicles";
 
 /**
  * Vraie carte (OpenStreetMap) pour l'écran « À proximité ».
@@ -75,6 +75,8 @@ function create(): void {
     interactive: false, zIndexOffset: 1000
   }).addTo(map);
   map.on("moveend", sync);
+  // pour inspecter la carte dans la console du navigateur (comme __kumm.STOPS)
+  (window as unknown as { __kummMap?: L.Map }).__kummMap = map;
 }
 
 /** Affiche seulement les repères visibles à l'écran (la liste complète compte des milliers d'arrêts) */
@@ -147,20 +149,20 @@ function syncVehicles(): void {
   for (const v of show ? VEHICLES.values() : []) {
     const k = vehicleKind(v);
     if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
-    const p = vehiclePos(v);
+    const p = vehiclePos(v), h = Math.round(vehicleHeading(v));
     if (!b.contains(p)) continue;
     seen.add(v.id);
     let m = vehMarkers.get(v.id);
     if (!m) {
-      m = L.marker(p, { icon: vehIcon(v.line, v.h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}` })
+      m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}` })
         .on("click", () => { S.overlay = { k: "veh", id: v.id }; render(); })
         .addTo(vehLayer);
-      (m as L.Marker & { _h?: number })._h = v.h;
       vehMarkers.set(v.id, m);
     } else {
       m.setLatLng(p);
-      const mm = m as L.Marker & { _h?: number };
-      if (mm._h !== v.h) { m.setIcon(vehIcon(v.line, v.h)); mm._h = v.h; }
+      // la flèche suit les virages du tracé, sans recréer l'icône
+      const arrow = m.getElement()?.querySelector<HTMLElement>(".va");
+      if (arrow) arrow.style.transform = `rotate(${h}deg)`;
     }
   }
   for (const [id, m] of vehMarkers) if (!seen.has(id)) { vehLayer.removeLayer(m); vehMarkers.delete(id); }
