@@ -1,6 +1,6 @@
 import type { Place, Stop, StopDeparture } from "../../shared/types";
 import { CONFIG, VERSION } from "./config";
-import { ALL_LINES, COLORS, DIRS, lineText, MESSAGES, MSG_STATE, hasAlert, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
+import { ALL_LINES, COLORS, DIRS, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES } from "./themes";
@@ -468,6 +468,12 @@ export function depCards(list: StopDeparture[]): string {
       <div class="f"><span>${ic(lineKind(d.line) === "ter" ? "train" : isTram(d.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(d.dest)}</b></span></span><span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div></button>`);
   }
   return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
+}
+
+/** Fiche d'un arrêt : infos trafic qui le concernent (un arrêt sans passage est souvent un arrêt non desservi) */
+export function stopNotice(name: string): string {
+  return messagesForStop(name).slice(0, 3).map(m => `<button class="stopnote" data-act="msgs">
+      <span class="sn-i">!</span><span><b>${esc(m.title)}</b>${m.period ? `<small>${esc(m.period)}</small>` : ""}${m.lines.length ? `<span class="sn-l">${m.lines.slice(0, 6).map(l => lineChip(l, true)).join("")}</span>` : ""}</span></button>`).join("");
 }
 
 export function debugBox(): string {

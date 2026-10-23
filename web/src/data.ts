@@ -93,6 +93,14 @@ export const MESSAGES: TrafficMsg[] = [];
 export const MSG_STATE: { status: "loading" | "ok" | "error" } = { status: "loading" };
 const sameLine = (a: string, b: string): boolean => a === b || lineLabel(a) === lineLabel(b);
 export const messagesFor = (l: string): TrafficMsg[] => MESSAGES.filter(m => m.lines.some(r => sameLine(r, l)));
+/** Infos trafic qui citent un arrêt par son nom (arrêt non desservi, déplacé, terminus modifié…) */
+const fold = (t: string): string => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, " ").toLowerCase();
+export function messagesForStop(name: string): TrafficMsg[] {
+  const n = fold(name).trim();
+  if (n.length < 4) return [];
+  const re = new RegExp(`(^|[^a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}($|[^a-z0-9])`);
+  return MESSAGES.filter(m => re.test(fold(m.title + " " + m.text)));
+}
 /** Ligne touchée par un incident ou des travaux en cours */
 export const hasAlert = (l: string): boolean => MESSAGES.some(m => m.lines.some(r => sameLine(r, l)));
 

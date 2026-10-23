@@ -8,7 +8,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  debugBox, depCards, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
+  debugBox, depCards, stopNotice, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc } from "./util";
@@ -152,7 +152,8 @@ async function loadDeps(): Promise<void> {
       if (s && document.getElementById("stopdeps")) {
         await fillSlot("stopdeps", async () => {
           const h = depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime));
-          return h.includes('class="dep"') ? h : h + debugBox();
+          // sans passage : souvent un arrêt non desservi (travaux, déviation) ; l'info trafic l'explique mieux que les détails techniques
+          return stopNotice(s.name) + (h.includes('class="dep"') ? h : h + debugBox());
         });
       }
     }

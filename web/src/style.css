@@ -362,3 +362,8 @@ a.box,.more a{text-decoration:none;color:inherit}
 :root[data-scheme="contrast"] .buy-hero{border:2px solid #fff;box-shadow:none}
 .buy-hero .qi{display:grid;place-items:center;background:var(--accent-soft)}
 .buy-hero .qi svg{fill:none;stroke:var(--accent-ink);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.stopnote{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:color-mix(in srgb,#E8402F 12%,var(--card));border:1px solid color-mix(in srgb,#E8402F 35%,transparent);border-radius:16px;padding:12px 14px;margin:0 0 10px;color:var(--ink);font:inherit}
+.stopnote b{display:block;font-size:15.5px;line-height:1.35}
+.stopnote small{display:block;color:var(--mute);margin-top:2px;font-size:13.5px}
+.stopnote .sn-i{flex:none;width:24px;height:24px;border-radius:50%;background:#E8402F;color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px;margin-top:1px}
+.stopnote .sn-l{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
