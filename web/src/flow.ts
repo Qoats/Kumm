@@ -2,7 +2,7 @@ import type { Place } from "../../shared/types";
 import { startNav } from "./nav";
 import { fetchWalk } from "./walk";
 import { fetchBike } from "./bike";
-import { JOURNEYS, PLAN } from "./views";
+import { JOURNEYS, PLAN, TRIP } from "./trip";
 import { hm, minutes } from "./transit";
 import type { Journey } from "./transit";
 import { CONFIG } from "./config";
@@ -28,7 +28,8 @@ export async function launchNav(kind: string): Promise<void> {
   if (kind.startsWith("j:")) return launchJourney(Number(kind.slice(2)));
   try {
     if (kind === "walk") {
-      const route = await fetchWalk(plan.origin, plan.dest);
+      // déjà calculé pour l'écran Itinéraires : pas de nouvel appel
+      const route = TRIP?.walk.data && TRIP.origin === plan.origin ? TRIP.walk.data : await fetchWalk(plan.origin, plan.dest);
       startNav({ title: `À pied vers ${plan.dest.label}`, route, dest: plan.dest });
       return;
     }

@@ -8,7 +8,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  debugBox, depCards, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayStop, planTrips, screenBuy, screenHome,
+  debugBox, depCards, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo
 } from "./views";
 import { cmpVersion, esc } from "./util";
@@ -21,7 +21,8 @@ import type { Place, Poi, StopDeparture } from "../../shared/types";
 import { buildVeloparks } from "./places";
 import { geocode } from "./walk";
 import { bikeToPoi, launchNav, walkToPoi } from "./flow";
-import { BIKE_ROUTES, PLAN } from "./views";
+import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
+import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { mountLiveMap, recenter } from "./livemap";
 
@@ -70,6 +71,8 @@ function draw(): void {
   if (okey !== lastOverlay) { if (o) document.querySelector(".overlay")?.classList.add("enter"); lastOverlay = okey; }
   const slot = document.getElementById("livemap-slot");
   if (slot) mountLiveMap(slot);
+  const tslot = document.getElementById("tripmap-slot");
+  if (tslot) mountTripMap(tslot);
   restoreSlots();
   void loadDeps();
 }
@@ -137,7 +140,8 @@ async function loadDeps(): Promise<void> {
       }
     }
     if (S.tab === "trips") {
-      if (document.getElementById("trips")) await fillSlot("trips", async () => CONFIG.USE_MOCK ? tripsDemo() : planTrips());
+      if (CONFIG.USE_MOCK) { if (document.getElementById("trips")) await fillSlot("trips", async () => tripsDemo()); }
+      else ensurePlanned();   // calcule une seule fois par trajet ; chaque mode s'affiche dès qu'il arrive
     }
   } catch (e) {
     console.error(e);
@@ -147,7 +151,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-sel],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -175,7 +179,8 @@ app.addEventListener("click", e => {
     if (r && PLAN?.dest) startNav({ title: `À vélo vers ${PLAN.dest.label}`, route: { distance: r.distance, duration: r.duration, coords: r.coords, steps: r.steps, mode: "bike" }, dest: PLAN.dest });
     return;
   }
-  if (d.mode) { S.trip.mode = d.mode as "walk" | "bike" | "transit"; render(); return; }
+  if (d.mode) { if (S.trip.mode !== d.mode) S.trip.sel = 0; S.trip.mode = d.mode as "walk" | "bike" | "transit"; render(); return; }
+  if (d.sel !== undefined) { S.trip.sel = Number(d.sel); render(); return; }
   if (d.poibike) { void bikeToPoi(d.poibike); return; }
   if (d.poitrip) {
     const p = POIS.find(x => x.id === d.poitrip);
@@ -211,6 +216,7 @@ app.addEventListener("click", e => {
   switch (d.act) {
     case "closeOverlay": S.overlay = null; break;
     case "tabHome": S.tab = S.tab === "lines" ? "search" : "home"; break;
+    case "swap": swapTrip(); break;
     case "sheet": if (S.swiped) return; S.sheet = !S.sheet; break;
     case "msgs": S.overlay = { k: "msgs" }; break;
     case "favs": S.overlay = { k: "favs" }; break;
@@ -220,6 +226,17 @@ app.addEventListener("click", e => {
   }
   render();
 });
+
+/** ⇅ : la destination devient le départ et inversement (« Ma position » passe en destination) */
+function swapTrip(): void {
+  const t = S.trip;
+  if (!t.dest) return;
+  const oldFrom = t.fromIsMe ? null : t.from, oldDest = t.dest;
+  t.from = oldDest; t.fromIsMe = false; t.fromText = oldDest.label;
+  t.dest = oldFrom ?? { label: "Ma position", lat: USER.lat, lon: USER.lon };
+  t.toText = t.dest.label;
+  t.sugg = null;
+}
 
 /* suggestions : arrêts connus tout de suite, adresses un instant plus tard */
 let sgTimer = 0;

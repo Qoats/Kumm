@@ -20,6 +20,8 @@ export interface JLeg {
   headsign?: string;
   stops?: number;
   realTime?: boolean;
+  /** tracé [latitude, longitude] pour la carte */
+  path: [number, number][];
 }
 
 export interface Journey {
@@ -39,7 +41,41 @@ export function kindOfMode(mode: string): Layer | "walk" {
   return "bus";
 }
 
+/** Décode un tracé « polyline » (Google) ; MOTIS l'envoie avec 6 décimales */
+export function decodePolyline(str: string, precision = 6): [number, number][] {
+  const out: [number, number][] = [], f = 10 ** precision;
+  let i = 0, lat = 0, lon = 0;
+  const next = (): number | null => {
+    let shift = 0, result = 0, b: number;
+    do {
+      if (i >= str.length) return null;
+      b = str.charCodeAt(i++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    return result & 1 ? ~(result >> 1) : result >> 1;
+  };
+  while (i < str.length) {
+    const dLat = next(), dLon = next();
+    if (dLat === null || dLon === null) break;
+    lat += dLat; lon += dLon;
+    out.push([lat / f, lon / f]);
+  }
+  return out;
+}
+
 const place = (p: MotisLeg["from"]) => ({ name: p.name && p.name !== "START" && p.name !== "END" ? p.name : "", lat: p.lat, lon: p.lon });
+
+/** Tracé d'une étape : celui de MOTIS, sinon la suite des arrêts */
+function legPath(l: MotisLeg): [number, number][] {
+  if (l.legGeometry?.points) {
+    try {
+      const p = decodePolyline(l.legGeometry.points, l.legGeometry.precision ?? 6);
+      if (p.length >= 2 && p.every(([a, b]) => Math.abs(a) <= 90 && Math.abs(b) <= 180)) return p;
+    } catch { /* tracé illisible : repli sur les arrêts */ }
+  }
+  return [l.from, ...(l.intermediateStops ?? []), l.to].map(p => [p.lat, p.lon] as [number, number]);
+}
 
 function toLeg(l: MotisLeg): JLeg {
   const kind = kindOfMode(l.mode);
@@ -54,7 +90,8 @@ function toLeg(l: MotisLeg): JLeg {
     color: kind === "walk" ? undefined : color,
     headsign: l.headsign,
     stops: l.intermediateStops?.length,
-    realTime: l.realTime
+    realTime: l.realTime,
+    path: legPath(l)
   };
 }
 

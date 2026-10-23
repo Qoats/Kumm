@@ -11,11 +11,11 @@ import { ic, type IconName } from "./icons";
 import { MAPPATHS, mapRoutes } from "./map";
 import { POIS, S, STOPS, USER, mins, stopById } from "./store";
 import { debug, nextDepartures } from "./api";
-import { fmtDist, haversine, walkMin } from "./geo";
-import { fetchTransit, hm, legColor, minutes } from "./transit";
-import type { Journey } from "./transit";
-import { fetchBike } from "./bike";
-import type { BikeRoute } from "./bike";
+import { fmtDist, fmtDur, haversine, walkMin } from "./geo";
+import { hm, minutes } from "./transit";
+import type { JLeg, Journey } from "./transit";
+import { TRIP, tripReady } from "./trip";
+import type { PlanCtx } from "./trip";
 import type { LL } from "./geo";
 import { esc } from "./util";
 
@@ -205,16 +205,6 @@ export function overlayPoi(id: string): string {
 export const nearestStops = (n: number, from: LL = USER): { s: Stop; d: number }[] =>
   STOPS.map(s => ({ s, d: haversine(from, s) })).sort((x, y) => x.d - y.d).slice(0, n);
 
-export const tripReady = (): boolean => !!S.trip.dest && (S.trip.fromIsMe || !!S.trip.from);
-const originPlace = (): Place => (!S.trip.fromIsMe && S.trip.from) ? S.trip.from : { label: "Ma position", lat: USER.lat, lon: USER.lon };
-
-/** Dernier calcul : sert au guidage (voir flow.ts) */
-export interface PlanCtx {
-  origin: Place;
-  dest: Place;
-  lines: Record<string, { board: Stop; alight: Stop }>;
-}
-export let PLAN: PlanCtx | null = null;
 
 function suggestionsHtml(): string {
   const sg = S.trip.sugg;
@@ -224,27 +214,8 @@ function suggestionsHtml(): string {
   return me + (items || `<div class="empty" style="padding:24px">Recherche…</div>`);
 }
 
-/** Trajets en transports du dernier calcul (sert au guidage, voir flow.ts) */
-export let JOURNEYS: Journey[] = [];
-
-function journeyHtml(j: Journey, i: number): string {
-  const bar = j.legs.map(l => {
-    const label = l.kind === "walk" ? "" : esc(lineLabel(l.line ?? ""));
-    return `<i style="flex:${Math.max(l.duration, 60)};background:${legColor(l, COLORS[lineLabel(l.line ?? "")])};${(l.line === "G" || lineLabel(l.line ?? "") === "G") ? "color:#222" : ""}">${label}</i>`;
-  }).join("");
-  const steps = j.legs.map(l => {
-    if (l.kind === "walk") return `<div class="jl"><span class="jw">🚶</span><span>${minutes(l.duration)} min à pied${l.distance ? ` · ${fmtDist(l.distance)}` : ""}</span></div>`;
-    return `<div class="jl"><span>${lineChip(l.line ?? "?", true)}</span><span><b>${esc(l.from.name)}</b> ${hm(l.start)} → <b>${esc(l.to.name)}</b> ${hm(l.end)}<br><small style="color:var(--mute)">${l.headsign ? `vers ${esc(l.headsign)} · ` : ""}${minutes(l.duration)} min${l.stops ? ` · ${l.stops + 1} arrêts` : ""}${l.realTime ? " · temps réel" : ""}</small></span></div>`;
-  }).join("");
-  const transfers = j.transfers === 0 ? "Direct" : `${j.transfers} correspondance${j.transfers > 1 ? "s" : ""}`;
-  return `<div class="trip"><div class="top"><b style="font-size:22px">${minutes(j.duration)} min</b><span style="color:var(--mute)">${hm(j.start)} → ${hm(j.end)}</span></div>
-    <div class="tl">${bar}</div>${steps}
-    <small style="color:var(--mute)">${transfers}</small>
-    <div class="acts"><button class="go" data-nav="j:${i}">Guider à pied jusqu’à l’arrêt</button></div></div>`;
-}
-
 /** Repli si le calculateur est injoignable : lignes directes d'après les arrêts connus */
-async function directLineCards(origin: Place, dest: Place): Promise<{ lines: PlanCtx["lines"]; cards: { score: number; html: string }[] }> {
+export async function directLineCards(origin: Place, dest: Place): Promise<{ lines: PlanCtx["lines"]; cards: { score: number; html: string }[] }> {
   const lines: PlanCtx["lines"] = {};
   const cards: { score: number; html: string }[] = [];
   const near = nearestStops(20, origin).filter(x => x.d < 1500);
@@ -269,96 +240,98 @@ async function directLineCards(origin: Place, dest: Place): Promise<{ lines: Pla
   return { lines, cards };
 }
 
-export const BIKE_ROUTES: BikeRoute[] = [];
+/** Étapes à afficher : une marche de quelques mètres (changement de quai) n'apporte rien */
+const shownLegs = (j: Journey): JLeg[] => j.legs.filter(l => l.kind !== "walk" || (l.distance ?? 999) >= 50 || l.duration >= 120);
 
-/** Itinéraires à vélo : cartes cliquables, chaque tracé s'affiche avant de lancer le guidage */
-function bikeCards(routes: BikeRoute[]): string {
-  return `<div class="sub">À vélo</div>` + routes.map((r, i) => {
-    const pts = r.coords.map(([lo, la]) => `${lo},${la}`).join(" ");
-    const [w, h] = svgSize(r.coords);
-    const [minx, miny] = svgBounds(r.coords);
-    return `<div class="trip"><div class="top"><b style="font-size:18px">🚲 ${minutes(r.duration)}</b><span style="color:var(--mute)">${fmtDist(r.distance)}${i > 0 ? " · itinéraire alternatif" : " · le plus rapide"}</span></div>
-      <svg class="tripsvg" viewBox="${minx} ${miny} ${w} ${h}" preserveAspectRatio="xMidYMid meet"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="${Math.max(w, h) / 200}" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <small style="color:var(--mute)">${r.steps.length} consignes · itinéraire guidé virage par virage</small>
-      <div class="acts"><button class="go" data-bikenav="${i}">Démarrer à vélo</button></div></div>`;
+/** Détail d'un trajet choisi : chaque étape, puis le guidage */
+function journeySteps(j: Journey, i: number): string {
+  const steps = shownLegs(j).map(l => {
+    if (l.kind === "walk") return `<div class="jl"><span class="jw">${ic("walk")}</span><span>${minutes(l.duration)} min à pied${l.distance ? ` · ${fmtDist(l.distance)}` : ""}</span></div>`;
+    return `<div class="jl"><span>${lineChip(l.line ?? "?", true)}</span><span><b>${esc(l.from.name)}</b> ${hm(l.start)} → <b>${esc(l.to.name)}</b> ${hm(l.end)}<br><small style="color:var(--mute)">${l.headsign ? `vers ${esc(l.headsign)} · ` : ""}${minutes(l.duration)} min${l.stops ? ` · ${l.stops + 1} arrêts` : ""}${l.realTime ? " · temps réel" : ""}</small></span></div>`;
   }).join("");
+  return `<div class="jdet">${steps}<div class="acts"><button class="go" data-nav="j:${i}">Guider à pied jusqu’à l’arrêt</button></div></div>`;
 }
 
-/** Cadre du tracé SVG (lon/lat → coordonnées locales) */
-function svgBounds(coords: [number, number][]): [number, number] {
-  const xs = coords.map(c => c[0]), ys = coords.map(c => c[1]);
-  const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
-  return [minx - (maxx - minx) * 0.08, miny - (maxy - miny) * 0.08];
+/** Une ligne de la liste des trajets : horaires, durée, enchaînement des lignes ; touchée, elle s'affiche sur la carte */
+function journeyRow(j: Journey, i: number): string {
+  const on = i === S.trip.sel;
+  const chev = '<span class="jc">›</span>';
+  const chain = shownLegs(j).map(l => l.kind === "walk" ? `<span class="jwk">${ic("walk")}<small>${minutes(l.duration)}</small></span>` : lineChip(l.line ?? "?", true)).join(chev);
+  const first = j.legs.find(l => l.kind !== "walk");
+  const live = j.legs.some(l => l.kind !== "walk" && l.realTime);
+  const info = first ? `Départ ${hm(first.start)} de ${esc(first.from.name)}${live ? " · temps réel" : ""}` : "";
+  return `<button class="jrow${on ? " on" : ""}" data-sel="${i}">
+      <span class="jr1"><b>${hm(j.start)} – ${hm(j.end)}</b><b>${fmtDur(j.duration)}</b></span>
+      <span class="jr2">${chain}</span>
+      <small>${info}${j.transfers ? ` · ${j.transfers} correspondance${j.transfers > 1 ? "s" : ""}` : " · direct"}</small>
+    </button>${on ? journeySteps(j, i) : ""}`;
 }
-function svgSize(coords: [number, number][]): [number, number] {
-  const xs = coords.map(c => c[0]), ys = coords.map(c => c[1]);
-  const w = (Math.max(...xs) - Math.min(...xs)) * 1.16 || 0.01;
-  const h = (Math.max(...ys) - Math.min(...ys)) * 1.16 || 0.01;
-  return [w, h];
+
+/** Durée affichée dans l'onglet d'un mode */
+function modeDuration(mode: "transit" | "walk" | "bike"): string {
+  const t = TRIP;
+  if (!t) return "";
+  const part = t[mode];
+  if (part.status === "loading" && !part.data) return "…";
+  if (mode === "transit") { const d = t.transit.data ?? []; return d.length ? fmtDur(Math.min(...d.map(j => j.duration))) : "–"; }
+  if (mode === "walk") return t.walk.data ? fmtDur(t.walk.data.duration) : "–";
+  return t.bike.data?.length ? fmtDur(t.bike.data[0].duration) : "–";
 }
 
-export async function planTrips(): Promise<string> {
-  const dest = S.trip.dest;
-  if (!dest) return "";
-  const origin = originPlace();
-  const direct = haversine(origin, dest);
-  const walk = `<div class="trip"><div class="top"><b style="font-size:18px">À pied</b><span style="color:var(--mute)">🚶 ~${walkMin(direct)} min · ${fmtDist(direct * 1.25)}</span></div><small style="color:var(--mute)">Itinéraire guidé, virage par virage</small><div class="acts"><button class="go" data-nav="walk">Démarrer à pied</button></div></div>`;
+const calculating = '<div class="empty" style="padding:24px">Calcul de l’itinéraire…</div>';
 
-  const mode = S.trip.mode;
-
-  if (mode === "walk") return `<div class="sub" style="margin-top:4px">À pied</div>` + walk;
-
-  if (mode === "bike") {
-    BIKE_ROUTES.length = 0;
-    try {
-      const routes = await fetchBike(origin, dest);
-      BIKE_ROUTES.push(...routes);
-      return bikeCards(routes) + `<small style="color:var(--mute)">Pistes et voies cyclables d'après OpenStreetMap (service OSRM).</small>`;
-    } catch (e) {
-      return `<div class="trip"><div class="top"><b style="font-size:18px">À vélo</b></div><small style="color:var(--mute)">Itinéraire vélo indisponible (${esc(e instanceof Error ? e.message : String(e))}).</small></div>` + `<div class="sub">À pied</div>` + walk;
-    }
+/** Liste sous la carte, pour le mode choisi */
+function tripList(): string {
+  const t = TRIP;
+  if (!t) return calculating;
+  if (S.trip.mode === "walk") {
+    if (!t.walk.data) return t.walk.status === "loading" ? calculating : `<div class="empty">Itinéraire à pied indisponible (${esc(t.walk.error ?? "")})</div>`;
+    const r = t.walk.data;
+    return `<div class="jrow on"><span class="jr1"><b>${fmtDur(r.duration)} <span class="jm">(${fmtDist(r.distance)})</span></b></span><small>Itinéraire guidé, virage par virage</small></div>
+      <div class="jdet"><div class="acts"><button class="go" data-nav="walk">Démarrer</button></div></div>`;
   }
-
-  let journeys: Journey[] = [];
-  let failure = "";
-  try { journeys = await fetchTransit(origin, dest); }
-  catch (e) { failure = e instanceof Error ? e.message : String(e); }
-  JOURNEYS = journeys;
-  PLAN = { origin, dest, lines: {} };
-
-  if (journeys.length) {
-    return `<div class="sub" style="margin-top:4px">En transports</div>` + journeys.map(journeyHtml).join("") + `<div class="sub">À pied</div>` + walk
-      + `<small style="color:var(--mute)">Trajets calculés avec les horaires du réseau (service Transitous, données ouvertes).</small>`;
+  if (S.trip.mode === "bike") {
+    if (!t.bike.data?.length) return t.bike.status === "loading" ? calculating : `<div class="empty">Itinéraire vélo indisponible (${esc(t.bike.error ?? "")})</div>`;
+    return t.bike.data.map((r, i) => {
+      const on = i === S.trip.sel;
+      return `<button class="jrow${on ? " on" : ""}" data-sel="${i}"><span class="jr1"><b>${fmtDur(r.duration)} <span class="jm">(${fmtDist(r.distance)})</span></b><small>${i === 0 ? "le plus rapide" : "autre itinéraire"}</small></span><small>${r.steps.length} consignes · pistes et voies cyclables d’OpenStreetMap</small></button>`
+        + (on ? `<div class="jdet"><div class="acts"><button class="go" data-bikenav="${i}">Démarrer à vélo</button></div></div>` : "");
+    }).join("");
   }
-  // repli : lignes directes d'après la liste des arrêts
-  const fb = await directLineCards(origin, dest);
-  PLAN = { origin, dest, lines: fb.lines };
-  const why = failure
-    ? `Calculateur d'itinéraires injoignable (${esc(failure)}) : seules les lignes directes sont proposées.`
-    : "Aucun trajet en transports trouvé pour ce départ et cette destination.";
-  return walk + fb.cards.slice(0, 4).map(c => c.html).join("") + `<small style="color:var(--mute)">${why}</small>`;
+  const list = t.transit.data ?? [];
+  if (list.length) {
+    return list.map(journeyRow).join("") + `<small class="src">Horaires du réseau et temps réel : Transitous (données ouvertes).${t.transit.status === "error" ? " Mise à jour impossible : derniers trajets connus." : ""}</small>`;
+  }
+  if (t.transit.status === "loading") return calculating;
+  const why = t.transit.status === "error"
+    ? `Calculateur d'itinéraires injoignable (${esc(t.transit.error ?? "")}) : seules les lignes directes sont proposées.`
+    : "Aucun trajet en transports trouvé : voici les lignes directes proches.";
+  return `<small class="src" style="display:block;margin-bottom:10px">${why}</small>` + (t.fallback ?? calculating);
 }
 
 export function screenTrips(): string {
-  const t = S.trip, has = t.toText.trim().length > 1;
-  const body = CONFIG.USE_MOCK
-    ? (has ? `<div id="trips"></div>` : `<div class="empty" style="font-weight:700;padding-top:90px;font-size:20px">Aucun itinéraire trouvé</div>`)
-    : t.sugg ? suggestionsHtml()
-    : tripReady() ? `<div id="trips"><div class="empty" style="padding:30px">Recherche…</div></div>`
-    : `<div class="empty" style="padding-top:70px">Choisissez un départ (adresse ou « Ma position ») et une destination.</div>`;
-  const modes: { id: "walk" | "bike" | "transit"; label: string; icon: IconName }[] = [
-    { id: "transit", label: "Transports", icon: "tram" },
-    { id: "bike", label: "Vélo", icon: "bike" },
-    { id: "walk", label: "À pied", icon: "pin" }
-  ];
-  const seg = `<div class="seg" style="margin:10px 0">${modes.map(m =>
-    `<button data-mode="${m.id}" class="${t.mode === m.id ? "on" : ""}" style="flex:1;justify-content:center">${ic(m.icon)}${m.label}</button>`).join("")}</div>`;
-  return bar("Itinéraires", "tabHome") + `<div class="pad" style="padding-top:12px">
-    <div class="field">${ic("target")}<input id="tfrom" value="${esc(t.fromText)}" placeholder="Départ : adresse à Strasbourg" autocomplete="off" ${CONFIG.USE_MOCK ? "readonly" : ""}></div>
-    <div class="field">${ic("search")}<input id="tto" value="${esc(t.toText)}" placeholder="Où voulez-vous aller ?" autocomplete="off"></div>
-    ${seg}
-    ${body}
+  const t = S.trip, mock = CONFIG.USE_MOCK;
+  const pin = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z" fill="#E8402F"/><circle cx="12" cy="10" r="2.6" fill="#fff"/></svg>';
+  const form = `<div class="thead">
+    <button class="tback" data-act="tabHome" aria-label="Retour">${ic("back")}</button>
+    <div class="trail"><i class="tdot"></i><i class="tline"></i>${pin}</div>
+    <div class="tinputs">
+      <input id="tfrom" value="${esc(t.fromText)}" placeholder="Départ" autocomplete="off" ${mock ? "readonly" : ""}>
+      <input id="tto" value="${esc(t.toText)}" placeholder="Où voulez-vous aller ?" autocomplete="off">
+    </div>
+    <button class="tswap" data-act="swap" aria-label="Inverser départ et destination" ${mock ? "disabled" : ""}>${ic("swap")}</button>
   </div>`;
+  if (mock) {
+    const has = t.toText.trim().length > 1;
+    return form + `<div class="pad">${has ? `<div id="trips"></div>` : `<div class="empty" style="font-weight:700;padding-top:90px;font-size:20px">Aucun itinéraire trouvé</div>`}</div>`;
+  }
+  if (t.sugg) return form + `<div class="pad">${suggestionsHtml()}</div>`;
+  if (!tripReady()) return form + `<div class="empty" style="padding-top:70px">Choisissez un départ (adresse ou « Ma position ») et une destination.</div>`;
+  const modes: { id: "transit" | "walk" | "bike"; icon: IconName; label: string }[] = [
+    { id: "transit", icon: "tram", label: "Transports" }, { id: "walk", icon: "walk", label: "À pied" }, { id: "bike", icon: "bike", label: "Vélo" }
+  ];
+  const tabs = `<div class="tmodes">${modes.map(m => `<button data-mode="${m.id}" class="${t.mode === m.id ? "on" : ""}" aria-label="${m.label}">${ic(m.icon)}<span>${modeDuration(m.id)}</span></button>`).join("")}</div>`;
+  return form + tabs + `<div class="tmap"><div id="tripmap-slot"></div><span class="osm">© OpenStreetMap</span></div><div class="pad tlist">${tripList()}</div>`;
 }
 
 /** Résultats d'exemple (mode démo uniquement) */

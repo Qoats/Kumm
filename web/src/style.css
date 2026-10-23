@@ -185,6 +185,41 @@ nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .jl{display:flex;gap:10px;align-items:flex-start;margin:6px 0;font-size:15px;line-height:1.3}
 .jl > span:first-child{flex:none;min-width:34px;text-align:center}
 .jw{font-size:20px}
+/* ---------- Itinéraires (façon calculateur : champs, onglets avec durées, carte, liste) ---------- */
+.thead{position:sticky;top:0;z-index:1002;display:flex;align-items:center;gap:10px;background:var(--card);padding:calc(10px + var(--safe-top)) 12px 10px 6px;border-radius:0 0 22px 22px;box-shadow:0 8px 20px -14px rgba(0,0,0,.45)}
+.tback,.tswap{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center}
+.tback svg,.tswap svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.tswap:disabled{opacity:.35}
+.trail{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;width:20px}
+.tdot{width:12px;height:12px;border-radius:50%;background:#1A73E8;box-shadow:0 0 0 3px rgba(26,115,232,.25)}
+.tline{width:0;height:16px;border-left:2px dotted var(--mute)}
+.tinputs{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.tinputs input{width:100%;box-sizing:border-box;border:0;outline:0;background:var(--chip);color:var(--ink);border-radius:12px;padding:11px 12px;font-size:16px;font-family:inherit}
+.tmodes{display:flex;gap:6px;padding:10px 12px 8px}
+.tmodes button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border-radius:20px;color:var(--ink);font-weight:700;font-size:15px;white-space:nowrap}
+.tmodes button.on{background:var(--accent-soft);color:var(--accent-ink)}
+.tmodes svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.tmap{position:relative;height:40vh;min-height:230px;background:var(--chip);overflow:hidden}
+#tripmap-slot{position:absolute;inset:0}
+.tmap .osm{bottom:4px;z-index:1001}
+.tlist{padding-top:12px}
+.jrow{display:block;width:100%;text-align:left;background:var(--card);border:2px solid transparent;border-radius:16px;padding:12px 14px;margin-bottom:8px;box-shadow:var(--sh);color:var(--ink)}
+.jrow.on{border-color:var(--accent)}
+.jr1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.jr1 b{font-size:18px}
+.jr1 small{color:var(--mute)}
+.jm{font-weight:500;color:var(--mute);font-size:15px}
+.jr2{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:8px 0 6px}
+.jc{color:var(--mute);font-weight:700}
+.jwk{display:inline-flex;align-items:flex-end;color:var(--mute)}
+.jwk svg,.jw svg{width:20px;height:20px;fill:none;stroke:var(--mute);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.jwk small{font-size:11px;margin-left:-2px}
+.jrow > small{display:block;color:var(--mute);font-size:13.5px;margin-top:4px}
+.jdet{padding:2px 6px 8px;margin:-2px 0 10px}
+.src{color:var(--mute);font-size:13px}
+.tm-b{width:auto!important;height:auto!important}
+.tm-bubble{display:inline-block;transform:translate(-50%,-125%);background:var(--card);color:var(--ink);font-weight:800;font-size:13px;white-space:nowrap;padding:4px 9px;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer}
+.tm-bubble.on{background:#1A73E8;color:#fff}
 .ticket{padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .ticket b{font-size:17px;display:block}
 .ticket span{color:var(--mute);font-size:14px}
@@ -252,7 +287,7 @@ nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .nv-done{background:var(--chip);border-radius:22px;padding:10px 18px;font-weight:700}
 
 /* ---------- contraste élevé ---------- */
-:root[data-scheme="contrast"] :is(.box,.dep,.trip,.ticket,.qa button,.field,.theme-card,.row-switch,.lyr,.sheet,.tools){border:2px solid #fff;box-shadow:none}
+:root[data-scheme="contrast"] :is(.box,.dep,.trip,.jrow,.ticket,.qa button,.field,.theme-card,.row-switch,.lyr,.sheet,.tools){border:2px solid #fff;box-shadow:none}
 :root[data-scheme="contrast"] .theme-card.on{border-color:var(--accent)}
 :root[data-scheme="contrast"] .pill,:root[data-scheme="contrast"] .seg button{border:1.5px solid #fff}
 

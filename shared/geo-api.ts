@@ -52,6 +52,8 @@ export interface MotisLeg {
   routeColor?: string;
   headsign?: string;
   intermediateStops?: MotisPlace[];
+  /** tracé encodé (algorithme « polyline » de Google, precision = nombre de décimales) */
+  legGeometry?: { points: string; precision?: number };
 }
 
 export interface MotisItinerary {

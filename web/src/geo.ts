@@ -49,5 +49,11 @@ export const fmtDist = (m: number): string =>
 
 export const fmtMin = (sec: number): string => `${Math.max(1, Math.round(sec / 60))} min`;
 
+/** Durée à la façon d'un calculateur d'itinéraire : « 26 min », « 1 h 16 » */
+export function fmtDur(sec: number): string {
+  const m = Math.max(1, Math.round(sec / 60));
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`;
+}
+
 /** Durée de marche estimée à vol d'oiseau (×1,25 pour les détours, 80 m/min) */
 export const walkMin = (m: number): number => Math.max(1, Math.round((m * 1.25) / 80));
