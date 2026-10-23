@@ -26,7 +26,8 @@ export function geoUpstream(url: URL): GeoUpstream | null {
   }
   if (url.pathname === "/geo/transit") {
     const from = url.searchParams.get("from") ?? "", to = url.searchParams.get("to") ?? "", time = url.searchParams.get("time");
-    if (!LATLON.test(from) || !LATLON.test(to) || (time !== null && !ISO_TIME.test(time))) return null;
+    const arrive = url.searchParams.get("arrive") === "1";   // « Arriver avant » l'heure donnée (sinon « Partir à »)
+    if (!LATLON.test(from) || !LATLON.test(to) || (time !== null && !ISO_TIME.test(time)) || (arrive && time === null)) return null;
     const u = new URL(TRANSIT);
     u.searchParams.set("fromPlace", from);
     u.searchParams.set("toPlace", to);
@@ -34,6 +35,7 @@ export function geoUpstream(url: URL): GeoUpstream | null {
     u.searchParams.set("language", "fr");
     u.searchParams.set("detailedTransfers", "false");
     if (time) u.searchParams.set("time", time);
+    if (arrive) u.searchParams.set("arriveBy", "true");
     return { url: u.toString(), ttl: 60, stale: 120 };
   }
 /** Construit la requête OSRM (piéton ou vélo) à partir de coordonnées validées */

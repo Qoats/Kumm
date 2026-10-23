@@ -272,6 +272,22 @@ app.addEventListener("input", e => {
   }
 });
 
+/* heure du trajet : « Partir maintenant », « Partir à… », « Arriver avant… » */
+app.addEventListener("change", e => {
+  const t = e.target as HTMLInputElement | HTMLSelectElement;
+  const w = S.trip.when;
+  if (t.id === "twkind") {
+    w.kind = t.value as typeof w.kind;
+    // par défaut : les 5 prochaines minutes rondes (ex. 17h02 → 17h05)
+    if (w.kind !== "now" && w.at < Date.now()) w.at = Math.ceil(Date.now() / 300_000) * 300_000;
+    render();
+  }
+  if (t.id === "twat") {
+    const ms = new Date(t.value).getTime();
+    if (!Number.isNaN(ms)) { w.at = ms; render(); }
+  }
+});
+
 app.addEventListener("focusin", e => {
   const t = e.target as HTMLInputElement;
   if (t.id === "hq") {

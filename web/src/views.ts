@@ -330,8 +330,13 @@ export function screenTrips(): string {
   const modes: { id: "transit" | "walk" | "bike"; icon: IconName; label: string }[] = [
     { id: "transit", icon: "tram", label: "Transports" }, { id: "walk", icon: "walk", label: "À pied" }, { id: "bike", icon: "bike", label: "Vélo" }
   ];
+  const w = t.when;
+  const local = (ms: number): string => { const d = new Date(ms), p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+  const whenRow = t.mode !== "transit" ? "" : `<div class="twhen">${ic("clock")}
+    <select id="twkind" aria-label="Heure du trajet">${([["now", "Partir maintenant"], ["depart", "Partir à…"], ["arrive", "Arriver avant…"]] as const).map(([v, l]) => `<option value="${v}"${w.kind === v ? " selected" : ""}>${l}</option>`).join("")}</select>
+    ${w.kind !== "now" ? `<input id="twat" type="datetime-local" value="${local(w.at)}" aria-label="Date et heure">` : ""}</div>`;
   const tabs = `<div class="tmodes">${modes.map(m => `<button data-mode="${m.id}" class="${t.mode === m.id ? "on" : ""}" aria-label="${m.label}">${ic(m.icon)}<span>${modeDuration(m.id)}</span></button>`).join("")}</div>`;
-  return form + tabs + `<div class="tmap"><div id="tripmap-slot"></div><span class="osm">© OpenStreetMap</span></div><div class="pad tlist">${tripList()}</div>`;
+  return form + tabs + whenRow + `<div class="tmap"><div id="tripmap-slot"></div><span class="osm">© OpenStreetMap</span></div><div class="pad tlist">${tripList()}</div>`;
 }
 
 /** Résultats d'exemple (mode démo uniquement) */

@@ -43,8 +43,9 @@ export function startNav(o: NavOptions): void {
   const layer = document.createElement("div");
   layer.id = "navlayer";
   layer.innerHTML = `
-    <div class="nv-top"><span id="nv-arrow">↑</span><div><b id="nv-text"></b><small id="nv-dist"></small></div></div>
+    <div class="nv-top"><div class="nv-dir"><span id="nv-arrow">↑</span><small id="nv-dist"></small></div><b id="nv-text"></b></div>
     <div id="nv-map"></div>
+    <button id="nv-recenter" hidden>➤ Recentrer</button>
     <div id="nv-end" hidden></div>
     <div class="nv-bottom">
       <div><b id="nv-eta"></b><small id="nv-rem"></small></div>
@@ -62,6 +63,11 @@ export function startNav(o: NavOptions): void {
   const me = L.circleMarker([first[1], first[0]], { radius: 9, color: "#fff", weight: 3, fillColor: "#4A90E2", fillOpacity: 1 }).addTo(map);
   map.fitBounds(line.getBounds(), { padding: [50, 50] });
   setTimeout(() => map.invalidateSize(), 50);
+  // la carte suit la position ; si on la déplace au doigt, elle s'arrête jusqu'à « Recentrer »
+  let follow = true, lastPos: LL | null = null;
+  map.on("dragstart", () => { follow = false; $("nv-recenter").hidden = false; });
+  /** Heure d'arrivée estimée, à l'heure de Strasbourg */
+  const arrival = (sec: number): string => new Date(Date.now() + sec * 1000).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
 
   function speak(text: string): void {
     if (!sound || !("speechSynthesis" in window)) return;
@@ -75,8 +81,8 @@ export function startNav(o: NavOptions): void {
     if (finished) return;
     finished = true;
     window.clearInterval(simTimer);
-    $("nv-text").textContent = "Vous êtes arrivé";
-    $("nv-dist").textContent = o.dest.label;
+    $("nv-text").textContent = `Vous êtes arrivé : ${o.dest.label}`;
+    $("nv-dist").textContent = "";
     $("nv-arrow").textContent = "⚑";
     speak("Vous êtes arrivé");
     const end = $("nv-end");
@@ -100,6 +106,7 @@ export function startNav(o: NavOptions): void {
   function onPos(p: LL): void {
     if (finished) return;
     me.setLatLng([p.lat, p.lon]);
+    lastPos = p;
     const dRoute = distToRoute(p, route.coords);
     if (dRoute < 150) wasOnRoute = true;
     if (!wasOnRoute) {
@@ -108,7 +115,7 @@ export function startNav(o: NavOptions): void {
       $("nv-dist").textContent = fmtDist(haversine(p, { lon: route.coords[0][0], lat: route.coords[0][1] }));
       return;
     }
-    map.panTo([p.lat, p.lon], { animate: true });
+    if (follow) map.panTo([p.lat, p.lon], { animate: true });
     const steps = route.steps;
     while (idx < steps.length - 1 && haversine(p, steps[idx]) < 25) idx++;
     const next = steps[idx];
@@ -118,11 +125,11 @@ export function startNav(o: NavOptions): void {
     $("nv-arrow").textContent = arrowFor(next);
     const isEnd = next.type === "arrive";
     $("nv-text").textContent = isEnd ? `Destination : ${o.dest.label}` : next.text;
-    $("nv-dist").textContent = d > 30 ? `Dans ${fmtDist(d)}` : "Maintenant";
+    $("nv-dist").textContent = d > 30 ? fmtDist(d) : "";
     let remaining = d;
     for (let j = idx; j < steps.length; j++) remaining += steps[j].distance;
     $("nv-eta").textContent = fmtMin(remaining / currentSpeed);
-    $("nv-rem").textContent = fmtDist(remaining);
+    $("nv-rem").textContent = `${fmtDist(remaining)} · ${arrival(remaining / currentSpeed)}`;
     if (d < 80 && !spoken.has(idx)) { spoken.add(idx); speak(`Dans ${Math.round(d / 10) * 10} mètres, ${isEnd ? "votre destination" : next.text}`); }
 
     // hors itinéraire : recalcul depuis la position actuelle
@@ -141,7 +148,7 @@ export function startNav(o: NavOptions): void {
   if ("geolocation" in navigator) {
     watchId = navigator.geolocation.watchPosition(
       pos => { if (simTimer === 0) onPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }); },
-      () => { if (!wasOnRoute) $("nv-dist").textContent = "Position indisponible : utilisez « Simuler »"; },
+      () => { if (!wasOnRoute) { $("nv-text").textContent = "Position indisponible : utilisez « Simuler »"; $("nv-dist").textContent = ""; } },
       { enableHighAccuracy: true, maximumAge: 2000 }
     );
   }
@@ -160,6 +167,10 @@ export function startNav(o: NavOptions): void {
   };
   $("nv-snd").onclick = () => { sound = !sound; $("nv-snd").textContent = sound ? "🔊" : "🔇"; if (!sound) window.speechSynthesis?.cancel(); };
   $("nv-quit").onclick = stopNav;
+  $("nv-recenter").onclick = () => {
+    follow = true; $("nv-recenter").hidden = true;
+    if (lastPos) map.setView([lastPos.lat, lastPos.lon], Math.max(map.getZoom(), 17), { animate: true });
+  };
 
   current = () => {
     window.clearInterval(simTimer);

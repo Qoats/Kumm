@@ -7,7 +7,7 @@ import { fetchBike } from "./bike";
 import type { BikeRoute } from "./bike";
 import { S, USER, render } from "./store";
 import { fetchTransit } from "./transit";
-import type { Journey } from "./transit";
+import type { Journey, TripTime } from "./transit";
 import { fetchWalk } from "./walk";
 import { directLineCards } from "./views";
 
@@ -26,6 +26,8 @@ export const BIKE_ROUTES: BikeRoute[] = [];
 export interface Part<T> { status: "loading" | "ok" | "error"; data?: T; error?: string }
 export interface TripState {
   key: string;
+  /** heure demandée pour les transports (« now » ou « depart:… » / « arrive:… ») */
+  whenKey: string;
   at: number;
   origin: Place;
   dest: Place;
@@ -45,21 +47,26 @@ const why = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 /** Les horaires des transports changent : nouveau calcul après 2 minutes (la marche et le vélo, eux, sont gardés) */
 const TRANSIT_MAX_AGE = 120_000;
 
-/** Lance le calcul si le départ ou la destination ont changé ; chaque mode s'affiche dès qu'il arrive */
+const tripTime = (): TripTime | undefined => (S.trip.when.kind === "now" ? undefined : { at: S.trip.when.at, arrive: S.trip.when.kind === "arrive" });
+const whenKeyOf = (w?: TripTime): string => (w ? `${w.arrive ? "arrive" : "depart"}:${w.at}` : "now");
+
+/** Lance le calcul si le départ, la destination ou l'heure ont changé ; chaque mode s'affiche dès qu'il arrive */
 export function ensurePlanned(): void {
   if (!tripReady()) return;
   const origin = originPlace(), dest = S.trip.dest as Place;
-  const key = keyOf(origin, dest);
-  if (TRIP && TRIP.key === key && Date.now() - TRIP.at < TRANSIT_MAX_AGE) return;
+  const key = keyOf(origin, dest), when = tripTime(), whenKey = whenKeyOf(when);
+  // « maintenant » : horaires recalculés après 2 minutes ; une heure choisie, elle, ne change pas
+  if (TRIP && TRIP.key === key && TRIP.whenKey === whenKey && (when || Date.now() - TRIP.at < TRANSIT_MAX_AGE)) return;
   const prev = TRIP && TRIP.key === key ? TRIP : null;
+  const sameWhen = prev?.whenKey === whenKey;
   const t: TripState = {
-    key, at: Date.now(), origin, dest,
-    transit: prev ? { ...prev.transit } : { status: "loading" },
+    key, whenKey, at: Date.now(), origin, dest,
+    transit: prev && sameWhen ? { ...prev.transit } : { status: "loading" },
     walk: prev ? prev.walk : { status: "loading" },
     bike: prev ? prev.bike : { status: "loading" },
-    fallback: prev?.fallback
+    fallback: sameWhen ? prev?.fallback : undefined
   };
-  if (!prev) S.trip.sel = 0;
+  if (!prev || (!sameWhen && S.trip.mode === "transit")) S.trip.sel = 0;
   TRIP = t;
   if (!prev) PLAN = { origin, dest, lines: {} };
   const done = (): void => { if (TRIP === t) render(); };
@@ -71,7 +78,7 @@ export function ensurePlanned(): void {
     t.fallback = fb.cards.slice(0, 4).map(c => c.html).join("") || " ";
     render();
   };
-  fetchTransit(origin, dest)
+  fetchTransit(origin, dest, when)
     .then(j => {
       t.transit = { status: "ok", data: j };
       if (TRIP === t) { JOURNEYS = j; if (S.trip.mode === "transit" && S.trip.sel >= j.length) S.trip.sel = 0; }

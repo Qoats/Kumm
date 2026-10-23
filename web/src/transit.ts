@@ -106,8 +106,12 @@ export function parseJourneys(plan: MotisPlan): Journey[] {
   return out.sort((a, b) => a.start - b.start);
 }
 
-export async function fetchTransit(from: LL, to: LL): Promise<Journey[]> {
-  const r = await fetch(url(`/geo/transit?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}`), { headers: appHeaders() });
+/** Heure demandée : départ (« Partir à ») ou arrivée (« Arriver avant ») ; sans heure = maintenant */
+export interface TripTime { at: number; arrive: boolean }
+
+export async function fetchTransit(from: LL, to: LL, when?: TripTime): Promise<Journey[]> {
+  const t = when ? `&time=${encodeURIComponent(new Date(when.at).toISOString())}${when.arrive ? "&arrive=1" : ""}` : "";
+  const r = await fetch(url(`/geo/transit?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}${t}`), { headers: appHeaders() });
   if (!r.ok) {
     const detail = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 140);
     throw new Error(`erreur ${r.status}${detail ? " : " + detail : ""}`);
