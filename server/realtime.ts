@@ -25,6 +25,8 @@ export interface Course {
   line: string;
   dest: string;
   realTime: boolean;
+  /** « tram » ou « bus », d'après la CTS (Extension.VehicleMode) */
+  mode: string;
   calls: { code: string; name: string; arr: number; dep: number }[];
 }
 
@@ -87,7 +89,8 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
         const calls = jr["EstimatedCalls"];
         const course: Course = {
           id: str(isObj(jr["FramedVehicleJourneyRef"]) ? jr["FramedVehicleJourneyRef"]["DatedVehicleJourneySAERef"] : "") || `${str(jr["LineRef"])}-${courses}`,
-          line: str(jr["PublishedLineName"]) || str(jr["LineRef"]), dest: "", realTime: false, calls: []
+          line: str(jr["PublishedLineName"]) || str(jr["LineRef"]), dest: "", realTime: false,
+          mode: str(isObj(jr["Extension"]) ? jr["Extension"]["VehicleMode"] : "").toLowerCase(), calls: []
         };
         for (const c of calls) {
           if (!isObj(c)) continue;

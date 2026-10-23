@@ -62,7 +62,14 @@ L'APK est l'application Kumm dans un habillage Android (Capacitor). Elle ne cont
 ### 3. Installer sur le téléphone
 Copiez `app-debug.apk` sur le téléphone, ouvrez-le et autorisez « installer des applications inconnues » quand Android le demande. Au premier lancement, acceptez la localisation.
 
-Notes : c'est un APK de test (signature « debug ») ; pour le Play Store il faudra une clé de signature et un fichier `.aab`. À chaque modification du code : `npm.cmd run build:android`, puis recompiler. Le bouton « retour » d'Android ferme le guidage, une fiche, puis revient à l'accueil.
+### Signature : installer chaque version par-dessus la précédente
+Android n'accepte une mise à jour que si elle est signée avec **la même clé** que la version installée. Le workflow « APK Android » signe l'APK avec la clé de l'application si ces deux secrets existent (Settings → Secrets and variables → Actions → **Secrets** → New repository secret) :
+- `KUMM_KEYSTORE_B64` : le fichier de clé `kumm-release.jks` encodé en base64 (sur Linux : `base64 -w0 kumm-release.jks`) ;
+- `KUMM_KEYSTORE_PASSWORD` : son mot de passe (alias de la clé : `kumm`).
+Le numéro de version Android augmente à chaque compilation. Sans ces secrets, l'APK est signé « debug » et il faut désinstaller l'ancienne version avant d'installer la nouvelle.
+**Gardez une copie de la clé et du mot de passe hors de GitHub** (gestionnaire de mots de passe) : une clé perdue oblige tous les utilisateurs à désinstaller l'application, et ne se remplace pas. Ne la mettez jamais dans le dépôt (`*.jks` est exclu par `.gitignore`).
+
+Notes : pour le Play Store il faudra un fichier `.aab` (même clé). À chaque modification du code : `npm.cmd run build:android`, puis recompiler. Le bouton « retour » d'Android ferme le guidage, une fiche, puis revient à l'accueil.
 
 ## Logo et installation sur téléphone
 Le logo est un « K » dessiné comme une ligne de plan de transport (barre blanche, branches jaune et bleue), avec un rond d'arrêt à chaque extrémité (« Kumm » = « viens » en alsacien). Fichiers dans `web/public/` : `favicon.svg` (logo vectoriel, modifiable), `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`, `manifest.webmanifest`. Une variante rouge / bleu / violet est fournie à part. Dans l'en-tête, le logo est l'icône `kumm` de `web/src/icons.ts` (il prend la couleur du thème).

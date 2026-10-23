@@ -14,6 +14,8 @@ export interface Vehicle {
   dest: string;
   /** horaires recalés en temps réel par la CTS (sinon théoriques) */
   rt: boolean;
+  /** « tram » ou « bus » selon la CTS (vide si inconnu) */
+  m: string;
   /** départ et arrivée du tronçon en cours (identiques si le véhicule est à quai) */
   a: At;
   b: At;
@@ -54,7 +56,7 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       if (!a || !b) continue;
       const p = a !== b && n ? pathBetween(c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : null;
       out.push({
-        id: c.id, line: c.line, dest: c.dest, rt: c.realTime, a, b, h,
+        id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h,
         next: calls.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr]),
         ...(p ? { p } : {})
       });

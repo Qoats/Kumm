@@ -1,7 +1,8 @@
 // Tracés des lignes CTS (trams et bus) depuis OpenStreetMap, pour que les véhicules suivent leur vraie trajectoire sur la carte.
 // Utilisation : npm run build:shapes            (télécharge via Overpass et écrit data/shapes.json)
 //               node scripts/build-shapes.mjs fichier.json   (à partir d'une réponse Overpass déjà téléchargée)
-// À relancer quand le réseau change (nouvelle ligne, déviation durable) ; le fichier produit est versionné.
+// Relancé chaque nuit par GitHub (.github/workflows/shapes.yml) : le fichier n'est réécrit que si les tracés ont changé,
+// et un téléchargement incomplet est refusé (le fichier précédent est gardé).
 import fs from "node:fs";
 import path from "node:path";
 
@@ -76,6 +77,21 @@ for (const rel of src.elements ?? []) {
   (lines[ref] ??= []).push(shape);
   variants++; points += shape.length;
 }
-fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.writeFileSync(OUT, JSON.stringify({ source: "© contributeurs OpenStreetMap (ODbL)", generated: new Date().toISOString().slice(0, 10), lines }));
-console.log(`${Object.keys(lines).length} lignes, ${variants} itinéraires, ${points} points → ${path.relative(process.cwd(), OUT)} (${Math.round(fs.statSync(OUT).size / 1024)} Ko)`);
+// garde-fou : une réponse partielle d'Overpass ne doit pas effacer les tracés existants
+const TRAMS = ["A", "B", "C", "D", "E", "F"];
+const missing = TRAMS.filter(t => !lines[t]?.length);
+if (Object.keys(lines).length < 30 || missing.length) {
+  console.error(`Résultat incomplet (${Object.keys(lines).length} lignes${missing.length ? ", trams manquants : " + missing.join(" ") : ""}) : fichier inchangé.`);
+  process.exit(1);
+}
+const summary = `${Object.keys(lines).length} lignes, ${variants} itinéraires, ${points} points`;
+let previous = null;
+try { previous = JSON.parse(fs.readFileSync(OUT, "utf8")); } catch { /* premier fichier */ }
+const sorted = o => Object.fromEntries(Object.keys(o).sort().map(k => [k, o[k]]));
+if (previous && JSON.stringify(sorted(previous.lines ?? {})) === JSON.stringify(sorted(lines))) {
+  console.log(`${summary} : aucun changement, ${path.relative(process.cwd(), OUT)} inchangé.`);
+} else {
+  fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  fs.writeFileSync(OUT, JSON.stringify({ source: "© contributeurs OpenStreetMap (ODbL)", generated: new Date().toISOString().slice(0, 10), lines: sorted(lines) }));
+  console.log(`${summary} → ${path.relative(process.cwd(), OUT)} mis à jour (${Math.round(fs.statSync(OUT).size / 1024)} Ko)`);
+}

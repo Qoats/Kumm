@@ -11,6 +11,8 @@ export interface Vehicle {
   line: string;
   dest: string;
   rt: boolean;
+  /** « tram » ou « bus » selon la CTS */
+  m?: string;
   /** [latitude, longitude, heure en ms] au début et à la fin du tronçon en cours */
   a: [number, number, number];
   b: [number, number, number];
@@ -88,4 +90,4 @@ export function vehicleHeading(v: Vehicle, t = serverNow()): number {
   return (Math.atan2((p1[1] - p0[1]) * Math.cos(rad(p0[0])), p1[0] - p0[0]) * 180 / Math.PI + 360) % 360;
 }
 
-export const vehicleKind = (v: Vehicle): "tram" | "bus" => (isTram(v.line) ? "tram" : "bus");
+export const vehicleKind = (v: Vehicle): "tram" | "bus" => (v.m === "tram" ? "tram" : v.m === "bus" ? "bus" : isTram(v.line) ? "tram" : "bus");

@@ -201,7 +201,8 @@ export function overlayVehicle(id: string): string {
   }).join("");
   return `<div class="overlay">${bar("Ligne " + lineLabel(v.line))}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(v.line)}<b style="font-size:18px">vers ${esc(v.dest)}</b></div>
-    <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques"} de la CTS (ce n'est pas un GPS).</small>
+    <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} de la CTS : ce n'est pas un GPS.</small>
+    ${messagesFor(v.line).map(m => `<button class="box" data-act="msgs" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;text-align:left${m.channel === "disruption" ? ";border-color:#E8402F" : ""}"><span class="warn">!</span><span style="flex:1"><b>${esc(m.title)}</b>${m.period ? `<br><small style="color:var(--mute)">${esc(m.period)}</small>` : ""}</span></button>`).join("")}
     <div class="sub" style="margin-top:0">Prochains arrêts</div>
     <div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div>${next || '<div class="empty">Arrivée au terminus.</div>'}</div>
   </div></main></div>`;
