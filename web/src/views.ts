@@ -19,6 +19,7 @@ import type { PlanCtx } from "./trip";
 import type { LL } from "./geo";
 import { esc } from "./util";
 import { VEHICLES, serverNow } from "./vehicles";
+import { NATIVE } from "./alerts";
 
 /* ============ COMPOSANTS ============ */
 export const lineChip = (l: string, sm = false): string => {
@@ -446,7 +447,8 @@ export function overlayMsgs(): string {
     ${dis.length ? `<div class="sub" style="margin-top:4px">Incidents en cours</div>${dis.map(m => msgCard(m)).join("")}` : ""}
     ${works.length ? `<div class="sub">Travaux et changements</div>${works.map(m => msgCard(m)).join("")}` : ""}
     ${MESSAGES.length ? "" : `<div class="empty">${empty}</div>`}
-    <small style="color:var(--mute)">${CONFIG.USE_MOCK ? "Messages fictifs (mode démonstration)." : "Source : CTS, infos trafic en temps réel (mises à jour toutes les 5 minutes)."}</small></div></main></div>`;
+    <button class="go" data-act="prefs" style="margin:6px 0 12px">🔔 ${S.alerts.enabled ? "Gérer mes alertes" : "Recevoir une alerte en cas de perturbation"}</button>
+    <small style="color:var(--mute);display:block">${CONFIG.USE_MOCK ? "Messages fictifs (mode démonstration)." : "Source : CTS, infos trafic en temps réel (mises à jour toutes les 5 minutes)."}</small></div></main></div>`;
 }
 
 export function overlayFavs(): string {
@@ -474,6 +476,29 @@ export function debugBox(): string {
 }
 
 /* ============ RÉGLAGES ============ */
+/** Lignes proposées pour les alertes : trams, lignes des arrêts favoris, lignes déjà choisies et lignes citées par les infos trafic */
+function alertLineChoices(): string[] {
+  const set = new Set<string>(ALL_LINES);
+  S.fav.map(stopById).forEach(s => s?.lines.forEach(l => set.add(lineLabel(l))));
+  S.alerts.lines.forEach(l => { if (l !== "*") set.add(l); });
+  MESSAGES.forEach(m => m.lines.forEach(l => set.add(l)));
+  const order = (l: string): string => (/^[A-H]$/.test(l) ? "0" + l : /^\d+$/.test(l) ? "2" + l.padStart(4, "0") : "1" + l);
+  return [...set].sort((a, b) => order(a).localeCompare(order(b))).slice(0, 60);
+}
+
+function alertSettings(): string {
+  const a = S.alerts, all = a.lines.includes("*");
+  const chips = ["*", ...alertLineChoices()].map(l => {
+    const on = l === "*" ? all : !all && a.lines.includes(l);
+    return `<button class="achip${on ? " on" : ""}" data-aline="${esc(l)}" aria-pressed="${on}">${l === "*" ? "Toutes" : lineChip(l, true)}</button>`;
+  }).join("");
+  return `<button class="row-switch" data-alerts="works" style="margin-top:8px"><span>Aussi les travaux et changements prévus</span><span class="switch ${a.works ? "on" : ""}"></span></button>
+    <div class="sub" style="font-size:13px;margin:14px 0 4px">Lignes suivies</div>
+    <div class="alines">${chips}</div>
+    <small class="src" style="display:block;margin-top:8px">${NATIVE
+      ? "Vérification environ toutes les 15 minutes, même application fermée. Certains téléphones (Xiaomi, Huawei, Samsung…) bloquent les tâches en arrière-plan : si les alertes n'arrivent pas, autorisez Kumm dans les réglages de batterie du téléphone."
+      : "Version web : les alertes n'arrivent que tant que la page est ouverte. Avec l'application Android, elles arrivent à tout moment."}</small>`;
+}
 const check = (): string => '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>';
 
 export function overlaySettings(): string {
@@ -490,6 +515,9 @@ export function overlaySettings(): string {
     <div class="accent-row">${accents}</div>
     <div class="sub">Carte</div>
     <button class="row-switch" data-darkmap="1"><span>Carte sombre avec les thèmes sombres</span><span class="switch ${p.darkMap ? "on" : ""}"></span></button>
+    <div class="sub">Alertes trafic</div>
+    <button class="row-switch" data-alerts="toggle"><span>Me prévenir des perturbations<br><small style="color:var(--mute)">Une notification pour chaque nouvel incident sur les lignes suivies</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
+    ${S.alerts.enabled ? alertSettings() : ""}
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
       <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro ; gares TER : CTS<br>Application indépendante, non affiliée à la CTS ni à l’Eurométropole</div></div>

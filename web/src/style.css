@@ -290,6 +290,10 @@ nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .switch{flex:none;width:48px;height:28px;border-radius:14px;background:var(--line);position:relative;transition:background .2s}
 .switch::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .2s}
 .switch.on{background:var(--accent)}
+.alines{display:flex;flex-wrap:wrap;gap:8px}
+.achip{border-radius:11px;padding:3px;opacity:.45;font-weight:700;font-size:14px;color:var(--ink);min-height:30px;transition:opacity .15s}
+.achip.on{opacity:1;box-shadow:0 0 0 2px var(--accent)}
+.achip[data-aline="*"]{padding:4px 12px;background:var(--chip)}
 .switch.on::after{transform:translateX(20px)}
 .ghost{border:1.5px solid var(--line);border-radius:22px;padding:10px 20px;font-weight:700;color:var(--ink);margin-top:12px}
 

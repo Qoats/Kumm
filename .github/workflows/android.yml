@@ -45,6 +45,12 @@ jobs:
           if [ ! -d android ]; then npx cap add android; fi
           # icône et écran de démarrage Kumm (au lieu de ceux de Capacitor) ; fond vert de l'écran de démarrage (Android 12+)
           cp -r android-res/. android/app/src/main/res/
+          # alertes trafic (module Background Runner) : sa bibliothèque JavaScript native, et pas de localisation en arrière-plan
+          GRADLE=android/app/build.gradle
+          grep -q "background-runner" "$GRADLE" || sed -i "s|dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'|dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'\n        dirs '../../node_modules/@capacitor/background-runner/android/src/main/libs', 'libs'|" "$GRADLE"
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          grep -q "xmlns:tools" "$MANIFEST" || sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">|' "$MANIFEST"
+          grep -q "ACCESS_BACKGROUND_LOCATION" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />|' "$MANIFEST"
           STYLES=android/app/src/main/res/values/styles.xml
           grep -q windowSplashScreenBackground "$STYLES" || sed -i 's|<item name="android:background">@drawable/splash</item>|<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">#136342</item>|' "$STYLES"
           npx cap sync android

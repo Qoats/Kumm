@@ -1,6 +1,6 @@
 import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
-import { LINE_MODES, LINE_NAMES, MESSAGES, MOCK_MESSAGES, MSG_STATE, isTram, kindOfStop } from "./data";
+import { LINE_MODES, LINE_NAMES, MESSAGES, MOCK_MESSAGES, MSG_STATE, isTram, kindOfStop, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
 import { loadLineInfo, loadMessages, loadPois, loadStops, nextDepartures } from "./api";
 import { KINDS } from "./kinds";
@@ -25,6 +25,7 @@ import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { mountLiveMap, recenter, zoomBy } from "./livemap";
+import { askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
 
 const app = document.getElementById("app") as HTMLElement;
 
@@ -157,7 +158,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-sel],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -187,6 +188,13 @@ app.addEventListener("click", e => {
   }
   if (d.mode) { if (S.trip.mode !== d.mode) S.trip.sel = 0; S.trip.mode = d.mode as "walk" | "bike" | "transit"; render(); return; }
   if (d.sel !== undefined) { S.trip.sel = Number(d.sel); render(); return; }
+  if (d.alerts) { void changeAlerts(d.alerts); return; }
+  if (d.aline) {
+    const a = S.alerts;
+    if (d.aline === "*") a.lines = a.lines.includes("*") ? [] : ["*"];
+    else { const l = a.lines.filter(x => x !== "*"); a.lines = l.includes(d.aline) ? l.filter(x => x !== d.aline) : [...l, d.aline]; }
+    saveAlerts(a); void syncAlerts(a); render(); return;
+  }
   if (d.wk && S.trip.whenDraft) {
     const w = S.trip.whenDraft;
     w.kind = d.wk as typeof w.kind;
@@ -250,6 +258,26 @@ app.addEventListener("click", e => {
   }
   render();
 });
+
+/** Alertes trafic : activation (avec l'autorisation du téléphone), désactivation, travaux */
+async function changeAlerts(what: string): Promise<void> {
+  const a = S.alerts;
+  if (what === "works") { a.works = !a.works; saveAlerts(a); await syncAlerts(a); render(); return; }
+  if (a.enabled) { a.enabled = false; saveAlerts(a); await syncAlerts(a); render(); toast("Alertes trafic désactivées"); return; }
+  if (!(await askPermission())) { toast("Notifications refusées : autorisez-les pour Kumm dans les réglages du téléphone"); return; }
+  if (!a.lines.length) {
+    // par défaut : les lignes des arrêts favoris, sinon les trams
+    const fromFavs = [...new Set(S.fav.map(stopById).flatMap(s => s?.lines ?? []).map(l => lineLabel(l)))];
+    a.lines = fromFavs.length ? fromFavs : ["A", "B", "C", "D", "E", "F"];
+  }
+  a.enabled = true;
+  saveAlerts(a);
+  // les perturbations déjà en cours ne sont pas annoncées : seulement les nouvelles
+  await syncAlerts(a, MESSAGES.map(m => m.id));
+  render();
+  const now = MESSAGES.filter(m => followed(m, a)).length;
+  toast(now ? `Alertes activées · ${now} perturbation${now > 1 ? "s" : ""} déjà en cours sur vos lignes` : "Alertes activées");
+}
 
 /** ⇅ : la destination devient le départ et inversement (« Ma position » passe en destination) */
 function swapTrip(): void {
@@ -341,6 +369,7 @@ async function refreshMessages(): Promise<void> {
     const list = await loadMessages();
     MESSAGES.length = 0; MESSAGES.push(...list);
     MSG_STATE.status = "ok";
+    checkAlerts(S.alerts, MESSAGES);
     render();
   } catch (e) {
     console.warn("Infos trafic indisponibles :", e);
@@ -349,6 +378,9 @@ async function refreshMessages(): Promise<void> {
 }
 
 async function initReal(): Promise<void> {
+  // alertes : réglages renvoyés au programme d'arrière-plan à chaque démarrage ; toucher une notification ouvre les infos trafic
+  if (S.alerts.enabled) void syncAlerts(S.alerts);
+  onAlertTap(() => { S.overlay = { k: "msgs" }; render(); });
   void refreshMessages();
   setInterval(() => { if (!document.hidden) void refreshMessages(); }, 5 * 60_000);
   // modes des lignes (tram / bus / TER) : améliore le classement des arrêts dès qu'ils arrivent

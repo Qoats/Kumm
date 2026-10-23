@@ -72,6 +72,26 @@ for name in ("ic_launcher", "ic_launcher_round"):
 os.makedirs(f"{OUT}/values", exist_ok=True)
 open(f"{OUT}/values/ic_launcher_background.xml", "w").write('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#136342</color>\n</resources>\n')
 
+# icône de notification (barre d'état) : silhouette blanche du K, Android la colore lui-même
+def stat_icon(size):
+    n = size * SS
+    img = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    k = 0.86 * n / 314
+    P = lambda x, y: (n / 2 + (x - 260) * k, n / 2 + (y - 256) * k)
+    d = ImageDraw.Draw(img)
+    w = round(44 * k)
+    W = (255, 255, 255, 255)
+    for a, b in (((168, 256), (352, 132)), ((168, 256), (352, 380)), ((168, 132), (168, 380))):
+        d.line([P(*a), P(*b)], fill=W, width=w)
+    for q in ((168, 132), (168, 380), (352, 132), (352, 380)):
+        x, y = P(*q); r1, r2 = 33 * k, 13 * k
+        d.ellipse((x - r1, y - r1, x + r1, y + r1), fill=W)
+        d.ellipse((x - r2, y - r2, x + r2, y + r2), fill=(0, 0, 0, 0))
+    return img.resize((size, size), Image.LANCZOS)
+
+for d, s in D.items():
+    save(stat_icon(round(24 * s)), f"{OUT}/drawable-{d}/ic_stat_kumm.png")
+
 # écran de démarrage (Android 11 et avant) : fond vert, logo au centre
 BG = (0x13, 0x63, 0x42)
 sizes = {"drawable/splash.png": (480, 320)}

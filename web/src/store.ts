@@ -1,6 +1,8 @@
 import type { Place, Poi, Stop } from "../../shared/types";
 import { LAYERS } from "./kinds";
 import { loadPrefs } from "./themes";
+import { loadAlerts } from "./alerts";
+import type { AlertPrefs } from "./alerts";
 import type { Prefs } from "./themes";
 import type { Layer } from "./kinds";
 import { CONFIG } from "./config";
@@ -15,6 +17,8 @@ export interface State {
   tab: Tab;
   filter: Filter;
   prefs: Prefs;
+  /** alertes trafic (notifications) */
+  alerts: AlertPrefs;
   /** catégories visibles sur la carte */
   layers: Record<Layer, boolean>;
   /** hauteur du panneau « À proximité » : 0 réduit (la carte en entier), 1 moitié, 2 agrandi */
@@ -61,7 +65,7 @@ export const stopById = (id: string): Stop | undefined => STOPS.find(s => s.id =
 export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now()) / 60000));
 
 export const S: State = {
-  tab: "home", filter: "all", prefs: loadPrefs(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null,
+  tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null,
   trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: ""
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }
