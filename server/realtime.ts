@@ -28,6 +28,8 @@ export interface Course {
   /** « tram » ou « bus », d'après la CTS (Extension.VehicleMode) */
   mode: string;
   calls: { code: string; name: string; arr: number; dep: number }[];
+  /** départ prévu (horaire théorique, qui ne bouge pas avec les retards) : sert au code du trajet */
+  aimed?: number;
 }
 
 /** Passages à venir, par code de quai CTS (« 412D ») */
@@ -100,6 +102,7 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
           const arr = Date.parse(str(c["ExpectedArrivalTime"]) || str(c["AimedArrivalTime"]));
           const a = Number.isNaN(arr) ? dep : arr, d = Number.isNaN(dep) ? arr : dep;
           if (Number.isNaN(a) || !str(c["StopPointRef"])) continue;
+          if (!course.calls.length) { const t = Date.parse(str(c["AimedDepartureTime"]) || str(c["AimedArrivalTime"])); if (!Number.isNaN(t)) course.aimed = t; }
           course.calls.push({ code: str(c["StopPointRef"]), name: str(c["StopPointName"]), arr: a, dep: d });
           course.dest ||= str(c["DestinationName"]);
           if (isObj(c["Extension"]) && c["Extension"]["IsRealTime"] === true) course.realTime = true;

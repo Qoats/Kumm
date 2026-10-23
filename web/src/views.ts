@@ -208,7 +208,7 @@ export function overlayVehicle(id: string): string {
   return `<div class="overlay">${bar("Ligne " + lineLabel(v.line))}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(v.line)}<b style="font-size:18px">vers ${esc(v.dest)}</b></div>
     ${wait !== null ? `<div class="box vwait"><b>Au terminus</b><span>Départ ${wait < 1 ? "imminent" : `dans ${wait} min`}</span></div>` : ""}
-    ${v.n ? `<div class="vno">Véhicule <b>${esc(v.n)}</b><small>Numéro attribué par Kumm d'après l'enchaînement des courses : la CTS ne publie pas les numéros des rames et des bus.</small></div>` : ""}
+    ${v.n ? `<div class="vno">Trajet <b>${esc(v.n)}</b><small>Terminus de départ, ligne, date et heure de départ prévue.</small></div>` : ""}
     <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} de la CTS : ce n'est pas un GPS.</small>
     ${messagesFor(v.line).map(m => `<button class="box" data-act="msgs" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;text-align:left${m.channel === "disruption" ? ";border-color:#E8402F" : ""}"><span class="warn">!</span><span style="flex:1"><b>${esc(m.title)}</b>${m.period ? `<br><small style="color:var(--mute)">${esc(m.period)}</small>` : ""}</span></button>`).join("")}
     <div class="sub" style="margin-top:0">Prochains arrêts</div>

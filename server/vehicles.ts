@@ -26,53 +26,50 @@ export interface Vehicle {
   next: [string, number][];
   /** tracé de la ligne entre a et b ([latitude, longitude][]), absent si inconnu (ligne droite) */
   p?: [number, number][];
-  /** numéro du véhicule estimé par Kumm (« B-4 ») : la CTS ne publie pas les numéros réels */
+  /** code du trajet (« hoeb2610240612 » : terminus, ligne, date, heure de départ prévue) */
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course (a = b = quai et heure de départ) */
   w?: boolean;
 }
 
-/* ---------- véhicules reconstitués : quelle course fait le même véhicule que la précédente ----------
-   La CTS décrit des courses, pas des véhicules. Une course qui arrive à un terminus et la prochaine course de la même ligne
-   qui part de ce terminus (même nom d'arrêt, au plus 40 min plus tard) sont attribuées au même véhicule ; s'il y en a
-   plusieurs, le premier arrivé repart le premier. Les numéros sont attribués par Kumm et gardés d'une mise à jour à l'autre. */
+/* ---------- code de chaque trajet et attente au terminus ----------
+   Code d'un trajet (« hoeb2610240612 ») : 3 lettres du terminus de départ, la ligne, la date (AAMMJJ) et l'heure de départ
+   prévue (HHMM, heure de Strasbourg). L'heure prévue ne change pas avec les retards : le code reste le même du départ à
+   l'arrivée. La CTS ne publie pas d'identifiant lisible ni les numéros des rames.
+   Attente au terminus : une course qui arrive à un terminus et la prochaine course de la même ligne qui en part (au plus
+   40 min plus tard, premier arrivé premier reparti) sont faites par le même véhicule ; il est affiché à quai entre les deux. */
 const MAX_LAYOVER = 40 * 60_000;
-const numbers = new Map<string, string>();        // course → numéro
 let chainsAt = -1;
 let prevOf = new Map<string, Course>();            // course → course précédente du même véhicule
 
-const stopKey = (n: string): string => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const plain = (n: string): string => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const stopKey = (n: string): string => plain(n).replace(/[^a-z0-9]/g, "");
+const parisParts = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/** Code lisible du trajet : terminus + ligne + date + heure de départ prévue */
+export function tripCode(c: Course): string {
+  const t = c.aimed ?? c.calls[0]?.dep;
+  if (!t) return "";
+  const parts = Object.fromEntries(parisParts.formatToParts(new Date(t)).map(x => [x.type, x.value]));
+  const term = (plain(c.calls[0].name).match(/[a-z0-9]+/g) ?? ["x"]).find(w => w.length > 2) ?? "x";
+  return `${term.slice(0, 3)}${plain(c.line).replace(/[^a-z0-9]/g, "")}${parts["year"]}${parts["month"]}${parts["day"]}${parts["hour"]}${parts["minute"]}`;
+}
 
 function buildChains(list: Course[]): void {
   const prev = new Map<string, Course>(), byLine = new Map<string, Course[]>();
   for (const c of list) if (c.calls.length >= 2) (byLine.get(c.line) ?? byLine.set(c.line, []).get(c.line)!).push(c);
-  const seen = new Set<string>();
-  for (const [line, cs] of byLine) {
+  for (const cs of byLine.values()) {
     cs.sort((a, b) => a.calls[0].dep - b.calls[0].dep);
     const waiting = new Map<string, Course[]>();   // terminus → véhicules arrivés, dans l'ordre d'arrivée
-    const used = new Set<string>();
-    for (const c of cs) { const n = numbers.get(c.id); if (n) used.add(n); }
     for (const c of cs) {
-      seen.add(c.id);
       const first = c.calls[0], here = waiting.get(stopKey(first.name)) ?? [];
       const i = here.findIndex(p => { const arr = p.calls[p.calls.length - 1].arr; return arr <= first.dep + 60_000 && first.dep - arr <= MAX_LAYOVER; });
-      if (i >= 0) {
-        const p = here.splice(i, 1)[0];
-        prev.set(c.id, p);
-        if (!numbers.has(c.id) && numbers.has(p.id)) numbers.set(c.id, numbers.get(p.id)!);
-      }
-      if (!numbers.has(c.id)) {
-        let k = 1;
-        while (used.has(`${line}-${k}`)) k++;
-        numbers.set(c.id, `${line}-${k}`);
-      }
-      used.add(numbers.get(c.id)!);
+      if (i >= 0) prev.set(c.id, here.splice(i, 1)[0]);
       const last = c.calls[c.calls.length - 1], key = stopKey(last.name);
       (waiting.get(key) ?? waiting.set(key, []).get(key)!).push(c);
       waiting.get(key)!.sort((a, b) => a.calls[a.calls.length - 1].arr - b.calls[b.calls.length - 1].arr);
     }
   }
-  for (const id of numbers.keys()) if (!seen.has(id)) numbers.delete(id);
   prevOf = prev;
 }
 
@@ -91,7 +88,7 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
   for (const c of snap.courses) {
     const calls = c.calls.map(k => ({ ...k, p: snap.stopPos.get(k.code) })).filter(k => k.p) as (typeof c.calls[number] & { p: { lat: number; lon: number } })[];
     if (calls.length < 2 || now > calls[calls.length - 1].arr) continue;
-    const vno = numbers.get(c.id);
+    const vno = tripCode(c);
     if (now < calls[0].dep) {
       // pas encore parti : affiché à quai au terminus seulement si le véhicule qui fera cette course y est déjà arrivé
       const p = prevOf.get(c.id);

@@ -218,7 +218,7 @@ function syncVehicles(): void {
     seen.add(v.id);
     let m = vehMarkers.get(v.id);
     if (!m) {
-      m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}${v.w ? " · au terminus" : ""}${v.n ? ` · véhicule ${v.n}` : ""}` })
+      m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}${v.w ? " · au terminus" : ""}${v.n ? ` · trajet ${v.n}` : ""}` })
         .on("click", () => { S.overlay = { k: "veh", id: v.id }; render(); })
         .addTo(vehLayer);
       m.getElement()?.setAttribute("data-vid", v.id);   // pour scripts/check-map.mjs

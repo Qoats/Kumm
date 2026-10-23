@@ -20,7 +20,7 @@ export interface Vehicle {
   next: [string, number][];
   /** tracé de la ligne entre a et b ; absent : ligne droite */
   p?: [number, number][];
-  /** numéro du véhicule estimé par Kumm (« B-4 ») : la CTS ne publie pas les numéros réels */
+  /** code du trajet (« hoeb2610240612 » : terminus de départ, ligne, date, heure de départ prévue) */
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course */
   w?: boolean;
