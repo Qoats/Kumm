@@ -83,15 +83,16 @@ const greeting = (): string => {
 };
 
 export function header(): string {
-  return `<header>
+  const lines = ["A", "B", "C", "D", "E", "F"], step = 100 / lines.length;
+  const stripe = lines.map((l, i) => `${COLORS[l]} ${(i * step).toFixed(2)}% ${((i + 1) * step).toFixed(2)}%`).join(",");
+  return `<div class="hwrap" style="background:linear-gradient(90deg,${stripe})"><header>
     <div class="top">
       <button data-act="account" aria-label="Compte">${ic("user")}</button>
       <span class="ic"><button data-act="msgs" aria-label="Messages">${ic("mail")}</button><button data-act="prefs" aria-label="Réglages">${ic("sliders")}</button><button data-act="favs" aria-label="Favoris">${ic("heart")}</button></span>
     </div>
     <p class="hello">${greeting()}</p>
     <div class="search"><input id="hq" placeholder="Où voulez-vous aller ?" readonly><span class="go">${ic("search")}</span></div>
-    <div class="strip">${["A", "B", "C", "D", "E", "F"].map(l => `<i style="background:${COLORS[l]}"></i>`).join("")}</div>
-  </header>`;
+  </header></div>`;
 }
 
 export function bar(title: string, back?: string): string {
@@ -176,8 +177,8 @@ export function screenNearby(): string {
   return `<div class="map">
     ${background}
     <div class="layers">${chips}</div>
-    <div class="tools"><button data-act="prefs" aria-label="Réglages">${ic("gear", 'stroke="currentColor"')}</button><button data-act="locate" aria-label="Me localiser">${ic("target", 'stroke="var(--accent)"')}</button></div>
-    ${CONFIG.USE_MOCK ? "" : `<div class="tools zoom"><button data-act="zoomIn" aria-label="Zoomer">${ic("plus", 'stroke="currentColor"')}</button><button data-act="zoomOut" aria-label="Dézoomer">${ic("minus", 'stroke="currentColor"')}</button></div>`}
+    <div class="mapbtns"><div class="tools"><button data-act="prefs" aria-label="Réglages">${ic("gear", 'stroke="currentColor"')}</button><button data-act="locate" aria-label="Me localiser">${ic("target", 'stroke="var(--accent)"')}</button></div>
+    ${CONFIG.USE_MOCK ? "" : `<div class="tools zoom"><button data-act="zoomIn" aria-label="Zoomer">${ic("plus", 'stroke="currentColor"')}</button><button data-act="zoomOut" aria-label="Dézoomer">${ic("minus", 'stroke="currentColor"')}</button></div>`}</div>
     <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
       <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
       <h3${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>

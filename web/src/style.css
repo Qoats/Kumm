@@ -53,7 +53,9 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;-webkit-overflow
 .pad{padding:14px 16px 28px}
 
 /* ---------- en-tête ---------- */
-header{background:linear-gradient(135deg,var(--head-a),var(--head-b));color:#fff;padding:calc(12px + var(--safe-top)) 16px 0;flex:none;border-radius:0 0 26px 26px;box-shadow:0 10px 24px -12px rgba(0,0,0,.5);position:relative;z-index:5}
+/* en-tête : la bande aux couleurs des lignes de tram est le fond de .hwrap, visible sur 5 px sous l'arrondi de l'en-tête */
+.hwrap{flex:none;padding-bottom:5px;border-radius:0 0 31px 31px;box-shadow:0 10px 24px -12px rgba(0,0,0,.5);position:relative;z-index:5}
+header{background:linear-gradient(135deg,var(--head-a),var(--head-b));color:#fff;padding:calc(12px + var(--safe-top)) 16px 16px;border-radius:0 0 26px 26px}
 header .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 header .ic{display:flex;gap:8px}
 header .top button{width:38px;height:38px;display:grid;place-items:center;border-radius:13px;background:rgba(255,255,255,.14)}
@@ -67,8 +69,6 @@ header .brand .mark svg{width:20px;height:20px;stroke:var(--accent-deep)}
 .search input::placeholder{color:var(--mute)}
 .search .go{width:38px;height:38px;flex:none;padding:0;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
 .search .go svg{width:20px;height:20px;stroke:var(--on-accent)}
-.strip{display:flex;height:5px;margin:16px -16px 0;border-radius:0 0 26px 26px;overflow:hidden}
-.strip i{flex:1}
 .bar{background:linear-gradient(135deg,var(--head-a),var(--head-b));color:#fff;padding:calc(14px + var(--safe-top)) 16px 14px;display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;flex:none;border-radius:0 0 22px 22px;box-shadow:0 10px 22px -14px rgba(0,0,0,.5)}
 .bar button{width:34px;height:34px;display:grid;place-items:center;border-radius:12px;background:rgba(255,255,255,.14)}
 .bar svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
@@ -124,13 +124,13 @@ h2:first-child{margin-top:4px}
 /* ---------- carte « À proximité » ---------- */
 .map{position:absolute;inset:0;background:var(--map)}
 .map svg.m{width:100%;height:100%;display:block}
-.tools{position:absolute;right:14px;top:calc(14px + var(--safe-top));background:var(--card);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.25);width:56px;overflow:hidden}
-.tools button{width:56px;height:56px;display:grid;place-items:center}
+/* boutons de la carte : une colonne à droite, sous la rangée des catégories */
+.mapbtns{position:absolute;right:12px;top:calc(62px + var(--safe-top));display:flex;flex-direction:column;gap:10px}
+.tools{background:var(--card);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.25);width:50px;overflow:hidden}
+.tools button{width:50px;height:50px;display:grid;place-items:center;color:var(--ink)}
 .tools button+button{border-top:1px solid var(--line)}
-.tools svg{width:28px;height:28px;fill:none;stroke-width:2;stroke-linecap:round}
-/* + et − : second panneau, sous Réglages et Position */
-.tools.zoom{top:calc(14px + 112px + 12px + var(--safe-top))}
-.tools.zoom svg{stroke-width:2.6;color:var(--ink)}
+.tools svg{width:26px;height:26px;fill:none;stroke-width:2;stroke-linecap:round}
+.tools.zoom svg{stroke-width:2.6}
 .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:28px 28px 0 0;box-shadow:0 -8px 28px rgba(0,0,0,.22);transition:height .25s ease;display:flex;flex-direction:column;overflow:hidden}
 .sheet .grab{display:grid;place-items:center;padding:8px 0 0;width:100%}
 .sheet .grab svg{width:30px;height:20px;stroke:var(--accent);fill:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
@@ -143,7 +143,7 @@ h2:first-child{margin-top:4px}
 .seg button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:800}
 .seg svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .sheet .list{overflow-y:auto;padding:0 14px 16px;flex:1}
-.layers{position:absolute;top:calc(14px + var(--safe-top));left:10px;right:84px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;z-index:2}
+.layers{position:absolute;top:calc(14px + var(--safe-top));left:10px;right:10px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;z-index:2}
 .layers::-webkit-scrollbar{display:none}
 .lyr{flex:none;display:flex;align-items:center;gap:6px;background:var(--card);box-shadow:var(--sh);border-radius:22px;padding:5px 13px 5px 5px;font-size:13.5px;font-weight:700;opacity:.6;transition:opacity .15s}
 .lyr.on{opacity:1;box-shadow:0 0 0 2px var(--accent),var(--sh)}
@@ -153,9 +153,9 @@ h2:first-child{margin-top:4px}
 .leaflet-container{background:var(--map)!important;font-family:var(--font)}
 .lm-icon{background:none!important;border:0!important}
 .me-dot{width:22px;height:22px;border-radius:50%;background:#4A90E2;border:3px solid #fff;box-shadow:0 0 0 6px rgba(74,144,226,.25),0 1px 4px rgba(0,0,0,.4)}
-.map .layers,.map .tools,.map .tools.zoom,.map .sheet,.map .osm{z-index:1001}
+.map .layers,.map .mapbtns,.map .sheet,.map .osm{z-index:1001}
 .osm{position:absolute;right:8px;font-size:11px;background:rgba(255,255,255,.85);color:#333;padding:1px 6px;border-radius:6px}
-.lm-note{position:absolute;left:12px;right:84px;top:calc(64px + var(--safe-top));z-index:1000;background:rgba(0,0,0,.75);color:#fff;font-size:13px;line-height:1.35;padding:8px 12px;border-radius:10px}
+.lm-note{position:absolute;left:12px;right:74px;top:calc(64px + var(--safe-top));z-index:1000;background:rgba(0,0,0,.75);color:#fff;font-size:13px;line-height:1.35;padding:8px 12px;border-radius:10px}
 
 /* ---------- barre du bas ---------- */
 nav{flex:none;background:var(--nav);display:flex;padding:8px 6px calc(6px + var(--safe-bottom));border-top:1px solid var(--line);box-shadow:0 -8px 20px -14px rgba(0,0,0,.35)}
