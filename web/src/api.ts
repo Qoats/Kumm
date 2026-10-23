@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import type { Departure, Poi, PoiKind, Stop } from "../../shared/types";
 import type { AnnotatedStopPoint, SiriStopMonitoring, SiriStopPoints } from "../../shared/cts-api";
 import { appHeaders, CONFIG, url } from "./config";
@@ -20,6 +21,8 @@ async function get<T>(path: string): Promise<T> {
     const to = setTimeout(() => ctl.abort(), 9000);
     try {
       const r = await fetch(CONFIG.CTS_BASE + path, { signal: ctl.signal, headers: appHeaders() });
+      // version web privée : session expirée → page de connexion
+      if (r.status === 401 && !Capacitor.isNativePlatform()) { location.href = "/connexion"; }
       if (!r.ok) {
         const body = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
         throw new HttpError(r.status, `CTS ${r.status}${body ? " : " + body : ""}`);

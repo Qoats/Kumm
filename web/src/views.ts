@@ -524,5 +524,6 @@ export function overlaySettings(): string {
       <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro ; gares TER : CTS<br>Application indépendante, non affiliée à la CTS ni à l’Eurométropole</div></div>
     ${CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher une mise à jour</button>` : ""}
     <button class="ghost" data-reset="1">Rétablir les réglages d’origine</button>
+    ${NATIVE ? "" : `<a class="ghost" href="/deconnexion" style="display:block;text-align:center;text-decoration:none;margin-top:10px">Se déconnecter</a>`}
   </div></main></div>`;
 }

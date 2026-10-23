@@ -28,7 +28,7 @@ const CSP = [
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
-  "form-action 'none'",
+  "form-action 'self'",
   "frame-ancestors 'none'"
 ].join("; ");
 

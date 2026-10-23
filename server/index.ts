@@ -14,6 +14,7 @@ import { parkingsRelais, poiResult, velhop } from "./poi.js";
 import { recordRequest, stats } from "./stats.js";
 import { serveStatic } from "./static.js";
 import { serveUpdate, updateStatus } from "./updates.js";
+import { WEB_PRIVATE, allowed, loginRoute, logoutRoute } from "./access.js";
 import { serveTile } from "./tiles.js";
 import { parseGeneralMessages } from "./messages.js";
 import { vehiclesAt } from "./vehicles.js";
@@ -257,6 +258,7 @@ function health(res: ServerResponse): Promise<void> {
     reseau_en_memoire: { ...realtimeStatus(), arrets_servis_depuis_la_memoire: stats.snapshotServed },
     alertes: alertsStatus(),
     apk: updateStatus(),
+    acces_web_prive: WEB_PRIVATE,
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });
   res.setHeader("Cache-Control", "no-store");
@@ -283,11 +285,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (origin && ORIGINS.includes(origin)) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
   if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-App-Key", "Access-Control-Max-Age": "86400" }); return void res.end(); }
   // seule écriture possible : l'abonnement aux alertes trafic
-  const isPost = req.method === "POST" && url.pathname === "/api/alerts";
+  const isPost = req.method === "POST" && (url.pathname === "/api/alerts" || url.pathname === "/connexion");
   if (req.method !== "GET" && req.method !== "HEAD" && !isPost) return send(res, 405, "text/plain", "Méthode non autorisée");
 
   const p = url.pathname;
   if (p === "/health") return health(res);
+  // bêta privée : connexion demandée au navigateur (l'APK Android passe sans rien saisir)
+  if (p === "/connexion") return loginRoute(req, res, readBody);
+  if (p === "/deconnexion") return logoutRoute(res);
+  if (!allowed(req, res, p)) return;
 
   const isTile = p.startsWith("/tiles/");
   const isService = p.startsWith("/api/") || p.startsWith("/geo/") || p.startsWith("/poi/");
