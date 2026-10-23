@@ -20,8 +20,8 @@ const MIN_COMPRESS = 1024;
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
   "img-src 'self' data: blob:",
   // carte 3D du guidage : style, tuiles vectorielles, polices et icônes d'OpenFreeMap ; MapLibre dessine dans un « worker »
   "connect-src 'self' https://tiles.openfreemap.org",

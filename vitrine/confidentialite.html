@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confidentialité – Kumm</title>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/legal.css">
+</head>
+<body>
+<div class="wrap">
+<header><a href="/"><img src="/logo.svg" alt="">Kumm</a></header>
+<main>
+<h1>Politique de confidentialité</h1>
+<p class="date">Dernière mise à jour : 23 octobre 2026</p>
+
+<p>Cette page explique quelles données Kumm utilise, pourquoi, et combien de temps elles sont gardées. Kumm n’a pas de compte utilisateur, pas de publicité et pas d’outil de statistiques de visite.</p>
+
+<h2>Responsable</h2>
+<p><mark>[Prénom Nom]</mark>, éditeur de Kumm. Contact : <mark>[adresse e-mail]</mark>.</p>
+
+<h2>Sur votre téléphone</h2>
+<p>Vos arrêts favoris, vos réglages (thème, couleur, lignes suivies) et vos préférences sont enregistrés uniquement sur votre téléphone ou dans votre navigateur. Ils ne sont pas envoyés au serveur.</p>
+
+<h2>Votre position</h2>
+<ul>
+  <li>Si vous l’autorisez, votre position sert à afficher les arrêts proches et à vous guider. Ce calcul se fait sur votre téléphone.</li>
+  <li>Quand vous demandez un itinéraire, le point de départ et d’arrivée sont envoyés au serveur Kumm, qui les transmet au service de calcul : Transitous pour les transports, le serveur de routage d’OpenStreetMap (routing.openstreetmap.de) pour la marche et le vélo. Ces services reçoivent les coordonnées, mais pas votre adresse IP ni aucun identifiant de votre téléphone.</li>
+  <li>Le serveur Kumm ne conserve pas ces positions.</li>
+  <li>Vous pouvez retirer l’autorisation de localisation à tout moment dans les réglages de votre téléphone ; Kumm reste utilisable sans.</li>
+</ul>
+
+<h2>Recherche d’adresses</h2>
+<p>Le texte que vous tapez pour chercher une adresse est envoyé par le serveur Kumm à la Base Adresse Nationale, sans votre adresse IP. Il n’est pas conservé.</p>
+
+<h2>Alertes trafic (application Android)</h2>
+<ul>
+  <li>Si vous activez les alertes, votre téléphone obtient un identifiant de notification auprès de Firebase Cloud Messaging (Google). Cet identifiant et la liste des lignes que vous suivez sont enregistrés sur le serveur Kumm, pour vous envoyer une notification quand une de ces lignes est perturbée.</li>
+  <li>Ces données sont supprimées dès que vous désactivez les alertes, ou quand Google signale que l’identifiant n’est plus valable (application désinstallée, par exemple).</li>
+  <li>Pour acheminer la notification, Google traite cet identifiant selon ses propres règles : <a href="https://firebase.google.com/support/privacy">firebase.google.com/support/privacy</a>.</li>
+</ul>
+
+<h2>Carte du guidage</h2>
+<p>Pendant un guidage, le fond de carte est chargé directement depuis OpenFreeMap (tiles.openfreemap.org) : comme pour tout site web, ce service voit l’adresse IP de votre téléphone. Les autres cartes de Kumm passent par le serveur Kumm.</p>
+
+<h2>Version web en test</h2>
+<p>Pendant la phase de test, la version web demande un identifiant et un mot de passe. Après la connexion, un cookie de session est enregistré dans votre navigateur pendant 30 jours. Il sert uniquement à vous garder connecté ; il n’est pas utilisé pour vous suivre. Aucun autre cookie n’est utilisé.</p>
+
+<h2>Journaux du serveur</h2>
+<p>Pour protéger le service contre les abus, le serveur garde en mémoire, pendant quelques minutes au plus, le nombre de requêtes et de tentatives de connexion par adresse IP. Il ne les écrit pas dans un fichier. Les journaux du serveur contiennent seulement des compteurs et des messages d’erreur, sans adresse IP, sans position et sans les adresses recherchées.</p>
+<p class="mute">L’hébergeur (voir les <a href="/mentions-legales.html">mentions légales</a>) peut conserver ses propres journaux techniques pour la sécurité de son réseau.</p>
+
+<h2>Vos droits</h2>
+<p>Vous pouvez demander l’accès à vos données, leur correction ou leur suppression en écrivant à <mark>[adresse e-mail]</mark>. Pour les alertes, le plus simple est de les désactiver dans l’application : vos données sont alors supprimées. Si vous estimez que vos droits ne sont pas respectés, vous pouvez contacter la CNIL (<a href="https://www.cnil.fr">cnil.fr</a>).</p>
+
+<h2>Modifications</h2>
+<p>Cette page sera mise à jour si le fonctionnement de Kumm change. La date de mise à jour est indiquée en haut.</p>
+</main>
+<footer><a href="/">Accueil</a> · <a href="/mentions-legales.html">Mentions légales</a></footer>
+</div>
+</body>
+</html>

@@ -1,3 +1,14 @@
+// police de l'interface, servie par Kumm lui-même (pas de requête vers Google Fonts : l'adresse IP des visiteurs reste privée)
+import "@fontsource/plus-jakarta-sans/latin-400.css";
+import "@fontsource/plus-jakarta-sans/latin-ext-400.css";
+import "@fontsource/plus-jakarta-sans/latin-500.css";
+import "@fontsource/plus-jakarta-sans/latin-ext-500.css";
+import "@fontsource/plus-jakarta-sans/latin-600.css";
+import "@fontsource/plus-jakarta-sans/latin-ext-600.css";
+import "@fontsource/plus-jakarta-sans/latin-700.css";
+import "@fontsource/plus-jakarta-sans/latin-ext-700.css";
+import "@fontsource/plus-jakarta-sans/latin-800.css";
+import "@fontsource/plus-jakarta-sans/latin-ext-800.css";
 import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isTram, kindOfStop, lineLabel } from "./data";
