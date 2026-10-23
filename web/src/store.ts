@@ -8,7 +8,7 @@ import { CENTER, KX, KY, MOCK_POIS, MOCK_STOPS } from "./data";
 
 export type Tab = "home" | "search" | "lines" | "nearby" | "trips" | "buy";
 export type Filter = "all" | "bus" | "tram";
-export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string } | { k: "poi"; id: string } | { k: "settings" } | { k: "msgs" } | { k: "favs" } | null;
+export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string } | { k: "poi"; id: string } | { k: "veh"; id: string } | { k: "settings" } | { k: "msgs" } | { k: "favs" } | null;
 export interface Modal { t: string; p: string; b: string[]; go?: () => void }
 
 export interface State {

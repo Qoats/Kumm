@@ -243,6 +243,12 @@ nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .stopline{display:flex;align-items:center;gap:14px;padding:0 6px;position:relative}
 .stopline .d{width:16px;height:16px;border-radius:50%;border:4px solid var(--c);background:var(--card);flex:none;z-index:1}
 .stopline .r{flex:1;padding:15px 0;border-bottom:1px solid var(--line);font-size:16.5px}
+.vn b{flex:none;font-size:15px;color:var(--accent-ink)}
+/* tram ou bus en circulation sur la carte : pastille de la ligne, flèche de direction autour */
+.veh{position:relative;width:34px;height:34px;display:grid;place-items:center;transition:transform .2s}
+.veh .vb{position:relative;z-index:1;min-width:24px;height:24px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:var(--c);color:#fff;font-weight:800;font-size:12.5px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.veh .va{position:absolute;inset:0;transform-origin:50% 50%}
+.veh .va::before{content:"";position:absolute;left:50%;top:-3px;margin-left:-6px;border:6px solid transparent;border-bottom:8px solid var(--c);border-top:0}
 .rail{position:absolute;left:13px;top:0;bottom:0;width:4px;background:var(--c);border-radius:2px}
 .ver{text-align:center;color:var(--mute);font-size:12.5px;margin:8px 0 0}
 

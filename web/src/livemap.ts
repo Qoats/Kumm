@@ -6,6 +6,9 @@ import type { Layer } from "./kinds";
 import { markerIcon } from "./markers";
 import { makeBaseLayer, wantsDarkMap } from "./tiles";
 import { POIS, S, STOPS, USER, render } from "./store";
+import { COLORS, lineLabel } from "./data";
+import { esc } from "./util";
+import { VEHICLES, refreshVehicles, vehicleKind, vehiclePos } from "./vehicles";
 
 /**
  * Vraie carte (OpenStreetMap) pour l'écran « À proximité ».
@@ -15,6 +18,9 @@ import { POIS, S, STOPS, USER, render } from "./store";
 let host: HTMLDivElement | null = null;
 let map: L.Map | null = null;
 let markers: L.LayerGroup | null = null;
+let vehLayer: L.LayerGroup | null = null;
+const vehMarkers = new Map<string, L.Marker>();
+let vehTimer = 0;
 let me: L.Marker | null = null;
 let lastKey = "";
 let lastUser = "";
@@ -63,6 +69,7 @@ function create(): void {
   useBaseLayer(map);
   L.control.zoom({ position: "topright" }).addTo(map);
   markers = L.layerGroup().addTo(map);
+  vehLayer = L.layerGroup().addTo(map);
   me = L.marker([USER.lat, USER.lon], {
     icon: L.divIcon({ html: '<div class="me-dot"></div>', className: "lm-icon", iconSize: [22, 22], iconAnchor: [11, 11] }),
     interactive: false, zIndexOffset: 1000
@@ -122,6 +129,54 @@ export function mountLiveMap(slot: HTMLElement): void {
     if (!centered && S.locOn) { centered = true; m.setView([USER.lat, USER.lon], 16); }   // une seule fois, quand la position arrive
   }
   sync();
+  startVehicles();
+}
+
+/* ---------- trams et bus en circulation ---------- */
+const vehColor = (line: string): string => COLORS[lineLabel(line)] ?? COLORS[line] ?? (/^[A-F]$/.test(lineLabel(line)) ? "#0B4A9E" : "#1296A8");
+const vehIcon = (line: string, h: number): L.DivIcon => L.divIcon({
+  html: `<div class="veh" style="--c:${vehColor(line)}"><i class="va" style="transform:rotate(${h}deg)"></i><span class="vb">${esc(lineLabel(line))}</span></div>`,
+  className: "lm-icon", iconSize: [34, 34], iconAnchor: [17, 17]
+});
+
+/** Place les véhicules visibles (catégories et filtre Tram / Bus respectés) ; appelé chaque seconde */
+function syncVehicles(): void {
+  if (!map || !vehLayer) return;
+  const b = map.getBounds().pad(0.3), seen = new Set<string>();
+  const show = map.getZoom() >= 13;
+  for (const v of show ? VEHICLES.values() : []) {
+    const k = vehicleKind(v);
+    if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
+    const p = vehiclePos(v);
+    if (!b.contains(p)) continue;
+    seen.add(v.id);
+    let m = vehMarkers.get(v.id);
+    if (!m) {
+      m = L.marker(p, { icon: vehIcon(v.line, v.h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}` })
+        .on("click", () => { S.overlay = { k: "veh", id: v.id }; render(); })
+        .addTo(vehLayer);
+      (m as L.Marker & { _h?: number })._h = v.h;
+      vehMarkers.set(v.id, m);
+    } else {
+      m.setLatLng(p);
+      const mm = m as L.Marker & { _h?: number };
+      if (mm._h !== v.h) { m.setIcon(vehIcon(v.line, v.h)); mm._h = v.h; }
+    }
+  }
+  for (const [id, m] of vehMarkers) if (!seen.has(id)) { vehLayer.removeLayer(m); vehMarkers.delete(id); }
+}
+
+/** Animation : une fois par seconde tant que la carte est affichée ; nouvelles positions toutes les 20 s */
+function startVehicles(): void {
+  if (vehTimer) return;
+  const tick = (): void => {
+    if (!host?.isConnected) { window.clearInterval(vehTimer); vehTimer = 0; return; }
+    if (document.hidden) return;
+    refreshVehicles(() => { syncVehicles(); if (S.overlay?.k === "veh") render(); });
+    syncVehicles();
+  };
+  vehTimer = window.setInterval(tick, 1000);
+  tick();
 }
 
 export function recenter(): void {

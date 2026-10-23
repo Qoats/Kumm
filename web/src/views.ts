@@ -18,6 +18,7 @@ import { TRIP, tripReady } from "./trip";
 import type { PlanCtx } from "./trip";
 import type { LL } from "./geo";
 import { esc } from "./util";
+import { VEHICLES, serverNow } from "./vehicles";
 
 /* ============ COMPOSANTS ============ */
 export const lineChip = (l: string, sm = false): string => {
@@ -187,6 +188,23 @@ export function screenNearby(): string {
       <div class="list" id="nearlist"></div>
     </div>
   </div>`;
+}
+
+/** Fiche d'un tram ou bus en circulation : destination et prochains arrêts */
+export function overlayVehicle(id: string): string {
+  const v = VEHICLES.get(id);
+  if (!v) return `<div class="overlay">${bar("Véhicule")}<main><div class="pad"><div class="empty">Ce véhicule n'est plus en circulation.</div></div></main></div>`;
+  const now = serverNow();
+  const next = v.next.filter(([, t]) => t > now - 30_000).map(([name, t]) => {
+    const m = Math.max(0, Math.round((t - now) / 60000));
+    return `<div class="stopline vn"><span class="d"></span><span class="r">${esc(name)}</span><b>${m < 1 ? "à l'approche" : m + " min"}</b></div>`;
+  }).join("");
+  return `<div class="overlay">${bar("Ligne " + lineLabel(v.line))}<main><div class="pad">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(v.line)}<b style="font-size:18px">vers ${esc(v.dest)}</b></div>
+    <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques"} de la CTS (ce n'est pas un GPS).</small>
+    <div class="sub" style="margin-top:0">Prochains arrêts</div>
+    <div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div>${next || '<div class="empty">Arrivée au terminus.</div>'}</div>
+  </div></main></div>`;
 }
 
 export function overlayPoi(id: string): string {

@@ -15,6 +15,7 @@ import { recordRequest, stats } from "./stats.js";
 import { serveStatic } from "./static.js";
 import { serveTile } from "./tiles.js";
 import { parseGeneralMessages } from "./messages.js";
+import { vehiclesAt } from "./vehicles.js";
 import { realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
 import type { CtsResult } from "./cts.js";
 
@@ -159,6 +160,8 @@ function upstreamFor(name: string, search: string): () => Promise<CtsResult> {
 function api(res: ServerResponse, url: URL): Promise<void> | void {
   const name = url.pathname.slice("/api/".length);
   if (name === "messages") return cached(res, "info:messages", 60, 3600, trafficMessages);
+  // position estimée des véhicules, depuis la photo du réseau en mémoire : recalculée au plus toutes les 5 s
+  if (name === "vehicles") return cached(res, "info:vehicles", 5, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(vehiclesAt()) }));
   const conf = ALLOWED[name];
   if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
   const clean = cleanQuery(name, url);
