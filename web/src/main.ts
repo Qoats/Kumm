@@ -19,7 +19,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  debugBox, depCards, stopNotice, stopTabs, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
+  debugBox, depCards, pickDir, stopNotice, stopTabs, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc } from "./util";
@@ -146,7 +146,10 @@ async function loadDeps(): Promise<void> {
         const res = await Promise.all(near.map(s => nextDepartures(s).then(ds => ds.map(d => ({ stop: s, d }))).catch(() => [] as StopDeparture[])));
         const all: StopDeparture[] = [];
         for (const rows of res) {
-          rows.filter(({ d }) => filter === "all" || (filter === "tram") === isTram(d.line)).sort(sortByTime).slice(0, 2).forEach(r => all.push(r));
+          // les 2 premières lignes de chaque arrêt, avec toutes leurs directions (choisies dans la tuile)
+          const kept = rows.filter(({ d }) => filter === "all" || (filter === "tram") === isTram(d.line)).sort(sortByTime);
+          const lines = [...new Set(kept.map(r => r.d.line))].slice(0, 2);
+          kept.filter(r => lines.includes(r.d.line)).forEach(r => all.push(r));
         }
         return depCards(all);
       });
@@ -155,7 +158,7 @@ async function loadDeps(): Promise<void> {
       for (const id of S.fav) {
         const s = stopById(id);
         if (!s || !document.getElementById("fav-" + id)) continue;
-        await fillSlot("fav-" + id, async () => depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime).slice(0, 2)));
+        await fillSlot("fav-" + id, async () => depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime), 2));
       }
     }
     if (S.overlay?.k === "stop") {
@@ -185,13 +188,14 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
   // ne jamais remonter hors de l'application : la page elle-même porte des attributs de thème (data-darkmap…)
   if (!b || !app.contains(b)) return;
   const d = b.dataset;
+  if (d.dirk !== undefined && d.dirv !== undefined) { pickDir(d.dirk, d.dirv); render(); return; }   // direction d'une ligne, sans ouvrir l'arrêt
   if (d.mb !== undefined) { const m = S.modal; S.modal = null; if (d.mb === "1" && m?.go) m.go(); render(); return; }
   if (d.tab) {
     S.tab = d.tab as Tab; S.overlay = null;

@@ -457,16 +457,43 @@ export function overlayFavs(): string {
 }
 
 /* ============ PASSAGES ============ */
-export function depCards(list: StopDeparture[]): string {
-  const rows: string[] = [];
+/** Direction choisie pour chaque ligne à chaque arrêt (« arrêt|ligne » → destination), gardée sur le téléphone */
+const DIR_KEY = "dirPick";
+let dirPick: Record<string, string> = {};
+try { dirPick = JSON.parse(localStorage.getItem(DIR_KEY) ?? "{}") as Record<string, string>; } catch { /* stockage indisponible */ }
+export function pickDir(key: string, dest: string): void {
+  dirPick[key] = dest;
+  try { localStorage.setItem(DIR_KEY, JSON.stringify(dirPick)); } catch { /* ignoré */ }
+}
+
+/** Une tuile par ligne et par arrêt : si la ligne part dans plusieurs directions, un sélecteur permet de choisir la sienne */
+export function depCards(list: StopDeparture[], max = Infinity): string {
+  const now = Date.now();
+  const groups = new Map<string, { stop: StopDeparture["stop"]; line: string; dests: Map<string, number[]> }>();
   for (const { stop, d } of list) {
-    const t = d.times.filter(x => x > Date.now() - 30000);
+    const t = d.times.filter(x => x > now - 30000);
     if (!t.length) continue;
-    const m = mins(t[0]);
-    rows.push(`<button class="dep" style="--lc:${COLORS[d.line] ?? "#999"}" data-stop="${esc(stop.id)}">
-      <div class="h">${lineChip(d.line, true)}${hasAlert(d.line) ? '<span class="warn">!</span>' : ""}<b>${esc(stop.name)}</b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
-      <div class="f"><span>${ic(lineKind(d.line) === "ter" ? "train" : isTram(d.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(d.dest)}</b></span></span><span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div></button>`);
+    const k = stop.id + "|" + d.line;
+    const g = groups.get(k) ?? groups.set(k, { stop, line: d.line, dests: new Map() }).get(k)!;
+    g.dests.set(d.dest, [...(g.dests.get(d.dest) ?? []), ...t].sort((a, b) => a - b));   // même direction sur deux quais : horaires réunis
   }
+  const cards = [...groups].map(([k, g]) => {
+    const dests = [...g.dests.keys()].sort((a, b) => a.localeCompare(b, "fr"));
+    const soonest = [...g.dests].sort((a, b) => a[1][0] - b[1][0])[0][0];
+    const dest = dirPick[k] && g.dests.has(dirPick[k]) ? dirPick[k] : soonest;
+    return { k, g, dests, dest, t: g.dests.get(dest)!, first: g.dests.get(soonest)![0] };
+  }).sort((a, b) => a.first - b.first);   // ordre selon le prochain départ de la ligne : la tuile ne bouge pas quand on change de direction
+  const rows = cards.slice(0, max).map(({ k, g, dests, dest, t }) => {
+    const m = mins(t[0]), c = COLORS[g.line] ?? COLORS[lineLabel(g.line)] ?? "#999";
+    const picker = dests.length > 1
+      ? `<div class="dirs${dests.length > 2 ? " many" : ""}" role="group" aria-label="Direction">${dests.map(x =>
+          `<button data-dirk="${esc(k)}" data-dirv="${esc(x)}" class="${x === dest ? "on" : ""}" aria-pressed="${x === dest}">${esc(x)}</button>`).join("")}</div>`
+      : "";
+    return `<div class="dep" role="button" tabindex="0" style="--lc:${c};--lt:${lineText(COLORS[g.line] ? g.line : lineLabel(g.line))}" data-stop="${esc(g.stop.id)}">
+      <div class="h">${lineChip(g.line, true)}${hasAlert(g.line) ? '<span class="warn">!</span>' : ""}<b>${esc(g.stop.name)}</b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
+      ${picker}
+      <div class="f"><span>${ic(lineKind(g.line) === "ter" ? "train" : isTram(g.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(dest)}</b></span></span><span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div></div>`;
+  });
   return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
 }
 

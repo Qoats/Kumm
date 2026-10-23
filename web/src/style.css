@@ -106,7 +106,7 @@ h2:first-child{margin-top:4px}
 .more .c b{color:var(--accent-ink)!important;font-size:15px!important}
 
 /* ---------- passages ---------- */
-.dep{position:relative;padding:12px 14px 12px 20px;margin-bottom:10px;width:100%;display:block;text-align:left;overflow:hidden}
+.dep{position:relative;padding:12px 14px 12px 20px;margin-bottom:10px;width:100%;display:block;text-align:left;overflow:hidden;cursor:pointer}
 .dep::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--lc,#999)}
 .dep .h{display:flex;align-items:center;gap:10px}
 .dep .h b{flex:1;font-size:17px}
@@ -368,3 +368,8 @@ a.box,.more a{text-decoration:none;color:inherit}
 .stopnote .sn-i{flex:none;width:24px;height:24px;border-radius:50%;background:#E8402F;color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px;margin-top:1px}
 .stopnote .sn-l{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
 .seg.stabs{padding:0 0 14px}
+.dep .dirs{display:flex;gap:3px;margin-top:10px;padding:3px;border-radius:12px;background:var(--chip)}
+.dep .dirs button{flex:1 1 0;min-width:0;padding:8px 10px;border-radius:10px;font-size:14px;font-weight:600;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .15s,color .15s}
+.dep .dirs button.on{background:var(--lc);color:var(--lt,#fff);font-weight:800}
+.dep .dirs.many{overflow-x:auto;scrollbar-width:none}
+.dep .dirs.many button{flex:0 0 auto;max-width:70%}
