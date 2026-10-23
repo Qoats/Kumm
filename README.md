@@ -163,6 +163,22 @@ Si un arrêt reste vide, ouvrez sa fiche et le bouton « Détails techniques » 
 ## Vérifier le code
 `npm.cmd run typecheck` contrôle les types de tout le projet.
 
+## Règle d'interface : un menu ne doit jamais revenir en haut tout seul
+L'interface est redessinée en entier à chaque changement (`render()` → `draw()` remplace le contenu de la page). Sans précaution,
+chaque liste revient en haut dès qu'on touche un bouton : c'est arrivé plusieurs fois (réglages, catégories de la carte,
+choix de la direction dans « À proximité »…). Désormais :
+- **`web/src/scroll.ts` garde la position de toutes les zones qui défilent**, automatiquement, à chaque redessin : rien à faire
+  pour un nouveau menu qui utilise une zone défilante normale (`overflow: auto` ou `scroll`).
+- Une zone est reconnue par son **`id`**, son attribut **`data-scroll="nom"`**, ou à défaut par sa place dans la page. Si un menu
+  change de structure d'un redessin à l'autre (un bloc qui apparaît au-dessus de la liste, par exemple), donnez à sa zone
+  défilante un `id` ou un `data-scroll` stable.
+- Les positions sont gardées **par écran** : un onglet retrouve sa position quand on y revient ; une fiche (arrêt, ligne,
+  réglages…) repart du haut à chaque nouvelle ouverture.
+- Ne remettez jamais `scrollTop = 0` à la main dans `draw()`, et n'ajoutez pas de liste de zones « à surveiller » : c'est ce qui
+  faisait oublier les nouveaux menus.
+- **Après toute modification de l'interface**, lancez `node scripts/check-scroll.mjs` (serveur démarré) : il passe dans chaque
+  menu, fait défiler toutes ses zones, redessine l'écran et signale toute zone qui a bougé. Ajoutez-y chaque nouveau menu.
+
 ## Sécurité
 - Le token reste dans `.env`, côté serveur. Ne le publiez jamais (`.gitignore` l'exclut).
 - Les textes venant de l'API sont échappés avant affichage.

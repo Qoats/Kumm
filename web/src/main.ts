@@ -37,6 +37,7 @@ import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { mountLiveMap, recenter, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
+import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
 import { acceptTerms, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
 import type { Release } from "./update";
 import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
@@ -51,10 +52,7 @@ const NAV: [Tab, string, IconName][] = [
 let lastTab: Tab | null = null;
 let lastOverlay = "";
 
-let lastOvKey = "";
-const SIDE_SCROLL = [".layers", ".chips", ".tmodes"];
-/** listes qui défilent verticalement dans un panneau (« À proximité ») : elles gardent leur position après un redessin */
-const DOWN_SCROLL = ["#nearlist"];
+let lastScreen = "";
 
 let lastPage = "";
 
@@ -79,14 +77,11 @@ function draw(): void {
   const o = S.overlay;
   const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : overlayFavs();
 
-  const scroller = document.querySelector<HTMLElement>("#app > main");
-  const top = scroller ? scroller.scrollTop : 0;
-  // fenêtre ouverte (réglages, ligne, arrêt…) : même fenêtre qu'avant → elle garde sa position de défilement
-  const ovKey = o ? o.k + ":" + ("id" in o ? String(o.id) : "") : "";
-  const ovTop = ovKey && ovKey === lastOvKey ? document.querySelector<HTMLElement>("#app > .overlay main")?.scrollTop ?? 0 : 0;
-  // rangées qui défilent de côté (catégories de la carte, lignes, onglets) : elles gardent leur position après un redessin
-  const sideways = SIDE_SCROLL.map(sel => document.querySelector<HTMLElement>(sel)?.scrollLeft ?? 0);
-  const downward = DOWN_SCROLL.map(sel => document.querySelector<HTMLElement>(sel)?.scrollTop ?? 0);
+  // positions de défilement de toutes les zones (listes, fiches, rangées de catégories…), par écran : voir scroll.ts
+  const screen = o ? `${t}|${o.k}:${"id" in o ? String(o.id) : ""}` : t;
+  saveScroll(app, lastScreen);
+  if (lastScreen !== screen && lastScreen.includes("|")) forgetScroll(lastScreen);   // fiche fermée : repartira du haut
+  lastScreen = screen;
   const active = document.activeElement as HTMLInputElement | null;
   const act = active?.id, pos = active?.selectionStart ?? null;
 
@@ -96,12 +91,6 @@ function draw(): void {
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
 
-  const m = document.querySelector<HTMLElement>("#app > main");
-  if (m && !o) m.scrollTop = top;
-  const om = document.querySelector<HTMLElement>("#app > .overlay main");
-  if (om && ovTop) om.scrollTop = ovTop;
-  lastOvKey = ovKey;
-  SIDE_SCROLL.forEach((sel, i) => { const el = document.querySelector<HTMLElement>(sel); if (el && sideways[i]) el.scrollLeft = sideways[i]; });
   if (act) {
     const el = document.getElementById(act) as HTMLInputElement | null;
     if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch { /* champ sans sélection */ } }
@@ -115,8 +104,8 @@ function draw(): void {
   const tslot = document.getElementById("tripmap-slot");
   if (tslot) mountTripMap(tslot);
   restoreSlots();
-  // après restoreSlots : la liste a retrouvé son contenu, donc sa hauteur
-  DOWN_SCROLL.forEach((sel, i) => { const el = document.querySelector<HTMLElement>(sel); if (el && downward[i]) el.scrollTop = downward[i]; });
+  // après restoreSlots : les listes chargées à part ont retrouvé leur contenu, donc leur hauteur
+  restoreScroll(app, screen);
   void loadDeps();
 }
 hooks.render = draw;
@@ -585,7 +574,7 @@ applyTheme(S.prefs);
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.prefs.theme === "auto") applyTheme(S.prefs); });
 
 /* pour inspecter les données dans la console du navigateur : __kumm.STOPS, __kumm.LINE_MODES */
-(window as unknown as { __kumm: unknown }).__kumm = { STOPS, POIS, LINE_MODES, LINE_NAMES, kindOfStop };
+(window as unknown as { __kumm: unknown }).__kumm = { STOPS, POIS, LINE_MODES, LINE_NAMES, kindOfStop, S, render };
 
 // premier lancement (ou conditions modifiées) : présentation avant tout le reste
 { const steps = onboardingSteps(); if (steps.length) S.onb = { steps, i: 0, refused: false }; }
