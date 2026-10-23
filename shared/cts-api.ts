@@ -27,6 +27,8 @@ export interface AnnotatedStopPoint {
   StopName: string;
   Location?: { Longitude: number | string; Latitude: number | string };
   Lines?: (string | { LineRef?: string; PublishedLineName?: string })[];
+  /** StopCode : code du quai (« 319A »), le même que dans les passages en temps réel */
+  Extension?: { StopCode?: string; LogicalStopCode?: string };
 }
 
 export interface SiriStopPoints {

@@ -88,6 +88,12 @@ function create(): void {
   (window as unknown as { __kummMap?: L.Map }).__kummMap = map;
 }
 
+/** Positions des arrêts modifiées (repères recentrés) : tous les repères sont recréés au prochain affichage */
+export function refreshMarkers(): void {
+  markers?.clearLayers(); shown.clear(); lastKey = "";
+  sync();
+}
+
 /** Affiche seulement les repères visibles à l'écran (la liste complète compte des milliers d'arrêts) ;
    ne crée ou ne retire que ce qui change, au lieu de tout redessiner à chaque déplacement */
 function sync(): void {

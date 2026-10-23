@@ -95,15 +95,16 @@ const caps = (t: string): number => (t.match(/\p{Lu}/gu) ?? []).length;
 
 export async function loadStops(): Promise<Stop[]> {
   const j = await get<SiriStopPoints>("/stoppoints-discovery");
-  interface Group { id: string; name: string; codes: Set<string>; quays: string[]; lat: number; lon: number; n: number; lines: Set<string> }
+  interface Group { id: string; name: string; codes: Set<string>; quays: string[]; pos: { code: string; lat: number; lon: number }[]; lat: number; lon: number; n: number; lines: Set<string> }
   const by: Record<string, Group> = {};
   for (const s of j.StopPointsDelivery.AnnotatedStopPointRef ?? []) {
     if (!s.Location) continue;
     // « Gare Centrale » et « Gare centrale » : un seul arrêt (la CTS écrit parfois le même nom de deux façons)
-    const g = (by[stopKey(s.StopName)] ??= { id: s.StopPointRef, name: s.StopName, codes: new Set(), quays: [], lat: 0, lon: 0, n: 0, lines: new Set() });
+    const g = (by[stopKey(s.StopName)] ??= { id: s.StopPointRef, name: s.StopName, codes: new Set(), quays: [], pos: [], lat: 0, lon: 0, n: 0, lines: new Set() });
     if (caps(s.StopName) > caps(g.name)) g.name = s.StopName;
     g.codes.add(logicalCode(s));
     g.quays.push(s.StopPointRef);
+    if (s.Extension?.StopCode) g.pos.push({ code: s.Extension.StopCode, lat: Number(s.Location.Latitude), lon: Number(s.Location.Longitude) });
     g.lat += Number(s.Location.Latitude);
     g.lon += Number(s.Location.Longitude);
     g.n++;
@@ -113,8 +114,32 @@ export async function loadStops(): Promise<Stop[]> {
     }
   }
   return Object.values(by).map(g => ({
-    id: g.id, name: g.name, refs: [...g.codes, ...g.quays], lat: g.lat / g.n, lon: g.lon / g.n, x: 0, y: 0, lines: [...g.lines]
+    id: g.id, name: g.name, refs: [...g.codes, ...g.quays], lat: g.lat / g.n, lon: g.lon / g.n, x: 0, y: 0, lines: [...g.lines], quays: g.pos
   }));
+}
+
+/** Mode de chaque quai (« 319A » → « tram », « bus » ou « bus+tram »), d'après les passages en temps réel */
+export async function loadQuayModes(): Promise<Record<string, string>> {
+  return get<Record<string, string>>("/quay-modes");
+}
+
+/**
+ * Station de tram dont certains quais ne servent qu'aux bus (Krimmeri, Lycée Couffignal…) : le repère est placé au centre
+ * de ses quais de tram, et non entre le tram et les arrêts de bus.
+ * Renvoie true si au moins une position a changé.
+ */
+export function placeOnTramQuays(stops: Stop[], modes: Record<string, string>): boolean {
+  let changed = false;
+  for (const s of stops) {
+    if (kindOfStop(s) !== "tram" || !s.quays?.length) continue;
+    const tram = s.quays.filter(q => modes[q.code]?.includes("tram"));
+    // 1 ou 2 quais de tram (une ligne, un quai par sens) avec des arrêts de bus à côté ; les grands croisements
+    // (République, Homme de Fer…) ont plusieurs quais de tram autour d'une place : on y garde le centre de tous les quais
+    if (!tram.length || tram.length > 2 || tram.length === s.quays.length) continue;
+    const lat = tram.reduce((a, q) => a + q.lat, 0) / tram.length, lon = tram.reduce((a, q) => a + q.lon, 0) / tram.length;
+    if (Math.abs(lat - s.lat) > 1e-6 || Math.abs(lon - s.lon) > 1e-6) { s.lat = lat; s.lon = lon; changed = true; }
+  }
+  return changed;
 }
 
 /** Mode (tram, bus, TER) et nom public de chaque ligne, d'après lines-discovery */

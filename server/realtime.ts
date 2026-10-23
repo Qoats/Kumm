@@ -35,6 +35,8 @@ let byCode = new Map<string, Visit[]>();
 let courses: Course[] = [];
 /** Position de chaque quai (StopCode) */
 let stopPos = new Map<string, { lat: number; lon: number }>();
+/** Modes des véhicules qui desservent chaque quai (« 319A » → tram), d'après les courses vues ; cumulé d'un chargement à l'autre */
+const quayModes = new Map<string, Set<string>>();
 let loadedAt = 0;
 let validUntil = "";
 let lastError = "";
@@ -131,6 +133,7 @@ async function refresh(): Promise<void> {
     if (r.status !== 200) throw new Error("HTTP " + r.status);
     const p = parseEstimatedTimetable(r.body);
     byCode = p.byCode; courses = p.list; validUntil = p.validUntil; loadedAt = Date.now(); lastError = "";
+    for (const c of p.list) if (c.mode) for (const call of c.calls) (quayModes.get(call.code) ?? quayModes.set(call.code, new Set()).get(call.code)!).add(c.mode);
     Object.assign(counts, { courses: p.courses, passages: p.passages, quais: p.byCode.size });
     if (counts.chargements++ === 0) console.log(`Passages du réseau chargés : ${p.courses} courses, ${p.byCode.size} quais`);
   } catch (e) {
@@ -181,6 +184,11 @@ export function stopMonitoringFromSnapshot(ref: string, now = Date.now()): strin
 export function snapshot(now = Date.now()): { courses: Course[]; stopPos: Map<string, { lat: number; lon: number }>; at: number } | null {
   if (!loadedAt || now - loadedAt > (ET_POLL_S + STALE_REALTIME_S) * 1000 || !stopPos.size) return null;
   return { courses, stopPos, at: loadedAt };
+}
+
+/** Mode de chaque quai : « tram », « bus », ou « tram+bus » si les deux s'y arrêtent */
+export function quayModesJson(): Record<string, string> {
+  return Object.fromEntries([...quayModes].map(([k, v]) => [k, [...v].sort().join("+")]));
 }
 
 /** Pour /health */

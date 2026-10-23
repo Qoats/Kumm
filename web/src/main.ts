@@ -13,7 +13,7 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { loadLineInfo, loadMessages, loadPois, loadStops, nextDepartures } from "./api";
+import { loadLineInfo, loadMessages, loadPois, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
@@ -35,7 +35,7 @@ import { bikeToPoi, launchNav, walkToPoi } from "./flow";
 import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
-import { mountLiveMap, recenter, zoomBy } from "./livemap";
+import { mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
 import { acceptTerms, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
@@ -498,6 +498,14 @@ async function refreshMessages(): Promise<void> {
   }
 }
 
+/* Mode de chaque quai (tram / bus) : les stations de tram sont placées sur leurs quais de tram (gardé sur le téléphone) */
+let quayModes: Record<string, string> = {};
+try { quayModes = JSON.parse(localStorage.getItem("quayModes") ?? "{}") as Record<string, string>; } catch { /* rien */ }
+function applyQuayModes(): void {
+  if (!placeOnTramQuays(STOPS, quayModes)) return;
+  STOPS.forEach(project); rebuildPois(); refreshMarkers(); render();
+}
+
 async function initReal(): Promise<void> {
   // alertes : réglages renvoyés au programme d'arrière-plan à chaque démarrage ; toucher une notification ouvre les infos trafic
   if (S.alerts.enabled) syncAlerts(S.alerts).catch(e => console.warn("Alertes trafic :", e));
@@ -509,12 +517,13 @@ async function initReal(): Promise<void> {
   // 1) démarrage instantané avec la liste d'arrêts gardée sur le téléphone (7 jours)
   try {
     const c = JSON.parse(localStorage.getItem("stopsCache2") ?? "null") as { t: number; list: typeof STOPS } | null;
-    if (c && Date.now() - c.t < 7 * 864e5) { STOPS.length = 0; c.list.forEach(s => STOPS.push(project(s))); render(); }
+    if (c && Date.now() - c.t < 7 * 864e5) { STOPS.length = 0; c.list.forEach(s => STOPS.push(project(s))); applyQuayModes(); render(); }
   } catch { /* pas de cache */ }
   // 2) mise à jour depuis l'API
   try {
     const list = await loadStops();
     STOPS.length = 0; list.forEach(s => STOPS.push(project(s)));
+    placeOnTramQuays(STOPS, quayModes); STOPS.forEach(project);
     rebuildPois();
     try { localStorage.setItem("stopsCache2", JSON.stringify({ t: Date.now(), list })); } catch { /* ignoré */ }
     render();
@@ -522,6 +531,13 @@ async function initReal(): Promise<void> {
     console.error(e);
     if (!STOPS.length) toast("Connexion à l’API CTS impossible");
   }
+  // modes des quais à jour (le serveur les connaît dès sa première photo du réseau)
+  void loadQuayModes().then(m => {
+    if (!Object.keys(m).length) return;
+    quayModes = m;
+    try { localStorage.setItem("quayModes", JSON.stringify(m)); } catch { /* ignoré */ }
+    applyQuayModes();
+  }).catch(() => { /* on garde les positions connues */ });
   // points d'intérêt (P+R, Vélopark…) : chargés à part, une panne ne bloque rien
   void loadPois().then(list => { remotePois = list; rebuildPois(); render(); });
   locateIfAllowed();

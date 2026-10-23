@@ -14,6 +14,8 @@ export interface Stop {
   lines: LineId[];
   /** codes à essayer pour interroger l'API : code de l'arrêt, puis codes des quais */
   refs?: string[];
+  /** quais de l'arrêt (code StopCode et position) : sert à placer le repère d'une station de tram sur ses quais de tram */
+  quays?: { code: string; lat: number; lon: number }[];
 }
 
 /** Prochains passages d'une ligne dans une direction (heures en millisecondes) */

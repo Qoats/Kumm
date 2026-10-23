@@ -20,7 +20,7 @@ import { parseGeneralMessages } from "./messages.js";
 import { vehiclesAt } from "./vehicles.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
 import type { TrafficMessage } from "./messages.js";
-import { realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
+import { quayModesJson, realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
 import type { CtsResult } from "./cts.js";
 
 if (!TOKEN) {
@@ -165,6 +165,8 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
   const name = url.pathname.slice("/api/".length);
   if (name === "messages") return cached(res, "info:messages", 60, 3600, trafficMessages);
   // position estimée des véhicules, depuis la photo du réseau en mémoire : recalculée au plus toutes les 5 s
+  // mode des quais (tram ou bus) : place le repère d'une station de tram sur ses quais de tram, pas entre le tram et les bus
+  if (name === "quay-modes") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(quayModesJson()), undefined, { cache: "public, max-age=600" });
   if (name === "vehicles") return cached(res, "info:vehicles", 5, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(vehiclesAt()) }));
   const conf = ALLOWED[name];
   if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
