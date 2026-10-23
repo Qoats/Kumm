@@ -1,6 +1,7 @@
 import "leaflet/dist/leaflet.css";
 import type { WalkRoute } from "../../shared/types";
-import { bearing, cumulative, distToRoute, fmtDist, fmtMin, haversine, nearestOnRoute, pointAt } from "./geo";
+import { bearing, distToRoute, fmtDist, fmtMin, haversine, nearestOnRoute } from "./geo";
+import { toast } from "./store";
 import type { LL } from "./geo";
 import { createNavView } from "./navmap";
 import type { NavView } from "./navmap";
@@ -20,7 +21,8 @@ export interface NavOptions {
 
 const WALK_SPEED = 1.35;   // m/s, marche normale
 const BIKE_SPEED = 4.2;    // m/s, vélo en ville (~15 km/h)
-const SIM_STEP = 14;       // mètres parcourus par tick en simulation
+/** Au-delà, le guidage n'a pas de sens (position hors de Strasbourg, mauvaise destination…) */
+const MAX_KM = { walk: 30, bike: 80 };
 let current: (() => void) | null = null;
 let currentSpeed: number = WALK_SPEED;
 
@@ -30,14 +32,18 @@ export function stopNav(): void {
 }
 
 export function startNav(o: NavOptions): void {
+  const mode = o.route.mode ?? "walk";
+  if (o.route.distance > MAX_KM[mode] * 1000) {
+    toast(`Trajet de ${fmtDist(o.route.distance)} : trop long pour un guidage ${mode === "bike" ? "à vélo" : "à pied"}. Vérifiez votre position.`);
+    return;
+  }
   stopNav();
   currentSpeed = o.route.mode === "bike" ? BIKE_SPEED : WALK_SPEED;
   let route = o.route;
-  let cum = cumulative(route.coords);
   let idx = Math.min(1, route.steps.length - 1);
   const spoken = new Set<number>();
-  let sound = true, finished = false, wasOnRoute = false, offCount = 0, lastReroute = 0, rerouting = false;
-  let simTimer = 0, simDist = 0, watchId: number | null = null;
+  let finished = false, wasOnRoute = false, offCount = 0, lastReroute = 0, rerouting = false;
+  let watchId: number | null = null;
 
   const layer = document.createElement("div");
   layer.id = "navlayer";
@@ -48,7 +54,7 @@ export function startNav(o: NavOptions): void {
     <div id="nv-end" hidden></div>
     <div class="nv-bottom">
       <div><b id="nv-eta"></b><small id="nv-rem"></small></div>
-      <div class="nv-btns"><button id="nv-snd" aria-label="Son">🔊</button><button id="nv-sim">Simuler</button><button id="nv-quit">Quitter</button></div>
+      <div class="nv-btns"><button id="nv-quit">Quitter</button></div>
     </div>`;
   document.body.appendChild(layer);
   const $ = <T extends HTMLElement>(id: string): T => layer.querySelector<T>("#" + id) as T;
@@ -78,7 +84,7 @@ export function startNav(o: NavOptions): void {
   const arrival = (sec: number): string => new Date(Date.now() + sec * 1000).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
 
   function speak(text: string): void {
-    if (!sound || !("speechSynthesis" in window)) return;
+    if (!("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "fr-FR";
@@ -88,7 +94,6 @@ export function startNav(o: NavOptions): void {
   function finish(): void {
     if (finished) return;
     finished = true;
-    window.clearInterval(simTimer);
     $("nv-text").textContent = `Vous êtes arrivé : ${o.dest.label}`;
     $("nv-dist").textContent = "";
     $("nv-arrow").textContent = "⚑";
@@ -141,11 +146,11 @@ export function startNav(o: NavOptions): void {
 
     // hors itinéraire : recalcul depuis la position actuelle
     offCount = dRoute > 60 ? offCount + 1 : 0;
-    if (offCount >= 3 && !rerouting && simTimer === 0 && Date.now() - lastReroute > 15000) {
+    if (offCount >= 3 && !rerouting && Date.now() - lastReroute > 15000) {
       rerouting = true; lastReroute = Date.now();
       $("nv-text").textContent = "Recalcul de l’itinéraire…";
       fetchWalk(p, o.dest).then(r => {
-        route = r; cum = cumulative(r.coords); idx = Math.min(1, r.steps.length - 1); spoken.clear(); offCount = 0;
+        route = r; idx = Math.min(1, r.steps.length - 1); spoken.clear(); offCount = 0;
         view?.setRemaining(r.coords);
       }).catch(() => { /* on garde l'ancien tracé */ }).finally(() => { rerouting = false; });
     }
@@ -154,25 +159,13 @@ export function startNav(o: NavOptions): void {
   // position réelle
   if ("geolocation" in navigator) {
     watchId = navigator.geolocation.watchPosition(
-      pos => { if (simTimer === 0) onPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }); },
-      () => { if (!wasOnRoute) { $("nv-text").textContent = "Position indisponible : utilisez « Simuler »"; $("nv-dist").textContent = ""; } },
+      pos => onPos({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => { if (!wasOnRoute) { $("nv-text").textContent = "Position indisponible : activez la localisation"; $("nv-dist").textContent = ""; } },
       { enableHighAccuracy: true, maximumAge: 2000 }
     );
   }
   onPos({ lat: first[1], lon: first[0] });
 
-  // simulation de marche (pour tester sans bouger)
-  $("nv-sim").onclick = () => {
-    if (simTimer) { window.clearInterval(simTimer); simTimer = 0; $("nv-sim").textContent = "Simuler"; return; }
-    $("nv-sim").textContent = "Arrêter";
-    simDist = 0; idx = Math.min(1, route.steps.length - 1); spoken.clear(); wasOnRoute = true;
-    simTimer = window.setInterval(() => {
-      simDist += SIM_STEP;
-      onPos(pointAt(route.coords, cum, simDist));
-      if (simDist >= cum[cum.length - 1]) { window.clearInterval(simTimer); simTimer = 0; finish(); }
-    }, 500);
-  };
-  $("nv-snd").onclick = () => { sound = !sound; $("nv-snd").textContent = sound ? "🔊" : "🔇"; if (!sound) window.speechSynthesis?.cancel(); };
   $("nv-quit").onclick = stopNav;
   $("nv-recenter").onclick = () => {
     $("nv-recenter").hidden = true;
@@ -181,7 +174,6 @@ export function startNav(o: NavOptions): void {
   };
 
   current = () => {
-    window.clearInterval(simTimer);
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     window.speechSynthesis?.cancel();
     stopped = true;

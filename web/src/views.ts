@@ -142,7 +142,7 @@ export function screenSearch(): string {
 }
 
 export function screenLines(): string {
-  return bar("Toutes les lignes", "tabHome") + `<div class="pad">${ALL_LINES.map(l => `<button class="item" data-line="${esc(l)}">${lineChip(l)}<span>${esc(dirText(l))}<br><small style="color:var(--mute)">${isTram(l) ? "Tram" : "Bus"}</small></span>${hasAlert(l) ? '<span class="warn ml">!</span>' : ""}</button>`).join("")}</div>`;
+  return bar("Toutes les lignes", "tabHome") + `<div class="pad">${ALL_LINES.map(l => `<button class="item" data-line="${esc(l)}">${lineChip(l)}<span>${esc(dirText(l))}<br><small style="color:var(--mute)">${isTram(l) ? "Tram" : "Bus"}</small></span>${hasAlert(l) ? '<span class="ml"><span class="warn" aria-label="Perturbation">!</span></span>' : ""}</button>`).join("")}</div>`;
 }
 
 export const layerCounts = (): Record<Layer, number> => {

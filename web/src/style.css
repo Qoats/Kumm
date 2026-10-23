@@ -115,7 +115,7 @@ h2:first-child{margin-top:4px}
 .dep .f{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px;color:var(--mute)}
 .dep .f span.to{color:var(--ink);font-size:16px}
 .dep .f .n{font-size:18px;white-space:nowrap;margin-left:10px}
-.warn{width:30px;height:30px;border-radius:50%;background:#E8402F;color:#fff;font-weight:800;display:grid;place-items:center;flex:none}
+.warn{width:30px;height:30px;border-radius:50%;background:#E8402F;color:#fff;font-weight:800;font-size:17px;line-height:1;display:inline-grid;place-items:center;flex:none}
 .live{display:inline-block;width:.7em;height:.7em;border:solid currentColor;border-width:2px 2px 0 0;border-radius:0 100% 0 0;transform:translateY(-.35em);margin-left:2px;animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
