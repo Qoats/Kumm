@@ -39,6 +39,7 @@ const NAV: [Tab, string, IconName][] = [
 let lastTab: Tab | null = null;
 let lastOverlay = "";
 
+let lastOvKey = "";
 const SIDE_SCROLL = [".layers", ".chips", ".tmodes"];
 
 function draw(): void {
@@ -56,6 +57,9 @@ function draw(): void {
 
   const scroller = document.querySelector<HTMLElement>("#app > main");
   const top = scroller ? scroller.scrollTop : 0;
+  // fenêtre ouverte (réglages, ligne, arrêt…) : même fenêtre qu'avant → elle garde sa position de défilement
+  const ovKey = o ? o.k + ":" + ("id" in o ? String(o.id) : "") : "";
+  const ovTop = ovKey && ovKey === lastOvKey ? document.querySelector<HTMLElement>("#app > .overlay main")?.scrollTop ?? 0 : 0;
   // rangées qui défilent de côté (catégories de la carte, lignes, onglets) : elles gardent leur position après un redessin
   const sideways = SIDE_SCROLL.map(sel => document.querySelector<HTMLElement>(sel)?.scrollLeft ?? 0);
   const active = document.activeElement as HTMLInputElement | null;
@@ -70,6 +74,9 @@ function draw(): void {
 
   const m = document.querySelector<HTMLElement>("#app > main");
   if (m && !o) m.scrollTop = top;
+  const om = document.querySelector<HTMLElement>("#app > .overlay main");
+  if (om && ovTop) om.scrollTop = ovTop;
+  lastOvKey = ovKey;
   SIDE_SCROLL.forEach((sel, i) => { const el = document.querySelector<HTMLElement>(sel); if (el && sideways[i]) el.scrollLeft = sideways[i]; });
   if (act) {
     const el = document.getElementById(act) as HTMLInputElement | null;
