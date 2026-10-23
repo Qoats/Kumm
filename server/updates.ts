@@ -37,6 +37,7 @@ export function latestRelease(): Release | null {
 export async function serveUpdate(req: IncomingMessage, res: ServerResponse, p: string): Promise<void> {
   const rel = latestRelease();
   if (p === "/app/latest.json") {
+    res.setHeader("Access-Control-Allow-Origin", "*");   // information publique : lue aussi par le site kumm.fr
     if (!rel) return send(res, 404, "application/json; charset=utf-8", JSON.stringify({ message: "Aucune version publiée" }), undefined, { cache: "no-store" });
     return send(res, 200, "application/json; charset=utf-8", JSON.stringify(rel), undefined, { cache: "no-cache" });
   }
