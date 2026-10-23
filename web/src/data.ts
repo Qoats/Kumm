@@ -7,7 +7,12 @@ export const CENTER = { lat: 48.5846, lon: 7.7507 };
 export const KX = 8832;
 export const KY = 13344;
 
-export const COLORS: Record<string, string> = {A:"#E30613",B:"#009FE3",C:"#F29100",D:"#009A3E",E:"#8E84BA",F:"#9AC20C",G:"#F5CD00",H:"#A5213F",C1:"#1FAE85",L1:"#7AB8E0",L2:"#C7A6D9",L3:"#E6A0B5"};
+/** Couleurs officielles des lignes (fond, puis texte quand il n'est pas blanc), d'après la CTS (lines-discovery : RouteColor,
+   RouteTextColor). Valeurs de départ (affichage immédiat, hors ligne), remplacées au lancement par celles envoyées par la CTS. */
+export const COLORS: Record<string, string> = {10:"#F8B705",12:"#89CDD1",15:"#89CDD1",17:"#F3C6DB",18:"#F8B705",2:"#E10D19",22:"#89CDD1",30:"#FFDC08",31:"#F3C6DB",40:"#FFDC08",42:"#C273A8",43:"#E75113",44:"#729ECF",45:"#9A5527",57:"#EC7007",60:"#EC7007",62:"#BDD753",63:"#7DBBDF",64:"#EA5297",67:"#6DB122",70:"#F8B705",71:"#73B3DE",72:"#F3C6DB",73:"#B5833C",74:"#008231",75:"#9FC204",76:"#C273A8",A:"#E10D19",B:"#009EE0",C:"#F29400",C1:"#22AE84",C3:"#9FC204",C4:"#F08118",C5:"#25715C",C6:"#7D5D9F",C7:"#008A27",C8:"#88CDD5",C9:"#F26640",D:"#009933",E:"#9085BA",F:"#97BF0D",G:"#F6C900",H:"#A62341",N1:"#B55C38",N2:"#7F0047",N3:"#2D3E58",S1:"#BD2685",S10:"#BD2685",S12:"#BD2685",S13:"#BD2685",S14:"#BD2685",S16:"#BD2685",S2:"#BD2685",S5:"#BD2685",S6:"#BD2685",S8:"#BD2685",L1:"#7AB8E0",L2:"#C7A6D9",L3:"#E6A0B5"};
+export const TEXT_COLORS: Record<string, string> = {10:"#000000",12:"#000000",15:"#000000",17:"#000000",18:"#000000",22:"#000000",30:"#000000",31:"#000000",40:"#000000",57:"#000000",62:"#000000",63:"#000000",70:"#000000",72:"#000000",75:"#000000",C3:"#000000",C8:"#000000",G:"#000000",S1:"#FAB937",S10:"#FAB937",S12:"#FAB937",S13:"#FAB937",S14:"#FAB937",S16:"#FAB937",S2:"#FAB937",S5:"#FAB937",S6:"#FAB937",S8:"#FAB937"};
+/** Couleur du texte sur la pastille d'une ligne */
+export const lineText = (l: string): string => TEXT_COLORS[l] ?? "#fff";
 export const TRAMS: string[] = ["A","B","C","D","E","F"];
 export const ALL_LINES: string[] = ["A","B","C","D","E","F","G","H","C1","L1","L2","L3"];
 export const DIRS: Record<string, [string, string]> = {

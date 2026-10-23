@@ -6,7 +6,7 @@ import type { Layer } from "./kinds";
 import { markerIcon } from "./markers";
 import { makeBaseLayer, wantsDarkMap } from "./tiles";
 import { POIS, S, STOPS, USER, render } from "./store";
-import { COLORS, lineLabel } from "./data";
+import { COLORS, lineLabel, lineText } from "./data";
 import { esc } from "./util";
 import { VEHICLES, refreshVehicles, vehicleHeading, vehicleKind, vehiclePos } from "./vehicles";
 
@@ -152,7 +152,7 @@ export function mountLiveMap(slot: HTMLElement): void {
 /* ---------- trams et bus en circulation ---------- */
 const vehColor = (line: string): string => COLORS[lineLabel(line)] ?? COLORS[line] ?? (/^[A-F]$/.test(lineLabel(line)) ? "#0B4A9E" : "#1296A8");
 const vehIcon = (line: string, h: number): L.DivIcon => L.divIcon({
-  html: `<div class="veh" style="--c:${vehColor(line)}"><i class="va" style="transform:rotate(${h}deg)"></i><span class="vb">${esc(lineLabel(line))}</span></div>`,
+  html: `<div class="veh" style="--c:${vehColor(line)};--t:${COLORS[lineLabel(line)] ? lineText(lineLabel(line)) : "#fff"}"><i class="va" style="transform:rotate(${h}deg)"></i><span class="vb">${esc(lineLabel(line))}</span></div>`,
   className: "lm-icon", iconSize: [34, 34], iconAnchor: [17, 17]
 });
 

@@ -1,6 +1,6 @@
 import type { Place, Stop, StopDeparture } from "../../shared/types";
 import { CONFIG, VERSION } from "./config";
-import { ALL_LINES, COLORS, DIRS, MESSAGES, MSG_STATE, hasAlert, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
+import { ALL_LINES, COLORS, DIRS, lineText, MESSAGES, MSG_STATE, hasAlert, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES } from "./themes";
@@ -25,10 +25,10 @@ import { CAN_UPDATE } from "./update";
 /* ============ COMPOSANTS ============ */
 export const lineChip = (l: string, sm = false): string => {
   const name = lineLabel(l);
-  return `<span class="ln ${sm ? "sm" : ""}" style="background:${COLORS[name] ?? COLORS[l] ?? "#777"};${name === "G" ? "color:#222" : ""}">${esc(name)}</span>`;
+  return `<span class="ln ${sm ? "sm" : ""}" style="background:${COLORS[name] ?? COLORS[l] ?? "#777"};color:${lineText(COLORS[name] ? name : l)}">${esc(name)}</span>`;
 };
 const chipAlert = (l: string): string =>
-  `<button class="ln" data-line="${esc(l)}" style="background:${COLORS[l]};${l === "G" ? "color:#222" : ""}">${esc(l)}${hasAlert(l) ? '<span class="al" style="color:#fff">!</span>' : ""}</button>`;
+  `<button class="ln" data-line="${esc(l)}" style="background:${COLORS[l] ?? "#777"};color:${lineText(l)}">${esc(l)}${hasAlert(l) ? '<span class="al" style="color:#fff">!</span>' : ""}</button>`;
 const live = '<span class="live"></span>';
 const dirs = (l: string): [string, string] => DIRS[l] ?? ["", ""];
 const dirText = (l: string): string => { const d = dirs(l); return d[0] + (d[0] !== d[1] ? " ⇄ " + d[1] : ""); };
@@ -398,7 +398,7 @@ export function tripsDemo(): string {
   return opts.map((o, i) => {
     const dep = new Date(now.getTime() + (3 + i * 6) * 60000), arr = new Date(dep.getTime() + o.m * 60000);
     return `<div class="trip"><div class="top"><b>${o.m} min</b><span style="color:var(--mute)">${f(dep)} → ${f(arr)}</span></div>
-      <div class="tl"><i style="flex:${o.w};background:#B9BEC4"></i>${o.l.map(l => `<i style="flex:${(o.m - o.w - 3) / o.l.length};background:${COLORS[l]}">${l}</i>`).join("")}<i style="flex:3;background:#B9BEC4"></i></div>
+      <div class="tl"><i style="flex:${o.w};background:#B9BEC4"></i>${o.l.map(l => `<i style="flex:${(o.m - o.w - 3) / o.l.length};background:${COLORS[l]};color:${lineText(l)}">${l}</i>`).join("")}<i style="flex:3;background:#B9BEC4"></i></div>
       <div class="legs"><small>🚶 ${o.w} min</small>${o.l.map(l => `${chev}${lineChip(l, true)}`).join("")}${chev}<small>🚶 3 min</small></div>
       <small style="color:var(--mute)">${o.c ? "1 correspondance" : "Direct"}</small></div>`;
   }).join("") + `<small style="color:var(--mute)">Itinéraires de démonstration.</small>`;

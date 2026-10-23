@@ -30,11 +30,16 @@ export interface LineInfo {
   modes: Record<string, Layer>;
   /** nom public de chaque ligne quand il diffère de son identifiant : { "100": "A" } */
   names: Record<string, string>;
+  /** couleurs officielles : fond et texte, « #RRGGBB » */
+  colors: Record<string, string>;
+  text: Record<string, string>;
 }
+
+const hex = (v: unknown): string | undefined => (typeof v === "string" && /^[0-9A-Fa-f]{6}$/.test(v) ? "#" + v.toUpperCase() : undefined);
 
 /** Lit la réponse lines-discovery : identifiant, nom public et mode de chaque ligne */
 export function parseLineInfo(json: unknown): LineInfo {
-  const out: LineInfo = { modes: {}, names: {} };
+  const out: LineInfo = { modes: {}, names: {}, colors: {}, text: {} };
   const walk = (v: unknown, depth: number): void => {
     if (depth > 8) return;
     if (Array.isArray(v)) { v.forEach(x => walk(x, depth + 1)); return; }
@@ -49,6 +54,13 @@ export function parseLineInfo(json: unknown): LineInfo {
       const m = modeOf(v);
       if (m) ids.forEach(id => { out.modes[id] = m; });
       if (ref && pub && ref !== pub) out.names[ref] = pub;
+      const ext = isObj(v["Extension"]) ? v["Extension"] : {};
+      const bg = hex(ext["RouteColor"] ?? v["RouteColor"]), fg = hex(ext["RouteTextColor"] ?? v["RouteTextColor"]);
+      [ref, pub].forEach(id => {
+        if (!id) return;
+        if (bg) out.colors[id] = bg;
+        if (fg) out.text[id] = fg;
+      });
       return;
     }
     Object.values(v).forEach(x => walk(x, depth + 1));
