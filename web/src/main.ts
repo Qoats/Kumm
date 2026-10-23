@@ -36,6 +36,8 @@ const NAV: [Tab, string, IconName][] = [
 let lastTab: Tab | null = null;
 let lastOverlay = "";
 
+const SIDE_SCROLL = [".layers", ".chips", ".tmodes"];
+
 function draw(): void {
   const t = S.tab;
   let body: string;
@@ -51,6 +53,8 @@ function draw(): void {
 
   const scroller = document.querySelector<HTMLElement>("#app > main");
   const top = scroller ? scroller.scrollTop : 0;
+  // rangées qui défilent de côté (catégories de la carte, lignes, onglets) : elles gardent leur position après un redessin
+  const sideways = SIDE_SCROLL.map(sel => document.querySelector<HTMLElement>(sel)?.scrollLeft ?? 0);
   const active = document.activeElement as HTMLInputElement | null;
   const act = active?.id, pos = active?.selectionStart ?? null;
 
@@ -62,6 +66,7 @@ function draw(): void {
 
   const m = document.querySelector<HTMLElement>("#app > main");
   if (m && !o) m.scrollTop = top;
+  SIDE_SCROLL.forEach((sel, i) => { const el = document.querySelector<HTMLElement>(sel); if (el && sideways[i]) el.scrollLeft = sideways[i]; });
   if (act) {
     const el = document.getElementById(act) as HTMLInputElement | null;
     if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch { /* champ sans sélection */ } }
