@@ -138,14 +138,19 @@ export function screenSearch(): string {
   // lieux de la carte (P+R, Vélhop, Véloparks…) et adresses : chaque résultat mène à l'écran des itinéraires (« Naviguer »)
   const pois = q.length > 1 ? POIS.filter(p => fold(p.name).includes(q)).slice(0, 8) : [];
   const addr = q.length > 2 && S.searchAddr && fold(S.searchAddr.q) === q ? S.searchAddr.items : [];
+  // véhicules en circulation, par le code de trajet attribué par Kumm (« hoeb2610241412 », « terelsass830860 ») ou le numéro du train
+  const code = q.replace(/\s+/g, "");
+  const vehs = code.length > 2 ? [...VEHICLES.values()].filter(v => v.n && (fold(v.n).includes(code) || (v.m === "ter" && /^\d+$/.test(code) && v.n.endsWith(code))))
+    .sort((a, b) => fold(a.n!).indexOf(code) - fold(b.n!).indexOf(code) || a.n!.localeCompare(b.n!)).slice(0, 10) : [];
   const goBtn = (ref: string): string => `<button class="sgo" data-goto="${esc(ref)}" aria-label="Naviguer">${ic("navigate")}</button>`;
   const results = !q
-    ? `<div class="empty">Cherchez un arrêt, une adresse ou un lieu, puis touchez « Naviguer » pour choisir votre itinéraire.<div class="ico">${ic("store")}${ic("bus")}${ic("parking")}${ic("bike")}${ic("clock")}</div></div>`
+    ? `<div class="empty">Cherchez un arrêt, une adresse, un lieu ou un code de trajet (« terelsass830860 »), puis touchez « Naviguer » pour choisir votre itinéraire.<div class="ico">${ic("store")}${ic("bus")}${ic("parking")}${ic("bike")}${ic("clock")}</div></div>`
     : (lines.length ? `<div class="sub">Lignes</div>` + lines.map(l => `<button class="item" data-line="${esc(l)}">${lineChip(l, true)}<span>${esc(dirs(l)[0])} ⇄ ${esc(dirs(l)[1])}</span></button>`).join("") : "") +
+      (vehs.length ? `<div class="sub">Véhicules en circulation</div>` + vehs.map(v => `<button class="item" data-follow="${esc(v.id)}">${lineChip(v.line, true)}<span><b>${esc(v.n!)}</b><br><small style="color:var(--mute)">vers ${esc(v.dest)}${v.w ? " · au terminus" : ""}</small></span></button>`).join("") : "") +
       (stops.length ? `<div class="sub">Arrêts</div>` + stops.map(s => `<div class="srow"><button class="item" data-stop="${esc(s.id)}">${pinIcon()}<span>${esc(s.name)}</span><span class="ml">${s.lines.slice(0, 6).map(l => lineChip(l, true)).join("")}</span></button>${goBtn("stop:" + s.id)}</div>`).join("") : "") +
       (pois.length ? `<div class="sub">Lieux</div>` + pois.map(p => `<button class="item" data-poi="${esc(p.id)}">${markerIcon(p.kind, 26)}<span>${esc(p.name)}<br><small style="color:var(--mute)">${esc(KINDS[p.kind].label)}</small></span></button>`).join("") : "") +
       (addr.length ? `<div class="sub">Adresses</div>` + addr.map((a, i) => `<button class="item" data-goto="addr:${i}">${pinIcon()}<span>${esc(a.label)}</span></button>`).join("") : "") +
-      (!stops.length && !lines.length && !pois.length && !addr.length ? `<div class="empty">${q.length > 2 && (!S.searchAddr || fold(S.searchAddr.q) !== q) ? "Recherche…" : `Aucun résultat pour « ${esc(S.q)} »`}</div>` : "");
+      (!stops.length && !lines.length && !pois.length && !addr.length && !vehs.length ? `<div class="empty">${q.length > 2 && (!S.searchAddr || fold(S.searchAddr.q) !== q) ? "Recherche…" : `Aucun résultat pour « ${esc(S.q)} »`}</div>` : "");
   return `<div class="bar" style="padding:calc(10px + var(--safe-top)) 14px 10px"><div class="search" style="flex:1"><input id="sq" value="${esc(S.q)}" placeholder="Arrêt, adresse, lieu…" autocomplete="off"><span class="go">${ic("search")}</span></div></div>
   <div class="pad" style="padding-top:6px">
     <button class="box" style="border:0;background:none;padding:6px 0;font-size:24px" data-tab="lines"><span>Voir toutes les lignes</span>${ic("chev", 'width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"')}</button>

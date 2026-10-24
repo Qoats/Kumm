@@ -259,6 +259,21 @@ function aboveSheet(m: L.Map, ll: L.LatLng): L.LatLng {
   return m.containerPointToLatLng(m.latLngToContainerPoint(ll).add([0, sheet / 2]));
 }
 
+/** Véhicule trouvé par la recherche (code du trajet) : la carte s'ouvre centrée sur lui, et le suit */
+export function followFromSearch(id: string): void {
+  const v = VEHICLES.get(id);
+  if (!v) { toast("Ce véhicule n’est plus en circulation"); return; }
+  const k = vehicleKind(v);
+  S.layers[k] = true;                                         // son repère doit pouvoir s'afficher
+  if (S.filter !== "all" && S.filter !== k) S.filter = "all";
+  Object.assign(S, { tab: "nearby", overlay: null, follow: { id, paused: false } });
+  if (S.sheet === 0) S.sheet = 1;
+  render();                                                   // affiche la carte
+  if (!map) return;
+  map.setView(vehiclePos(v), Math.max(map.getZoom(), 16), { animate: false });
+  map.panTo(aboveSheet(map, map.getCenter()), { animate: false });
+}
+
 /** Chaque seconde : recentre la carte sur le véhicule suivi et met à jour son panneau (sans redessiner la page) */
 function followTick(): void {
   for (const [id, m] of vehMarkers) m.getElement()?.classList.toggle("vfollow", id === S.follow?.id);

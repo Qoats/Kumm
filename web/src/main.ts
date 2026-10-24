@@ -35,7 +35,8 @@ import { launchNav } from "./flow";
 import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
-import { mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
+import { refreshVehicles } from "./vehicles";
+import { followFromSearch, mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
 import { answerRide, rideBanner, rideDebug, startRideDetection, stopRideDetection, stopSharing } from "./ride";
@@ -219,7 +220,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -281,6 +282,7 @@ app.addEventListener("click", e => {
     if (p) openTrip({ label: p.name, lat: p.lat, lon: p.lon });
     return;
   }
+  if (d.follow) { followFromSearch(d.follow); return; }   // véhicule trouvé par son code de trajet
   if (d.goto) {
     // « Naviguer » : arrêt (fiche ou recherche) ou adresse trouvée par la recherche
     const [kind, ref] = [d.goto.slice(0, d.goto.indexOf(":")), d.goto.slice(d.goto.indexOf(":") + 1)];
@@ -489,7 +491,11 @@ function askSuggestions(field: "from" | "to"): void {
 
 app.addEventListener("input", e => {
   const t = e.target as HTMLInputElement;
-  if (t.id === "sq") { S.q = t.value; render(); searchAddresses(); }
+  if (t.id === "sq") {
+    S.q = t.value; render(); searchAddresses();
+    // codes de trajet des véhicules : positions chargées au besoin (au plus toutes les 20 s)
+    if (S.q.trim().length > 2) refreshVehicles(() => { if (S.tab === "search") render(); });
+  }
   if (t.id === "tto" || t.id === "tfrom") {
     if (CONFIG.USE_MOCK) {
       if (t.id !== "tto") return;
