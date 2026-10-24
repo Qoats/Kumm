@@ -26,6 +26,10 @@ export interface Vehicle {
   w?: boolean;
   /** vitesse moyenne estimée par le serveur sur les prochains tronçons (km/h) */
   s?: number;
+  /** position partagée par un voyageur à bord */
+  g?: boolean;
+  /** retard sur l'horaire prévu, en secondes (négatif : en avance), d'après la position partagée */
+  d?: number;
 }
 
 export const VEHICLES = new Map<string, Vehicle>();

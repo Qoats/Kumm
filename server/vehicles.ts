@@ -6,6 +6,7 @@
 import { snapshot } from "./realtime.js";
 import type { Course } from "./realtime.js";
 import { pathBetween } from "./shapes.js";
+import { locateOnCourse, sharedPosition } from "./ride.js";
 
 /** [latitude, longitude, heure en ms] */
 type At = [number, number, number];
@@ -33,6 +34,10 @@ export interface Vehicle {
   w?: boolean;
   /** vitesse moyenne estimée en km/h (0 à quai) ; absente si elle ne peut pas être calculée */
   s?: number;
+  /** position partagée par un voyageur à bord (moins de 45 s) : a = b = cette position */
+  g?: boolean;
+  /** retard sur l'horaire annoncé par la CTS, en secondes (négatif : en avance), d'après la position partagée */
+  d?: number;
 }
 
 /** Longueur en mètres d'une suite de points */
@@ -124,6 +129,25 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       out.push({
         id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a: [s.p.lat, s.p.lon, s.dep], b: [s.p.lat, s.p.lon, s.dep],
         h: heading(s.p, calls[1].p), next: calls.slice(1, 7).map(k => [k.name, k.arr]), w: true, ...(vno ? { n: vno } : {})
+      });
+      continue;
+    }
+    // un voyageur à bord partage sa position : vraie position, retard sur l'horaire prévu, prochains passages recalés
+    const shared = sharedPosition(c.id, now);
+    const where = shared ? locateOnCourse(shared, calls) : null;
+    if (shared && where) {
+      const k = where.k, s0 = calls[k], s1 = calls[k + 1];
+      const expected = s0.dep + where.f * (s1.arr - s0.dep);                    // heure estimée par la CTS à cet endroit
+      const shift = shared.t - expected;                                         // en retard sur l'estimation de la CTS si > 0
+      const aimed = s0.aim !== undefined && s1.aim !== undefined ? s0.aim + where.f * (s1.aim - s0.aim) : null;
+      out.push({
+        id: c.id, line: c.line, dest: c.dest, rt: true, m: c.mode, a: [shared.lat, shared.lon, shared.t], b: [shared.lat, shared.lon, shared.t],
+        h: heading(s0.p, s1.p), g: true,
+        ...(shared.speed !== null ? { s: Math.round(shared.speed * 3.6) } : {}),
+        // écart avec l'horaire prévu s'il est publié, sinon avec l'horaire annoncé par la CTS (celui des écrans en station)
+        d: Math.round((aimed !== null ? shared.t - aimed : shift) / 1000),
+        next: calls.slice(k + 1, k + 7).map(x => [x.name, Math.round(x.arr + shift)]),
+        ...(vno ? { n: vno } : {})
       });
       continue;
     }

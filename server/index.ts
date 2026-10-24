@@ -20,7 +20,8 @@ import { parseGeneralMessages } from "./messages.js";
 import { vehiclesAt } from "./vehicles.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
 import type { TrafficMessage } from "./messages.js";
-import { quayModesJson, realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
+import { quayModesJson, realtimeStatus, setStopIndex, snapshot, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
+import { receiveRide, rideStatus } from "./ride.js";
 import type { CtsResult } from "./cts.js";
 
 if (!TOKEN) {
@@ -260,6 +261,7 @@ function health(res: ServerResponse): Promise<void> {
     reseau_en_memoire: { ...realtimeStatus(), arrets_servis_depuis_la_memoire: stats.snapshotServed },
     alertes: alertsStatus(),
     apk: updateStatus(),
+    trajets_partages: rideStatus(),
     acces_web_prive: WEB_PRIVATE,
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });
@@ -287,7 +289,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (origin && ORIGINS.includes(origin)) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
   if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-App-Key", "Access-Control-Max-Age": "86400" }); return void res.end(); }
   // seule écriture possible : l'abonnement aux alertes trafic
-  const isPost = req.method === "POST" && (url.pathname === "/api/alerts" || url.pathname === "/connexion");
+  const isPost = req.method === "POST" && (url.pathname === "/api/alerts" || url.pathname === "/api/ride" || url.pathname === "/connexion");
   if (req.method !== "GET" && req.method !== "HEAD" && !isPost) return send(res, 405, "text/plain", "Méthode non autorisée");
 
   const p = url.pathname;
@@ -311,6 +313,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (isPost) {
     let body: unknown;
     try { body = JSON.parse(await readBody(req)); } catch { return send(res, 400, "text/plain", "Requête invalide"); }
+    if (url.pathname === "/api/ride") {
+      // position partagée par un voyageur à bord (voir ride.ts)
+      const snap = snapshot();
+      const r = snap ? receiveRide(body, snap.courses, snap.stopPos) : { status: 503, msg: "Réseau indisponible" };
+      return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
+    }
     const r = subscribe(body);
     return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
   }

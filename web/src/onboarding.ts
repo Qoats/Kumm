@@ -97,7 +97,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
       body = `<div class="onb-big">${ic("target")}</div><h1>Votre position</h1>
         <p>Elle sert à afficher les arrêts autour de vous, à partir de « Ma position » dans les itinéraires et à vous guider à pied.</p>
         <div class="onb-box"><b>Ce qui est partagé</b>
-          <small>Votre position reste sur votre téléphone. Elle n’est envoyée au serveur Kumm que quand vous demandez un itinéraire, pour le calculer, et elle n’est pas conservée.</small></div>
+          <small>Votre position reste sur votre téléphone. Elle n’est envoyée au serveur Kumm que quand vous demandez un itinéraire, ou si vous acceptez de partager un trajet en bus ou en tram (sans nom ni identifiant, jusqu’à votre descente). Elle n’est pas conservée.</small></div>
         <p class="onb-note">Sans la position, Kumm fonctionne aussi : la carte s’ouvre sur le centre de Strasbourg.</p>`;
       actions = `<button class="onb-main" data-onb="loc">Autoriser la position</button><button class="onb-sec" data-onb="next">Plus tard</button>`;
       break;

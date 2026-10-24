@@ -203,6 +203,12 @@ export function followStops(next: [string, number][]): string {
     : '<div class="empty">Arrivée au terminus.</div>';
 }
 
+/** Écart avec l'horaire prévu, d'après la position partagée par un voyageur */
+export const delayText = (sec: number): string => {
+  const m = Math.round(sec / 60);
+  return m >= 1 ? `${m} min de retard sur l’horaire annoncé` : m <= -1 ? `${-m} min d’avance sur l’horaire annoncé` : "à l’heure";
+};
+
 /** Case de vitesse : la vitesse estimée (0 à l'arrêt, « — » si elle ne peut pas être calculée) */
 export const speedText = (i: { speed: number | null }): string => (i.speed === null ? "—" : String(i.speed));
 
@@ -213,6 +219,7 @@ function followPanel(f: { id: string; paused: boolean }): string {
   const info = followInfo(v), first = info.next[0];
   return `<div class="fhead">${lineChip(v.line)}<div class="ft"><b>vers ${esc(v.dest)}</b>${v.n ? `<small>Trajet ${esc(v.n)}</small>` : ""}</div>
       <button class="fclose" data-act="unfollow" aria-label="Arrêter de suivre"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    ${v.g ? `<div class="fshared"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
     <div class="fstats">
       <div><b id="fv-speed">${esc(speedText(info))}</b><small>km/h estimés</small></div>
       <div><b id="fv-next">${first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—"}</b><small id="fv-nextname">${first ? esc(first[0]) : "terminus"}</small></div>
@@ -234,6 +241,7 @@ export function overlayVehicle(id: string): string {
   const wait = v.w ? Math.max(0, Math.round((v.a[2] - now) / 60000)) : null;
   return `<div class="overlay">${bar("Ligne " + lineLabel(v.line))}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(v.line)}<b style="font-size:18px">vers ${esc(v.dest)}</b></div>
+    ${v.g ? `<div class="fshared" style="margin:0 0 10px"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
     ${wait !== null ? `<div class="box vwait"><b>Au terminus</b><span>Départ ${wait < 1 ? "imminent" : `dans ${wait} min`}</span></div>` : ""}
     ${v.n ? `<div class="vno">Trajet <b>${esc(v.n)}</b><small>Terminus de départ, ligne, date et heure de départ prévue.</small></div>` : ""}
     <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} de la CTS : ce n'est pas un GPS.</small>

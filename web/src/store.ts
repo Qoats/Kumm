@@ -50,6 +50,9 @@ export interface State {
   askedLoc: boolean;
   swiped: boolean;
   toast: string;
+  /** « Êtes-vous dans le C6 ? » (ride.ts) : question posée, puis trajet partagé en cours */
+  ridePrompt: { id: string; line: string; dest: string } | null;
+  riding: { id: string; line: string; dest: string } | null;
   /** véhicule suivi sur la carte « À proximité » (paused : l'utilisateur a déplacé la carte) */
   follow: { id: string; paused: boolean } | null;
   /** présentation du premier lancement : étapes à montrer et étape en cours (null : terminée) */
@@ -82,7 +85,7 @@ export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now(
 
 export const S: State = {
   tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null,
-  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", follow: null, onb: null, upd: null
+  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", ridePrompt: null, riding: null, follow: null, onb: null, upd: null
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }
 

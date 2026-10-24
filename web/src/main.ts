@@ -38,6 +38,7 @@ import { startNav } from "./nav";
 import { mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
+import { answerRide, rideBanner, rideDebug, startRideDetection, stopRideDetection, stopSharing } from "./ride";
 import { acceptTerms, allSteps, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
 import type { Release } from "./update";
 import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
@@ -89,6 +90,7 @@ function draw(): void {
     `<nav>${NAV.map(n => `<button data-tab="${n[0]}" class="${t === n[0] || (n[0] === "search" && t === "lines") ? "on" : ""}"><span class="ni">${ic(n[2])}</span>${n[1]}</button>`).join("")}</nav>` +
     whenSheet() +
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
+    rideBanner() +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
 
   if (act) {
@@ -208,7 +210,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -216,6 +218,7 @@ app.addEventListener("click", e => {
   if (!b || !app.contains(b)) return;
   const d = b.dataset;
   if (d.onb) { void onboardingAction(d.onb); return; }
+  if (d.ride) { if (d.ride === "stop") stopSharing(); else answerRide(d.ride === "yes"); return; }
   if (d.upd) { updateAction(d.upd); return; }
   if (d.dirk !== undefined && d.dirv !== undefined) { pickDir(d.dirk, d.dirv); render(); return; }   // direction d'une ligne, sans ouvrir l'arrêt
   if (d.mb !== undefined) { const m = S.modal; S.modal = null; if (d.mb === "1" && m?.go) m.go(); render(); return; }
@@ -416,8 +419,13 @@ function setUserPosition(p: GeolocationPosition): void {
 /** Au démarrage : position demandée seulement après la présentation (où son usage est expliqué) */
 function locateIfAllowed(): void {
   if (!onboardingDone()) return;
-  navigator.geolocation?.getCurrentPosition(setUserPosition, () => { /* position refusée : on garde Homme de Fer */ });
+  navigator.geolocation?.getCurrentPosition(p => { setUserPosition(p); if (!CONFIG.USE_MOCK) startRideDetection(); }, () => { /* position refusée : on garde Homme de Fer */ });
 }
+// « Êtes-vous dans ce bus ? » : seulement application ouverte (aucun suivi en arrière-plan)
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopRideDetection();
+  else if (S.locOn && onboardingDone() && !CONFIG.USE_MOCK) startRideDetection();
+});
 
 /** ⇅ : la destination devient le départ et inversement (« Ma position » passe en destination) */
 function swapTrip(): void {
@@ -611,7 +619,7 @@ applyTheme(S.prefs);
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.prefs.theme === "auto") applyTheme(S.prefs); });
 
 /* pour inspecter les données dans la console du navigateur : __kumm.STOPS, __kumm.LINE_MODES */
-(window as unknown as { __kumm: unknown }).__kumm = { STOPS, POIS, LINE_MODES, LINE_NAMES, kindOfStop, S, render };
+(window as unknown as { __kumm: unknown }).__kumm = { STOPS, POIS, LINE_MODES, LINE_NAMES, kindOfStop, S, render, ride: rideDebug };
 
 // premier lancement (ou conditions modifiées) : présentation avant tout le reste
 { const steps = onboardingSteps(); if (steps.length) S.onb = { steps, i: 0, refused: false }; }

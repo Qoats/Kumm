@@ -226,10 +226,12 @@ function syncVehicles(): void {
         .addTo(vehLayer);
       m.getElement()?.setAttribute("data-vid", v.id);   // pour scripts/check-map.mjs
       m.getElement()?.classList.toggle("vwaiting", !!v.w);
+      m.getElement()?.classList.toggle("vshared", !!v.g);
       vehMarkers.set(v.id, m);
     } else {
       m.setLatLng(p);
       m.getElement()?.classList.toggle("vwaiting", !!v.w);   // en attente au terminus, puis en route
+      m.getElement()?.classList.toggle("vshared", !!v.g);    // position partagée par un voyageur à bord
       // la flèche suit les virages du tracé, sans recréer l'icône
       const arrow = m.getElement()?.querySelector<HTMLElement>(".va");
       if (arrow) arrow.style.transform = `rotate(${h}deg)`;

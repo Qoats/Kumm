@@ -14,7 +14,7 @@
 <header><a href="/"><img src="/logo.svg" alt="">Kumm</a></header>
 <main>
 <h1>Politique de confidentialité</h1>
-<p class="date">Dernière mise à jour : 23 octobre 2026</p>
+<p class="date">Dernière mise à jour : 24 octobre 2026</p>
 
 <p>Cette page explique quelles données Kumm utilise, pourquoi, et combien de temps elles sont gardées. Kumm n’a pas de compte utilisateur, pas de publicité et pas d’outil de statistiques de visite.</p>
 
@@ -30,6 +30,14 @@
   <li>Quand vous demandez un itinéraire, le point de départ et d’arrivée sont envoyés au serveur Kumm, qui les transmet au service de calcul : Transitous pour les transports, le serveur de routage d’OpenStreetMap (routing.openstreetmap.de) pour la marche et le vélo. Ces services reçoivent les coordonnées, mais pas votre adresse IP ni aucun identifiant de votre téléphone.</li>
   <li>Le serveur Kumm ne conserve pas ces positions.</li>
   <li>Vous pouvez retirer l’autorisation de localisation à tout moment dans les réglages de votre téléphone ; Kumm reste utilisable sans.</li>
+</ul>
+
+<h2>Trajet partagé (« Êtes-vous dans ce bus ? »)</h2>
+<ul>
+  <li>Quand l’application est ouverte et que la position est autorisée, Kumm compare votre position à celle des trams et bus en circulation, <b>sur votre téléphone</b>. Si vous semblez voyager dans un véhicule, l’application vous demande si vous êtes à bord. Rien n’est envoyé à ce stade.</li>
+  <li>Si vous acceptez de partager votre trajet, votre position est envoyée au serveur Kumm toutes les 10 secondes, avec seulement le trajet concerné : <b>aucun nom, aucun identifiant de votre téléphone</b>. Elle sert à afficher la vraie position du véhicule et son retard pour tous les utilisateurs.</li>
+  <li>Le serveur garde uniquement la dernière position de chaque véhicule, en mémoire, pendant 2 minutes au plus ; rien n’est écrit sur disque.</li>
+  <li>Le partage s’arrête quand vous touchez « Arrêter », au terminus, si vous quittez le trajet, au bout d’une heure, ou quand l’application passe en arrière-plan. Il ne fonctionne jamais application fermée.</li>
 </ul>
 
 <h2>Recherche d’adresses</h2>
