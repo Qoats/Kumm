@@ -15,9 +15,10 @@ const FILE = [path.join(here, "..", "..", "data", "rail.json"), path.join(here, 
 const R = 6371000, rad = (d: number): number => (d * Math.PI) / 180;
 const dist = (a: Pt, b: Pt): number => Math.hypot(rad(b[1] - a[1]) * Math.cos(rad((a[0] + b[0]) / 2)), rad(b[0] - a[0])) * R;
 
-/** Nœuds (points des voies ; un point commun à deux voies est un aiguillage) et voisins */
+/** Nœuds (points des voies ; un point commun à deux voies est un aiguillage), voisins, et tronçons (pour rattacher une gare) */
 const nodes: Pt[] = [];
 const edges: { to: number; m: number }[][] = [];
+const segs: [number, number][] = [];
 try {
   if (FILE) {
     const j = JSON.parse(fs.readFileSync(FILE, "utf8")) as { ways?: Pt[][] };
@@ -31,7 +32,8 @@ try {
     for (const w of j.ways ?? []) {
       for (let k = 1; k < w.length; k++) {
         const a = id(w[k - 1]), b = id(w[k]), m = dist(w[k - 1], w[k]);
-        edges[a].push({ to: b, m }); edges[b].push({ to: a, m });
+        if (a === b) continue;
+        edges[a].push({ to: b, m }); edges[b].push({ to: a, m }); segs.push([a, b]);
       }
     }
   }
@@ -40,19 +42,25 @@ console.log(`Voies ferrées : ${nodes.length ? nodes.length + " points" : "aucun
 
 const SNAP_M = 400;                // une gare à plus de 400 m des voies connues : hors de la zone couverte
 
-function nearest(p: Pt): number {
-  let best = -1, bd = SNAP_M;
-  for (let i = 0; i < nodes.length; i++) {
-    if (Math.abs(nodes[i][0] - p[0]) > 0.005) continue;               // filtre rapide (≈ 550 m)
-    const d = dist(p, nodes[i]);
-    if (d < bd) { bd = d; best = i; }
+/** Point de voie le plus proche d'une gare : sur le tronçon a → b, à da mètres de a et db mètres de b */
+interface Snap { a: number; b: number; q: Pt; da: number; db: number }
+function snap(p: Pt): Snap | null {
+  const k = Math.cos(rad(p[0]));
+  let best: Snap | null = null, bd = SNAP_M;
+  for (const [a, b] of segs) {
+    const A = nodes[a], B = nodes[b];
+    if (Math.min(A[0], B[0]) > p[0] + 0.005 || Math.max(A[0], B[0]) < p[0] - 0.005) continue;   // filtre rapide (≈ 550 m)
+    const dx = (B[1] - A[1]) * k, dy = B[0] - A[0], l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, (((p[1] - A[1]) * k) * dx + (p[0] - A[0]) * dy) / l2)) : 0;
+    const q: Pt = [A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])], d = dist(p, q);
+    if (d < bd) { bd = d; best = { a, b, q, da: dist(A, q), db: dist(B, q) }; }
   }
   return best;
 }
 
-/** Plus court chemin (Dijkstra, tas binaire) */
-function shortest(from: number, to: number): number[] | null {
-  const d = new Map<number, number>([[from, 0]]), prev = new Map<number, number>(), heap: [number, number][] = [[0, from]];
+/** Plus court chemin entre deux points de voie (Dijkstra, tas binaire) : liste des nœuds traversés */
+function shortest(from: Snap, to: Snap): number[] | null {
+  const d = new Map<number, number>(), prev = new Map<number, number>(), heap: [number, number][] = [];
   const push = (x: [number, number]): void => {
     heap.push(x);
     for (let i = heap.length - 1; i > 0;) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; }
@@ -72,18 +80,21 @@ function shortest(from: number, to: number): number[] | null {
     }
     return top;
   };
-  while (heap.length) {
+  for (const [n, c] of [[from.a, from.da], [from.b, from.db]] as const) if (c < (d.get(n) ?? Infinity)) { d.set(n, c); push([c, n]); }
+  const done = new Set<number>();
+  while (heap.length && !(done.has(to.a) && done.has(to.b))) {
     const [cost, u] = pop();
-    if (u === to) break;
-    if (cost > (d.get(u) ?? Infinity)) continue;
+    if (done.has(u)) continue;
+    done.add(u);
     for (const e of edges[u]) {
       const c = cost + e.m;
       if (c < (d.get(e.to) ?? Infinity)) { d.set(e.to, c); prev.set(e.to, u); push([c, e.to]); }
     }
   }
-  if (!d.has(to)) return null;
-  const out = [to];
-  for (let u = to; u !== from;) { u = prev.get(u)!; out.push(u); }
+  const viaA = (d.get(to.a) ?? Infinity) + to.da, viaB = (d.get(to.b) ?? Infinity) + to.db;
+  if (!Number.isFinite(Math.min(viaA, viaB))) return null;
+  const out = [viaA <= viaB ? to.a : to.b];
+  for (let u = out[0]; prev.has(u);) { u = prev.get(u)!; out.push(u); }
   return out.reverse();
 }
 
@@ -95,14 +106,15 @@ export function railBetween(a: Pt, b: Pt): Pt[] | null {
   const k = `${a[0]},${a[1]}>${b[0]},${b[1]}`;
   if (cache.has(k)) return cache.get(k) ?? null;
   let res: Pt[] | null = null;
-  const from = nearest(a), to = nearest(b);
-  if (from >= 0 && to >= 0 && from !== to) {
-    const ids = shortest(from, to);
+  const from = snap(a), to = snap(b);
+  if (from && to) {
+    // même tronçon : droit sur la voie ; sinon plus court chemin le long des voies
+    const ids = from.a === to.a && from.b === to.b ? [] : shortest(from, to);
     if (ids) {
-      const pts = ids.map(i => nodes[i]);
+      const pts: Pt[] = [a, from.q, ...ids.map(i => nodes[i]), to.q, b];
       let len = 0;
       for (let i = 1; i < pts.length; i++) len += dist(pts[i - 1], pts[i]);
-      if (len < dist(a, b) * 2.5 + 1000) res = [a, ...pts, b];             // sinon : détour invraisemblable (voie manquante)
+      if (len < dist(a, b) * 2.5 + 1000) res = pts;                        // sinon : détour invraisemblable (voie manquante)
     }
   }
   if (cache.size > 5000) cache.clear();
