@@ -23,7 +23,11 @@ export const WIDGETS = Capacitor.getPlatform() === "android" && Capacitor.isPlug
 const Widgets = registerPlugin<KummWidgetsPlugin>("KummWidgets");
 
 /** Choix d'un widget en cours (écran ouvert depuis un widget pas encore réglé) */
-export interface WidgetSetup { id: number; type: string; q: string; stop?: string; deps?: { line: string; dest: string }[] }
+export interface WidgetSetup {
+  id: number; type: string; q: string; stop?: string; deps?: { line: string; dest: string }[];
+  /** widget « arrêt favori » : directions cochées (aucune = toutes) */
+  sel?: number[];
+}
 
 let last = "";
 let timer = 0;

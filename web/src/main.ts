@@ -483,12 +483,19 @@ async function pickForWidget(v: string): Promise<void> {
     } else if (kind === "stop") {
       const cfg = stopConfig(ref), s = stopById(ref);
       if (!cfg || !s) return;
-      if (w.type === "stop") { await configureWidget(cfg); return; }
-      // « Mon trajet » : les lignes et directions qui passent à cet arrêt
-      w.stop = ref; w.deps = undefined; render();
+      // les lignes et directions qui passent à cet arrêt : une seule pour « Mon trajet », une ou plusieurs pour l'arrêt favori
+      w.stop = ref; w.deps = undefined; w.sel = []; render();
       const deps = await nextDepartures(s);
       w.deps = deps.map(d => ({ line: d.line, dest: d.dest })).sort((a, b) => a.line.localeCompare(b.line, "fr", { numeric: true }) || a.dest.localeCompare(b.dest, "fr"));
       render();
+    } else if (kind === "dir" && w.deps) {
+      const i = Number(ref), sel = w.sel ?? [];
+      w.sel = sel.includes(i) ? sel.filter(x => x !== i) : [...sel, i];
+      render();
+    } else if (kind === "done" && w.stop && w.deps) {
+      const cfg = stopConfig(w.stop);
+      const only = (w.sel ?? []).map(i => w.deps![i]).filter(Boolean).map(d => `${d.line}|${d.dest}`);
+      if (cfg) await configureWidget({ ...cfg, only });
     } else if (kind === "line" && w.stop && w.deps) {
       const d = w.deps[Number(ref)], cfg = stopConfig(w.stop);
       if (d && cfg) await configureWidget({ ...cfg, line: d.line, dest: d.dest });

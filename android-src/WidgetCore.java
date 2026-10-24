@@ -231,7 +231,12 @@ public final class WidgetCore {
                         if (!cfg.has("refs") && !cfg.has("sncf")) return unconfigured(c, v, widgetId, "stop", "Touchez pour choisir l'arrêt");
                         v.setTextViewText(id(c, "w_title"), cfg.optString("name"));
                         v.setOnClickPendingIntent(id(c, "w_root"), open(c, widgetId, 0, "stop:" + cfg.optString("stopId")));
-                        j = get(c, "/api/widget/stop?refs=" + enc(join(cfg.optJSONArray("refs"))) + (cfg.optString("sncf").isEmpty() ? "" : "&sncf=" + enc(cfg.optString("sncf"))));
+                        // directions choisies à la pose du widget (aucune = toutes)
+                        JSONArray only = cfg.optJSONArray("only");
+                        StringBuilder o = new StringBuilder();
+                        for (int i = 0; only != null && i < only.length(); i++) { if (o.length() > 0) o.append('~'); o.append(only.optString(i)); }
+                        j = get(c, "/api/widget/stop?refs=" + enc(join(cfg.optJSONArray("refs"))) + (cfg.optString("sncf").isEmpty() ? "" : "&sncf=" + enc(cfg.optString("sncf")))
+                            + (o.length() > 0 ? "&only=" + enc(o.toString()) : ""));
                     } else {
                         v.setOnClickPendingIntent(id(c, "w_root"), open(c, widgetId, 0, "carte"));
                         double[] pos = position(c);

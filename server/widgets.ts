@@ -1,7 +1,8 @@
 /**
  * Données des widgets Android (écran d'accueil du téléphone) : réponses courtes, tirées de la mémoire du serveur
  * (photo du réseau CTS, trains SNCF, infos trafic, Vélhop et P+R), sans appel supplémentaire à la CTS.
- *   /api/widget/stop?refs=…&sncf=…    prochains passages d'un arrêt (codes de l'arrêt et de ses quais ; gare SNCF éventuelle)
+ *   /api/widget/stop?refs=…&sncf=…    prochains passages d'un arrêt (codes de l'arrêt et de ses quais ; gare SNCF éventuelle) ;
+ *                                     &only=C|Gare Centrale~B|Hoenheim Gare : seulement ces lignes et directions
  *   /api/widget/nearby?lat=…&lon=…    arrêt le plus proche qui a encore des passages
  *   /api/widget/traffic?lines=A,C     infos trafic des lignes suivies
  *   /api/widget/poi?id=velhop-…|pr-…  vélos ou places disponibles
@@ -59,7 +60,10 @@ export async function widgetData(
     const refs = list(q.get("refs"), 40), sncf = q.get("sncf") ?? "";
     const v = refs.length ? upcomingFor(refs, now) : [];
     if (v === null && !sncf) return json({ erreur: "Passages momentanément indisponibles" }, 503);
-    const deps = [...group(v ?? []), ...(sncf ? trains(sncf) : [])].sort((a, b) => a.t[0] - b.t[0]).slice(0, 6);
+    // directions choisies pour ce widget (« ligne|destination », séparées par ~) ; sinon toutes
+    const only = (q.get("only") ?? "").split("~").filter(Boolean).slice(0, 20);
+    const all = [...group(v ?? [], 40), ...(sncf ? trains(sncf) : [])].filter(g => !only.length || only.includes(g.l + "|" + g.d));
+    const deps = all.sort((a, b) => a.t[0] - b.t[0]).slice(0, 6);
     return json({ now, deps });
   }
   if (name === "nearby") {

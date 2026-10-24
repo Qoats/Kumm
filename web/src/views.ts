@@ -553,6 +553,12 @@ export function overlayWidget(): string {
     const list = POIS.filter(p => (p.kind === "velhop" || p.kind === "pr") && (!q || fold(p.name).includes(q))).sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 60);
     body = search("Station Vélhop ou parking relais…") + `<p style="color:var(--mute);margin-top:0">Choisissez la station ou le parking à afficher sur l’écran d’accueil.</p>` +
       (list.map(p => `<button class="item" data-wpick="poi:${esc(p.id)}">${markerIcon(p.kind, 26)}<span>${esc(p.name)}<br><small style="color:var(--mute)">${esc(p.info ?? KINDS[p.kind].label)}</small></span></button>`).join("") || `<div class="empty">Aucun résultat</div>`);
+  } else if (w.stop && w.deps && w.type === "stop") {
+    // arrêt favori : une ou plusieurs directions (aucune cochée = toutes)
+    const s = stopById(w.stop), sel = w.sel ?? [];
+    body = `<p style="color:var(--mute);margin-top:0">${esc(s?.name ?? "")} : cochez les directions à afficher, ou gardez-les toutes.</p>` +
+      w.deps.map((d, i) => `<button class="item wdir${sel.includes(i) ? " on" : ""}" data-wpick="dir:${i}" aria-pressed="${sel.includes(i)}"><span class="wck">${sel.includes(i) ? check() : ""}</span>${lineChip(d.line, true)}<span>vers <b>${esc(d.dest)}</b></span></button>`).join("") +
+      `<button class="go" data-wpick="done:1" style="width:100%;margin-top:16px">${sel.length ? `Valider (${sel.length} direction${sel.length > 1 ? "s" : ""})` : "Afficher toutes les directions"}</button>`;
   } else if (w.stop && w.deps) {
     const s = stopById(w.stop);
     body = `<p style="color:var(--mute);margin-top:0">${esc(s?.name ?? "")} : choisissez la ligne et la direction.</p>` +
@@ -561,7 +567,7 @@ export function overlayWidget(): string {
     const favs = S.fav.map(stopById).filter((s): s is Stop => !!s && (!q || fold(s.name).includes(q)));
     const others = q ? STOPS.filter(s => !S.fav.includes(s.id) && fold(s.name).includes(q)).sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 50) : [];
     const row = (s: Stop): string => `<button class="item" data-wpick="stop:${esc(s.id)}">${pinIcon()}<span>${esc(s.name)}</span><span class="ml">${s.lines.slice(0, 5).map(l => lineChip(l, true)).join("")}</span></button>`;
-    body = search("Rechercher un arrêt…") + `<p style="color:var(--mute);margin-top:0">${w.type === "stop" ? "Choisissez l’arrêt dont le widget affichera les passages." : "Choisissez votre arrêt de départ, puis la ligne et la direction."}</p>` +
+    body = search("Rechercher un arrêt…") + `<p style="color:var(--mute);margin-top:0">${w.type === "stop" ? "Choisissez l’arrêt, puis les directions à afficher." : "Choisissez votre arrêt de départ, puis la ligne et la direction."}</p>` +
       (favs.length ? `<div class="sub">Mes favoris</div>${favs.map(row).join("")}` : "") +
       (others.length ? `<div class="sub">Arrêts</div>${others.map(row).join("")}` : "") +
       (!favs.length && !others.length ? `<div class="empty">${q ? "Aucun arrêt trouvé" : "Tapez le nom d’un arrêt"}</div>` : "");
