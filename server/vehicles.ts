@@ -9,6 +9,7 @@ import type { StopPos } from "./ride.js";
 import { pathBetween } from "./shapes.js";
 import { locateOnCourse, sharedPosition } from "./ride.js";
 import { railBetween } from "./rail.js";
+import { roadBetween } from "./roads.js";
 import { terCourses, trainCode } from "./ter.js";
 
 /** [latitude, longitude, heure en ms] */
@@ -43,6 +44,15 @@ export interface Vehicle {
   d?: number;
 }
 
+/**
+ * Trajet entre deux arrêts : les rails pour un train ; le tracé de la ligne pour un tram ou un bus ; pour un bus hors de son
+ * tracé (déviation, itinéraire absent d'OpenStreetMap), la route (calculée une fois, voir roads.ts). null : ligne droite.
+ */
+function segmentPath(mode: string, line: string, key: string, a: Pt, b: Pt): Pt[] | null {
+  if (mode === "ter") return railBetween(a, b);
+  return pathBetween(line, key, a, b) ?? (mode === "tram" ? null : roadBetween(a, b));
+}
+
 /** Longueur en mètres d'une suite de points */
 function lengthM(pts: Pt[]): number {
   let m = 0;
@@ -55,7 +65,7 @@ function lengthM(pts: Pt[]): number {
  * donne des valeurs absurdes, car les horaires sont souvent arrondis à la minute. Plafonnée à une vitesse plausible.
  */
 function speedAhead(line: string, mode: string, calls: { code: string; dep: number; arr: number; p: { lat: number; lon: number } }[], i: number): number | null {
-  const pathOf = mode === "ter" ? (_l: string, _k: string, a: Pt, b: Pt) => railBetween(a, b) : pathBetween;
+  const pathOf = (l: string, k: string, a: Pt, b: Pt): Pt[] | null => segmentPath(mode, l, k, a, b);
   let meters = 0;
   const last = Math.min(calls.length - 1, i + 3);
   for (let k = i; k < last; k++) {
@@ -179,9 +189,7 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
         h = heading(s.p, n.p);
       }
       if (!a || !b) continue;
-      const p = a !== b && n
-        ? (c.mode === "ter" ? railBetween([s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : pathBetween(c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]))
-        : null;
+      const p = a !== b && n ? segmentPath(c.mode, c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : null;
       const sp = a !== b ? speedAhead(c.line, c.mode, calls, i) : 0;
       out.push({
         id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp !== null ? { s: sp } : {}),

@@ -19,6 +19,7 @@ import { serveTile } from "./tiles.js";
 import { parseGeneralMessages } from "./messages.js";
 import { allCourses, vehiclesAt } from "./vehicles.js";
 import { startTer, terStatus, trainDepartures } from "./ter.js";
+import { roadStatus } from "./roads.js";
 import { TER_STATIONS_EMS } from "../shared/ter.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
 import type { TrafficMessage } from "./messages.js";
@@ -272,6 +273,7 @@ function health(res: ServerResponse): Promise<void> {
     apk: updateStatus(),
     trajets_partages: rideStatus(),
     trains_ter: terStatus(),
+    trajets_routiers: roadStatus(),
     acces_web_prive: WEB_PRIVATE,
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });
