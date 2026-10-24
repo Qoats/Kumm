@@ -149,10 +149,13 @@ async function loadDeps(): Promise<void> {
         .sort((a, b) => Math.hypot(a.x - 170, a.y - 222) - Math.hypot(b.x - 170, b.y - 222)).slice(0, 12);
       const filter = S.filter;
       await fillSlot("nearlist", async () => {
-        const res = await Promise.all(near.map(s => nextDepartures(s).then(ds => ds.map(d => ({ stop: s, d }))).catch(() => [] as StopDeparture[])));
+        const res = await Promise.all(near.map(s => nextDepartures(s).then(ds => ds.map(d => ({ stop: s, d }))).catch(() => null)));
+        // aucun arrêt n'a pu être interrogé : on garde la liste affichée (voir le catch de loadDeps)
+        if (res.every(r => r === null)) throw new Error("Serveur Kumm injoignable");
         const all: StopDeparture[] = [];
         let stops = 0;
         for (const rows of res) {   // dans l'ordre de distance
+          if (!rows) continue;
           // les 2 premières lignes de chaque arrêt, avec toutes leurs directions (choisies dans la tuile)
           const now = Date.now();
           const kept = rows.filter(({ d }) => (filter === "all" || (filter === "tram") === isTram(d.line)) && d.times.some(t => t > now - 30000)).sort(sortByTime);
@@ -192,8 +195,15 @@ async function loadDeps(): Promise<void> {
     }
   } catch (e) {
     console.error(e);
-    const el = document.getElementById("stopdeps") ?? document.getElementById("nearlist");
-    if (el) el.innerHTML = '<div class="empty" style="padding:24px">Erreur : ' + esc(e instanceof Error ? e.message : e) + "</div>";
+    // serveur momentanément injoignable (mise à jour, réseau) : les derniers horaires restent affichés, avec un avertissement ;
+    // la liste se remet à jour toute seule à la réponse suivante (toutes les 30 s)
+    for (const el of document.querySelectorAll<HTMLElement>("#stopdeps, #nearlist, [id^=fav-]")) {
+      if (el.querySelector(".dep")) {
+        if (!el.querySelector(".stalenote")) el.insertAdjacentHTML("afterbegin", '<div class="stalenote">Connexion perdue : derniers horaires connus</div>');
+      } else if (el.id !== "nearlist" || !el.innerHTML.trim() || el.querySelector(".empty")) {
+        el.innerHTML = '<div class="empty" style="padding:24px">Horaires indisponibles pour le moment : nouvel essai dans quelques secondes.</div>';
+      }
+    }
   }
 }
 

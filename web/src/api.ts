@@ -47,9 +47,11 @@ export async function nextDepartures(stop: Stop): Promise<Departure[]> {
   const map: Record<string, Departure> = {};
   debug.last = [];
   debug.info = { id: stop.id, name: stop.name, lines: stop.lines, kind: kindOfStop(stop), essais: candidates };
+  let answered = false, lastError: unknown = null;
   for (const ref of candidates) {
     try {
       const j = await get<SiriStopMonitoring>("/stop-monitoring?MonitoringRef=" + encodeURIComponent(ref));
+      answered = true;
       let n = 0;
       for (const dl of j.ServiceDelivery?.StopMonitoringDelivery ?? []) {
         for (const v of dl.MonitoredStopVisit ?? []) {
@@ -67,10 +69,14 @@ export async function nextDepartures(stop: Stop): Promise<Departure[]> {
       if (n > 0) break;
     } catch (e) {
       debug.last.push({ ref, error: e instanceof Error ? e.message : String(e) });
+      lastError = e;
       // le serveur n'arrive pas à joindre la CTS : inutile d'essayer les autres codes
       if (e instanceof HttpError && (e.status === 502 || e.status === 503)) break;
     }
   }
+  // aucune réponse du serveur (redémarrage, réseau coupé) : erreur, pour garder à l'écran les derniers horaires connus
+  // plutôt que d'afficher « Aucun passage »
+  if (!answered && lastError) throw lastError;
   const out = Object.values(map);
   out.forEach(d => d.times.sort((a, b) => a - b));
   return out;
