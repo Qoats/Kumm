@@ -31,7 +31,7 @@ import type { Accent, Theme } from "./themes";
 import type { Place, Poi, StopDeparture } from "../../shared/types";
 import { buildVeloparks } from "./places";
 import { geocode } from "./walk";
-import { bikeToPoi, launchNav, walkToPoi } from "./flow";
+import { launchNav } from "./flow";
 import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
@@ -219,7 +219,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -276,7 +276,6 @@ app.addEventListener("click", e => {
     else w.at = base + Number(d.wq) * 60_000;
     render(); return;
   }
-  if (d.poibike) { void bikeToPoi(d.poibike); return; }
   if (d.poitrip) {
     const p = POIS.find(x => x.id === d.poitrip);
     if (p) openTrip({ label: p.name, lat: p.lat, lon: p.lon });
@@ -303,7 +302,6 @@ app.addEventListener("click", e => {
     S.layers[k] = !S.layers[k]; render(); return;
   }
   if (d.poi) { S.overlay = { k: "poi", id: d.poi }; render(); return; }
-  if (d.poinav) { void walkToPoi(d.poinav); return; }
   if (d.line) { S.overlay = { k: "line", id: d.line }; render(); return; }
   if (d.stop) { S.overlay = { k: "stop", id: d.stop }; render(); return; }
   if (d.f) { S.filter = d.f as Filter; render(); return; }

@@ -264,9 +264,7 @@ export function overlayPoi(id: string): string {
   return `<div class="overlay">${bar(p.name)}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">${markerIcon(p.kind, 44)}<b style="font-size:19px">${KINDS[p.kind].label}</b></div>
     ${p.info ? `<div class="box" style="margin-bottom:14px"><span>${esc(p.info)}</span></div>` : ""}
-    <button class="go" data-poinav="${esc(p.id)}">Y aller à pied</button>
-    <button class="go" data-poibike="${esc(p.id)}" style="margin-top:8px">Y aller à vélo</button>
-    <button class="go" style="margin-top:8px" data-poitrip="${esc(p.id)}">Y aller en transports</button>
+    <button class="go" data-poitrip="${esc(p.id)}">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')} Naviguer</button>
   </div></main></div>`;
 }
 
