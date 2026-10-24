@@ -5,7 +5,7 @@ import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, h
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES } from "./themes";
-import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_FLEXHOP, CTS_OBJETS_TROUVES, CTS_PLANS, CTS_POINTS_DE_VENTE, CTS_SITE, KUMM_CONTACT, isIOS } from "./links";
+import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_OBJETS_TROUVES, CTS_POINTS_DE_VENTE, CTS_SITE, KUMM_CONTACT, isIOS } from "./links";
 import type { Layer } from "./kinds";
 import { marker, markerIcon } from "./markers";
 import { ic, type IconName } from "./icons";
@@ -108,8 +108,8 @@ export function screenHome(): string {
   const favStops = S.fav.map(stopById).filter((s): s is Stop => !!s);
   // [libellé, couleur, icône, lien officiel ou action de l'application]
   const more: [string, string, IconName, string][] = [
-    ["Mon compte", "#EF8B00", "user2", "act:account"], ["Flex’hop", "#fff", "clock", CTS_FLEXHOP], ["Objets perdus", "#00BFA5", "lost", CTS_OBJETS_TROUVES], ["Parkings", "#1B6EC2", "parking", "act:mapParkings"],
-    ["Points de vente", "#C0892F", "store", CTS_POINTS_DE_VENTE], ["Plans", "#D582E1", "map", CTS_PLANS], ["Vélo", "#86B80B", "bike", "act:mapBikes"], ["FAQ/ Contact", "#AAB4BC", "help", "act:help"]
+    ["Objets perdus", "#00BFA5", "lost", CTS_OBJETS_TROUVES], ["Parkings", "#1B6EC2", "parking", "act:mapParkings"],
+    ["Vélo", "#86B80B", "bike", "act:mapBikes"], ["FAQ/ Contact", "#AAB4BC", "help", "act:help"]
   ];
   return `<div class="pad">
     <div class="qa"><button data-tab="search"><span class="qi">${ic("navigate")}</span>Naviguer</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>Carte</button><button data-tab="buy"><span class="qi">${ic("ticket")}</span>Billets</button></div>
@@ -126,7 +126,7 @@ export function screenHome(): string {
     <button class="box" data-tab="search"><span>Trouvez les horaires d’une ligne à un arrêt</span><span class="rb">${ic("clock")}</span></button>
 
     <h2>En plus</h2>
-    <div class="more">${more.map(m => { const inner = `<div class="c" style="background:${m[1]}">${m[1] === "#fff" ? '<b style="color:#999;font-size:20px;line-height:1">flex<br>hop</b>' : ic(m[2])}</div>${m[0].replace(" ", "<br>")}`; return m[3].startsWith("act:") ? `<button data-act="${m[3].slice(4)}">${inner}</button>` : `<a href="${m[3]}" target="_blank" rel="noopener noreferrer">${inner}</a>`; }).join("")}</div>
+    <div class="more">${more.map(m => { const inner = `<div class="c" style="background:${m[1]}">${ic(m[2])}</div>${m[0].replace(" ", "<br>")}`; return m[3].startsWith("act:") ? `<button data-act="${m[3].slice(4)}">${inner}</button>` : `<a href="${m[3]}" target="_blank" rel="noopener noreferrer">${inner}</a>`; }).join("")}</div>
 
     <p class="ver">Kumm v${VERSION}${CONFIG.USE_MOCK ? " · démonstration : données fictives" : ""}</p>
   </div>`;

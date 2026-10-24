@@ -107,6 +107,9 @@ button.go>svg{flex:none}
 .more button{flex:none;width:84px;text-align:center;font-size:13.5px;font-weight:600;line-height:1.2}
 /* boutons et liens : icône en haut, nom dessous ; même hauteur que le nom tienne sur une ou deux lignes */
 .more>button,.more>a{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;align-self:flex-start;padding:0;margin:0}
+/* quatre tuiles : réparties sur toute la largeur, sans défilement */
+.more>button,.more>a{flex:1 1 0;min-width:0;width:auto;max-width:96px}
+.more{justify-content:space-between}
 .more .c{width:68px;height:68px;border-radius:22px;display:grid;place-items:center;margin:0 auto 8px;background:var(--accent-soft)!important}
 .more svg{width:32px;height:32px;stroke:var(--accent-ink);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .more .c b{color:var(--accent-ink)!important;font-size:15px!important}
