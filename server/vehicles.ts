@@ -9,6 +9,7 @@ import { pathBetween } from "./shapes.js";
 
 /** [latitude, longitude, heure en ms] */
 type At = [number, number, number];
+type Pt = [number, number];
 export interface Vehicle {
   id: string;
   line: string;
@@ -30,6 +31,32 @@ export interface Vehicle {
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course (a = b = quai et heure de départ) */
   w?: boolean;
+  /** vitesse moyenne estimée en km/h (0 à quai) ; absente si elle ne peut pas être calculée */
+  s?: number;
+}
+
+/** Longueur en mètres d'une suite de points */
+function lengthM(pts: Pt[]): number {
+  let m = 0;
+  for (let k = 1; k < pts.length; k++) m += Math.hypot((pts[k][1] - pts[k - 1][1]) * 111_320 * Math.cos(rad(pts[k][0])), (pts[k][0] - pts[k - 1][0]) * 110_540);
+  return m;
+}
+
+/**
+ * Vitesse moyenne sur les 3 prochains tronçons (tracé réel, sinon distance à vol d'oiseau majorée de 20 %) : un seul tronçon
+ * donne des valeurs absurdes, car les horaires sont souvent arrondis à la minute. Plafonnée à une vitesse plausible.
+ */
+function speedAhead(line: string, mode: string, calls: { code: string; dep: number; arr: number; p: { lat: number; lon: number } }[], i: number): number | null {
+  let meters = 0;
+  const last = Math.min(calls.length - 1, i + 3);
+  for (let k = i; k < last; k++) {
+    const a: Pt = [calls[k].p.lat, calls[k].p.lon], b: Pt = [calls[k + 1].p.lat, calls[k + 1].p.lon];
+    const path = pathBetween(line, `${calls[k].code}>${calls[k + 1].code}`, a, b);
+    meters += path ? lengthM(path) : lengthM([a, b]) * 1.2;
+  }
+  const secs = (calls[last].arr - calls[i].dep) / 1000;
+  if (last <= i || secs < 30) return null;
+  return Math.round(Math.min(mode === "tram" ? 70 : 60, (meters / secs) * 3.6));
 }
 
 /* ---------- code de chaque trajet et attente au terminus ----------
@@ -114,8 +141,9 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       }
       if (!a || !b) continue;
       const p = a !== b && n ? pathBetween(c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : null;
+      const sp = a !== b ? speedAhead(c.line, c.mode, calls, i) : 0;
       out.push({
-        id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h,
+        id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp !== null ? { s: sp } : {}),
         next: calls.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr]),
         ...(p ? { p } : {}), ...(vno ? { n: vno } : {})
       });

@@ -1,5 +1,5 @@
 /** numéro affiché en bas de l'accueil : sert à vérifier quelle version tourne */
-export const VERSION = "0.21.5";
+export const VERSION = "0.21.6";
 
 /**
  * Adresse du serveur Kumm. Vide sur le web (même adresse que la page).

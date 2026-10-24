@@ -203,8 +203,8 @@ export function followStops(next: [string, number][]): string {
     : '<div class="empty">Arrivée au terminus.</div>';
 }
 
-/** Case de vitesse : la vitesse estimée en route, « À quai » ou « Au terminus » à l'arrêt */
-export const speedText = (i: { state: string; speed: number | null }): string => (i.speed ? String(i.speed) : i.state === "En route" ? "—" : i.state);
+/** Case de vitesse : la vitesse estimée (0 à l'arrêt, « — » si elle ne peut pas être calculée) */
+export const speedText = (i: { speed: number | null }): string => (i.speed === null ? "—" : String(i.speed));
 
 /** Panneau « À proximité » remplacé par le véhicule suivi : ligne, trajet, vitesse estimée, prochains arrêts */
 function followPanel(f: { id: string; paused: boolean }): string {
@@ -214,8 +214,9 @@ function followPanel(f: { id: string; paused: boolean }): string {
   return `<div class="fhead">${lineChip(v.line)}<div class="ft"><b>vers ${esc(v.dest)}</b>${v.n ? `<small>Trajet ${esc(v.n)}</small>` : ""}</div>
       <button class="fclose" data-act="unfollow" aria-label="Arrêter de suivre"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="fstats">
-      <div><b id="fv-speed">${esc(speedText(info))}</b><small id="fv-speedlbl">${info.speed ? "km/h estimés" : "à l'arrêt"}</small></div>
+      <div><b id="fv-speed">${esc(speedText(info))}</b><small>km/h estimés</small></div>
       <div><b id="fv-next">${first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—"}</b><small id="fv-nextname">${first ? esc(first[0]) : "terminus"}</small></div>
+      <div class="fstate"><b id="fv-state">${esc(info.state)}</b></div>
     </div>
     ${f.paused ? `<button class="go fre" data-act="refollow">${ic("target", 'stroke="currentColor"')} Suivre de nouveau</button>` : ""}
     <div class="list"><div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div><div id="fv-stops">${followStops(info.next)}</div></div>

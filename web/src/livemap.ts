@@ -270,7 +270,7 @@ function followTick(): void {
   const info = followInfo(v), first = info.next[0];
   const set = (id: string, t: string): void => { const el = document.getElementById(id); if (el && el.textContent !== t) el.textContent = t; };
   set("fv-speed", speedText(info));
-  set("fv-speedlbl", info.speed ? "km/h estimés" : "à l'arrêt");
+  set("fv-state", info.state);
   set("fv-next", first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—");
   set("fv-nextname", first ? first[0] : "terminus");
   const stops = document.getElementById("fv-stops"), html = followStops(info.next);

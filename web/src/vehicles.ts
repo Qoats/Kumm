@@ -24,6 +24,8 @@ export interface Vehicle {
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course */
   w?: boolean;
+  /** vitesse moyenne estimée par le serveur sur les prochains tronçons (km/h) */
+  s?: number;
 }
 
 export const VEHICLES = new Map<string, Vehicle>();
@@ -111,7 +113,8 @@ export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed:
   if (v.w) return { state: "Au terminus", speed: 0, next };
   const atStop = v.a[0] === v.b[0] && v.a[1] === v.b[1];
   if (atStop) return { state: "À quai", speed: 0, next };
-  // vitesse moyenne entre l'arrêt quitté et le suivant : longueur du tracé / temps prévu par les horaires
+  // vitesse calculée par le serveur sur les 3 prochains tronçons (plus fiable) ; sinon, sur le tronçon en cours
+  if (v.s !== undefined) return { state: "En route", speed: v.s, next };
   const meters = v.p && v.p.length > 1 ? cumOf(v, v.p)[v.p.length - 1] * 111_320 : len([v.a[0], v.a[1]], [v.b[0], v.b[1]]) * 111_320;
   const secs = (v.b[2] - v.a[2]) / 1000;
   return { state: "En route", speed: secs > 0 ? Math.round((meters / secs) * 3.6) : null, next };
