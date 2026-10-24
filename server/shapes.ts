@@ -15,12 +15,53 @@ const FILE = [path.join(here, "..", "..", "data", "shapes.json"), path.join(here
 const R = 6371000, rad = (d: number): number => (d * Math.PI) / 180;
 const dist = (a: Pt, b: Pt): number => Math.hypot(rad(b[1] - a[1]) * Math.cos(rad((a[0] + b[0]) / 2)), rad(b[0] - a[0])) * R;
 
+/*
+ * Morceaux de tracé retirés (data/shape-cuts.json, écrit par scripts/check-shapes-plan.py) : là où OpenStreetMap fait passer
+ * une ligne alors que le plan officiel de la CTS ne la montre pas (prolongement vers un dépôt, ancien itinéraire, voie
+ * oubliée reliée en ligne droite). Le tracé y est coupé ; le bus suit alors la route entre ses arrêts (roads.ts).
+ * Un segment de plus de 1,5 km sans aucun point est aussi coupé : c'est un trou de la relation OpenStreetMap.
+ */
+const CUTS_FILE = FILE ? path.join(path.dirname(FILE), "shape-cuts.json") : null;
+const MAX_STRAIGHT_M = 1500;
+let cuts: Record<string, Pt[]> = {}, cutRadius = 70;
+try {
+  if (CUTS_FILE && fs.existsSync(CUTS_FILE)) {
+    const c = JSON.parse(fs.readFileSync(CUTS_FILE, "utf8")) as { rayon_m?: number; lines?: Record<string, Pt[]> };
+    cuts = c.lines ?? {}; cutRadius = c.rayon_m ?? cutRadius;
+  }
+} catch (e) { console.warn("Morceaux de tracé à retirer illisibles :", e instanceof Error ? e.message : e); }
+
+/** Découpe un tracé en morceaux sans les segments retirés */
+function cutPieces(pts: Pt[], bad: Pt[]): Pt[][] {
+  const near = (p: Pt): boolean => bad.some(b => Math.abs(b[0] - p[0]) < 0.002 && dist(b, p) < cutRadius);
+  const out: Pt[][] = [];
+  let cur: Pt[] = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], len = dist(a, b);
+    let removed = len > MAX_STRAIGHT_M;
+    for (let k = 0, n = Math.max(1, Math.ceil(len / 30)); !removed && k <= n; k++) {
+      removed = near([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+    }
+    if (removed) { if (cur.length >= 2) out.push(cur); cur = [b]; }
+    else cur.push(b);
+  }
+  if (cur.length >= 2) out.push(cur);
+  return out;
+}
+
 const shapes = new Map<string, Shape[]>();
+let removedKm = 0;
 try {
   if (FILE) {
     const j = JSON.parse(fs.readFileSync(FILE, "utf8")) as { lines?: Record<string, Pt[][]> };
     for (const [ref, list] of Object.entries(j.lines ?? {})) {
-      shapes.set(ref, list.filter(p => p.length >= 2).map(pts => {
+      const pieces = list.filter(p => p.length >= 2).flatMap(pts => {
+        const kept = cutPieces(pts, cuts[ref] ?? []);
+        const len = (q: Pt[]): number => q.slice(1).reduce((m, p, i) => m + dist(q[i], p), 0);
+        removedKm += (len(pts) - kept.reduce((m, q) => m + len(q), 0)) / 1000;
+        return kept;
+      });
+      shapes.set(ref, pieces.map(pts => {
         const cum = [0];
         for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + dist(pts[i - 1], pts[i]));
         return { pts, cum };
@@ -28,6 +69,7 @@ try {
     }
   }
 } catch (e) { console.warn("Tracés des lignes illisibles :", e instanceof Error ? e.message : e); }
+if (removedKm > 0) console.log(`Tracés des lignes : ${removedKm.toFixed(1)} km retirés (absents du plan de la CTS, ou trous)`);
 console.log(`Tracés des lignes : ${shapes.size ? shapes.size + " lignes" : "aucun (véhicules en ligne droite entre deux arrêts)"}`);
 
 /** Projection d'un point sur un tracé : distance depuis le début, écart au tracé (m), point projeté */

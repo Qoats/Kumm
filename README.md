@@ -119,6 +119,7 @@ Les fonds de carte viennent des serveurs publics d'OpenStreetMap, faits pour un 
 | Adresses | Base Adresse Nationale, via la Géoplateforme de l'IGN (`data.geopf.fr/geocodage`) |
 | Trajets avec correspondances | Transitous / MOTIS (`api.transitous.org`) |
 | Tracés des lignes (véhicules sur la carte) | © contributeurs OpenStreetMap (ODbL) : itinéraires CTS extraits par `npm run build:shapes` dans `data/shapes.json` (à relancer quand le réseau change) |
+| Contrôle des tracés | plan détaillé officiel de la CTS (non inclus dans le dépôt) : `python3 scripts/check-shapes-plan.py Plan-Detaille-reseau-CTS.pdf http://localhost:3000` écrit `data/shape-cuts.json`, les morceaux de tracé OpenStreetMap absents du plan, que le serveur retire (le bus y suit la route) ; à relancer à chaque nouveau plan |
 | Carte 3D du guidage | OpenFreeMap (`tiles.openfreemap.org`, tuiles vectorielles OpenMapTiles, © contributeurs OpenStreetMap), affichée avec MapLibre GL ; repli sur la carte 2D si le téléphone ne sait pas l'afficher |
 Pas encore branchés : Flex'hop (zones de transport à la demande) ; les TGV et Intercités (seuls les TER sont affichés).
 

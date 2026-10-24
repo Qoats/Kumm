@@ -26,8 +26,14 @@ const R = 6371000, rad = d => (d * Math.PI) / 180;
 const dist = (a, b) => Math.hypot(rad(b[1] - a[1]) * Math.cos(rad((a[0] + b[0]) / 2)), rad(b[0] - a[0])) * R;
 const same = (a, b) => dist(a, b) < 2;
 
-/** Assemble les voies d'un itinéraire dans l'ordre de la relation, en retournant celles qui sont dans l'autre sens */
+/**
+ * Assemble les voies d'un itinéraire dans l'ordre de la relation, en retournant celles qui sont dans l'autre sens.
+ * Un trou dans la relation (voie manquante dans OpenStreetMap) coupe l'itinéraire en morceaux : le relier par une ligne
+ * droite faisait traverser la ville aux bus (ligne C1 : 6,9 km en diagonale). Entre deux morceaux, le serveur prend la route.
+ */
+const MAX_GAP_M = 40;
 function stitch(ways) {
+  const pieces = [];
   let line = [];
   for (const w of ways) {
     if (!line.length) { line = [...w]; continue; }
@@ -37,11 +43,13 @@ function stitch(ways) {
     else if (line.length === ways[0].length && same(start, w[0])) { line.reverse(); line.push(...w.slice(1)); }        // la 1re voie était à l'envers
     else if (line.length === ways[0].length && same(start, w[w.length - 1])) { line.reverse(); line.push(...[...w].reverse().slice(1)); }
     else {
-      // trou dans la relation : on continue par l'extrémité la plus proche
-      line.push(...(dist(end, w[0]) <= dist(end, w[w.length - 1]) ? w : [...w].reverse()));
+      const fwd = dist(end, w[0]) <= dist(end, w[w.length - 1]), next = fwd ? w : [...w].reverse();
+      if (dist(end, next[0]) <= MAX_GAP_M) line.push(...next);       // petit décalage entre deux voies : on continue
+      else { pieces.push(line); line = [...next]; }                  // trou : nouveau morceau
     }
   }
-  return line;
+  if (line.length) pieces.push(line);
+  return pieces;
 }
 
 /** Douglas-Peucker (en mètres) */
@@ -73,9 +81,12 @@ for (const rel of src.elements ?? []) {
   // voies parcourues (rôle vide) ; les quais et arrêts ont leur propre rôle
   const ways = (rel.members ?? []).filter(m => m.type === "way" && !m.role && m.geometry?.length >= 2).map(m => m.geometry.map(g => [g.lat, g.lon]));
   if (!ways.length) continue;
-  const shape = simplify(stitch(ways), TOLERANCE_M).map(([la, lo]) => [Math.round(la * 1e5) / 1e5, Math.round(lo * 1e5) / 1e5]);
-  (lines[ref] ??= []).push(shape);
-  variants++; points += shape.length;
+  for (const piece of stitch(ways)) {
+    const shape = simplify(piece, TOLERANCE_M).map(([la, lo]) => [Math.round(la * 1e5) / 1e5, Math.round(lo * 1e5) / 1e5]);
+    if (shape.length < 2) continue;
+    (lines[ref] ??= []).push(shape);
+    variants++; points += shape.length;
+  }
 }
 // garde-fou : une réponse partielle d'Overpass ne doit pas effacer les tracés existants
 const TRAMS = ["A", "B", "C", "D", "E", "F"];
