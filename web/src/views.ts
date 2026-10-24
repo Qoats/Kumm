@@ -111,7 +111,7 @@ export function screenHome(): string {
     ["Points de vente", "#C0892F", "store", CTS_POINTS_DE_VENTE], ["Plans", "#D582E1", "map"], ["Vélo", "#86B80B", "bike"], ["FAQ/ Contact", "#AAB4BC", "help"]
   ];
   return `<div class="pad">
-    <div class="qa"><button data-tab="search"><span class="qi">${ic("navigate")}</span>Naviguer</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>À proximité</button><button data-tab="buy"><span class="qi">${ic("ticket")}</span>Billets</button></div>
+    <div class="qa"><button data-tab="search"><span class="qi">${ic("navigate")}</span>Naviguer</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>Carte</button><button data-tab="buy"><span class="qi">${ic("ticket")}</span>Billets</button></div>
     <h2>Prochains passages <button class="pill" data-act="favs">Personnaliser</button></h2>
     ${favStops.length ? favStops.map(s => `<div id="fav-${esc(s.id)}"></div>`).join("") :
       `<div class="box"><span>Affichez les prochains passages à vos arrêts favoris</span><span class="rb">${ic("heart")}</span></div>`}
@@ -264,7 +264,7 @@ export function overlayPoi(id: string): string {
   return `<div class="overlay">${bar(p.name)}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">${markerIcon(p.kind, 44)}<b style="font-size:19px">${KINDS[p.kind].label}</b></div>
     ${p.info ? `<div class="box" style="margin-bottom:14px"><span>${esc(p.info)}</span></div>` : ""}
-    <button class="go" data-poitrip="${esc(p.id)}">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')} Naviguer</button>
+    <button class="go" data-poitrip="${esc(p.id)}">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button>
   </div></main></div>`;
 }
 
@@ -483,7 +483,7 @@ export function overlayStop(id: string): string {
   return `<div class="overlay">${bar(s.name)}
    <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
    <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div>
-   <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')} Naviguer</button><div id="stopdeps"></div></div></main></div>`;
+   <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button><div id="stopdeps"></div></div></main></div>`;
 }
 
 export function overlayMsgs(): string {

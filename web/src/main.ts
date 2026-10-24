@@ -46,7 +46,7 @@ import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, s
 const app = document.getElementById("app") as HTMLElement;
 
 const NAV: [Tab, string, IconName][] = [
-  ["home", "Accueil", "home"], ["search", "Recherche", "search"], ["nearby", "A Proximité", "pin"], ["buy", "Billets", "ticket"]
+  ["home", "Accueil", "home"], ["nearby", "Carte", "pin"], ["search", "Recherche", "search"], ["buy", "Billets", "ticket"]
 ];
 
 /* ============ RENDU ============ */

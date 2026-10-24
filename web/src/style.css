@@ -85,6 +85,9 @@ h2:first-child{margin-top:4px}
 .box:active,.dep:active,.ticket:active,.qa button:active,.item:active{transform:scale(.985);transition:transform .08s}
 .sub{color:var(--mute);font-weight:700;font-size:14px;margin:18px 0 8px}
 .go{background:var(--accent);color:var(--on-accent);border-radius:22px;padding:10px 20px;font-weight:700}
+/* icône et texte d'un bouton centrés sur la même ligne */
+button.go{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+button.go>svg{flex:none}
 .qa{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 4px}
 .qa button{background:var(--card);box-shadow:var(--sh);border:1px solid transparent;border-radius:18px;padding:14px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:9px;font-weight:700;font-size:13.5px}
 .qa .qi{width:46px;height:46px;border-radius:16px;background:var(--accent-soft);display:grid;place-items:center}

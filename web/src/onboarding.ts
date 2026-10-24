@@ -89,7 +89,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
         ${row(ic("sliders"), "Réglages", "En haut de l’accueil : thème, alertes trafic, version de l’application, mentions légales.")}
         ${row(ic("heart"), "Favoris", "Touchez le cœur sur la fiche d’un arrêt pour voir ses passages dès l’accueil.")}
         ${row(ic("mail"), "Infos trafic", "En haut de l’accueil, toutes les perturbations en cours.")}
-        ${row(ic("pin"), "À proximité", "En bas de l’écran : la carte et les arrêts autour de vous.")}
+        ${row(ic("pin"), "Carte", "En bas de l’écran : la carte, les arrêts et les départs autour de vous.")}
         ${row(ic("search"), "Recherche et « Naviguer »", "En bas de l’écran : un arrêt, une adresse ou un lieu, puis « Naviguer » pour choisir l’itinéraire et l’heure.")}`;
       actions = next();
       break;
