@@ -12,7 +12,7 @@ import { CENTER, KX, KY, MOCK_POIS, MOCK_STOPS } from "./data";
 
 export type Tab = "home" | "search" | "lines" | "nearby" | "trips" | "buy";
 export type Filter = "all" | "bus" | "tram";
-export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string; /** onglet des départs : tous, ou un seul mode (arrêts desservis par trams et bus) */ mode?: "tram" | "bus" | "ter" } | { k: "poi"; id: string } | { k: "veh"; id: string } | { k: "settings" } | { k: "msgs" } | { k: "favs" } | { k: "account" } | { k: "help" } | null;
+export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string; /** onglet des départs : tous, ou un seul mode (arrêts desservis par trams et bus) */ mode?: "tram" | "bus" | "ter" } | { k: "poi"; id: string } | { k: "veh"; id: string } | { k: "settings" } | { k: "msgs" } | { k: "favs" } | { k: "account" } | { k: "help" } | { k: "widget" } | null;
 export interface Modal { t: string; p: string; b: string[]; go?: () => void }
 
 export interface State {
@@ -33,6 +33,8 @@ export interface State {
   searchAddr: { q: string; items: Place[] } | null;
   /** texte cherché dans « Mes arrêts favoris » */
   favQ: string;
+  /** réglage d'un widget de l'écran d'accueil en cours (voir widgets.ts) */
+  wsetup: import("./widgets").WidgetSetup | null;
   /** écran à retrouver en quittant l'écran des itinéraires (ouvert par « Naviguer ») */
   tripBack: { tab: Tab; overlay: Overlay } | null;
   trip: {
@@ -90,7 +92,7 @@ export const stopById = (id: string): Stop | undefined => STOPS.find(s => s.id =
 export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now()) / 60000));
 
 export const S: State = {
-  tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null, searchAddr: null, favQ: "", tripBack: null,
+  tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null, searchAddr: null, favQ: "", wsetup: null, tripBack: null,
   trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", ridePrompt: null, riding: null, follow: null, onb: null, upd: null
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }

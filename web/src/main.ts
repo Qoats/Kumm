@@ -19,7 +19,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -37,6 +37,7 @@ import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { refreshVehicles } from "./vehicles";
 import { hideSplash } from "./splash";
+import { configureWidget, initWidgets, stopConfig, syncWidgets } from "./widgets";
 import { followFromSearch, showOnMap, mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
@@ -78,7 +79,7 @@ function draw(): void {
   else body = `<main>${screenBuy()}</main>`;
 
   const o = S.overlay;
-  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : overlayFavs();
+  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
 
   // positions de défilement de toutes les zones (listes, fiches, rangées de catégories…), par écran : voir scroll.ts
   const screen = o ? `${t}|${o.k}:${"id" in o ? String(o.id) : ""}` : t;
@@ -111,6 +112,7 @@ function draw(): void {
   // après restoreSlots : les listes chargées à part ont retrouvé leur contenu, donc leur hauteur
   restoreScroll(app, screen);
   void loadDeps();
+  syncWidgets();   // n'envoie rien si les données des widgets n'ont pas changé
 }
 hooks.render = draw;
 
@@ -232,7 +234,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-wpick],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -294,6 +296,7 @@ app.addEventListener("click", e => {
     if (p) openTrip({ label: p.name, lat: p.lat, lon: p.lon });
     return;
   }
+  if (d.wpick) { void pickForWidget(d.wpick); return; }   // réglage d'un widget de l'écran d'accueil
   if (d.follow) { followFromSearch(d.follow); return; }   // véhicule trouvé par son code de trajet
   if (d.goto) {
     // « Naviguer » : arrêt (fiche ou recherche) ou adresse trouvée par la recherche
@@ -468,6 +471,31 @@ function swapTrip(): void {
 /* suggestions : arrêts connus tout de suite, adresses un instant plus tard */
 let sgTimer = 0;
 const textOf = (f: "from" | "to"): string => (f === "from" ? S.trip.fromText : S.trip.toText);
+/** Choix fait dans l'écran de réglage d'un widget */
+async function pickForWidget(v: string): Promise<void> {
+  const w = S.wsetup;
+  if (!w) return;
+  const [kind, ref] = [v.slice(0, v.indexOf(":")), v.slice(v.indexOf(":") + 1)];
+  try {
+    if (kind === "poi") {
+      const p = POIS.find(x => x.id === ref);
+      if (p) await configureWidget({ id: p.id, name: p.name });
+    } else if (kind === "stop") {
+      const cfg = stopConfig(ref), s = stopById(ref);
+      if (!cfg || !s) return;
+      if (w.type === "stop") { await configureWidget(cfg); return; }
+      // « Mon trajet » : les lignes et directions qui passent à cet arrêt
+      w.stop = ref; w.deps = undefined; render();
+      const deps = await nextDepartures(s);
+      w.deps = deps.map(d => ({ line: d.line, dest: d.dest })).sort((a, b) => a.line.localeCompare(b.line, "fr", { numeric: true }) || a.dest.localeCompare(b.dest, "fr"));
+      render();
+    } else if (kind === "line" && w.stop && w.deps) {
+      const d = w.deps[Number(ref)], cfg = stopConfig(w.stop);
+      if (d && cfg) await configureWidget({ ...cfg, line: d.line, dest: d.dest });
+    }
+  } catch { toast("Impossible de régler le widget : réessayez"); }
+}
+
 /** Ouvre l'écran des itinéraires vers ce lieu, depuis ma position ; son bouton retour ramène à l'écran actuel */
 function openTrip(dest: Place): void {
   S.tripBack = { tab: S.tab, overlay: S.overlay };
@@ -506,6 +534,7 @@ function askSuggestions(field: "from" | "to"): void {
 app.addEventListener("input", e => {
   const t = e.target as HTMLInputElement;
   if (t.id === "fq") { S.favQ = t.value; render(); return; }
+  if (t.id === "wq" && S.wsetup) { S.wsetup.q = t.value; render(); return; }
   if (t.id === "sq") {
     S.q = t.value; render(); searchAddresses();
     // codes de trajet des véhicules : positions chargées au besoin (au plus toutes les 20 s)
@@ -699,4 +728,5 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
 if (CONFIG.USE_MOCK) { MESSAGES.push(...MOCK_MESSAGES); MSG_STATE.status = "ok"; }
 else void initReal();
 render();
-hideSplash();   // l'application est affichée sous l'animation de lancement : elle peut s'effacer
+hideSplash();
+void initWidgets();   // l'application est affichée sous l'animation de lancement : elle peut s'effacer

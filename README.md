@@ -81,6 +81,17 @@ Le numéro de version Android augmente à chaque compilation. Sans ces secrets, 
 
 Notes : pour le Play Store il faudra un fichier `.aab` (même clé). À chaque modification du code : `npm.cmd run build:android`, puis recompiler. Le bouton « retour » d'Android ferme le guidage, une fiche, puis revient à l'accueil.
 
+## Widgets de l'écran d'accueil (Android)
+Sept widgets, à ajouter par un appui long sur l'écran d'accueil → Widgets → Kumm :
+arrêt favori (4×2), mon trajet (2×2 et 1×1), arrêt le plus proche (4×2), infos trafic (4×1), Vélhop / P+R (2×2), raccourcis (4×1).
+- Code natif : `android-src/WidgetCore.java` (données et dessin), `KummWidget.java` et une petite classe par widget ; mises en
+  page et aperçus dans `android-res/` ; déclarés dans le manifeste par le workflow (`android-src/widgets-manifest.xml`).
+- Données : `/api/widget/stop`, `/nearby`, `/traffic`, `/poi` (`server/widgets.ts`), tirées de la mémoire du serveur.
+- L'application leur transmet l'adresse du serveur, les couleurs des lignes, les lignes suivies et la dernière position
+  (`web/src/widgets.ts`, module `KummWidgets`). Un widget à régler ouvre Kumm sur l'écran de choix (arrêt, ligne, station).
+- Android ne met à jour un widget que toutes les 30 min : les passages sont donc affichés en heure (« 18:44 »), et
+  actualisés aussi par le bouton ↻, à l'ouverture et à la fermeture de Kumm.
+
 ## Logo et installation sur téléphone
 Le logo est un « K » dessiné comme une ligne de plan de transport (barre blanche, branches jaune et bleue), avec un rond d'arrêt à chaque extrémité (« Kumm » = « viens » en alsacien). Fichiers dans `web/public/` : `favicon.svg` (logo vectoriel, modifiable), `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`, `manifest.webmanifest`. Une variante rouge / bleu / violet est fournie à part. Dans l'en-tête, le logo est l'icône `kumm` de `web/src/icons.ts` (il prend la couleur du thème).
 Pour installer l'app sur un téléphone : ouvrez-la dans le navigateur, puis « Ajouter à l'écran d'accueil » (l'icône Kumm apparaît).

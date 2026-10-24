@@ -541,6 +541,34 @@ export function overlayHelp(): string {
   </div></main></div>`;
 }
 
+/** Réglage d'un widget de l'écran d'accueil : arrêt (puis ligne et direction pour « Mon trajet »), ou station Vélhop / P+R */
+export function overlayWidget(): string {
+  const w = S.wsetup;
+  if (!w) return "";
+  const q = fold(w.q);
+  const search = (ph: string): string => `<div class="search" style="margin-bottom:12px"><input id="wq" value="${esc(w.q)}" placeholder="${ph}" autocomplete="off"><span class="go">${ic("search")}</span></div>`;
+  const title = w.type === "poi" ? "Widget Vélhop / P+R" : w.type === "stop" ? "Widget arrêt favori" : "Widget mon trajet";
+  let body = "";
+  if (w.type === "poi") {
+    const list = POIS.filter(p => (p.kind === "velhop" || p.kind === "pr") && (!q || fold(p.name).includes(q))).sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 60);
+    body = search("Station Vélhop ou parking relais…") + `<p style="color:var(--mute);margin-top:0">Choisissez la station ou le parking à afficher sur l’écran d’accueil.</p>` +
+      (list.map(p => `<button class="item" data-wpick="poi:${esc(p.id)}">${markerIcon(p.kind, 26)}<span>${esc(p.name)}<br><small style="color:var(--mute)">${esc(p.info ?? KINDS[p.kind].label)}</small></span></button>`).join("") || `<div class="empty">Aucun résultat</div>`);
+  } else if (w.stop && w.deps) {
+    const s = stopById(w.stop);
+    body = `<p style="color:var(--mute);margin-top:0">${esc(s?.name ?? "")} : choisissez la ligne et la direction.</p>` +
+      (w.deps.map((d, i) => `<button class="item" data-wpick="line:${i}">${lineChip(d.line, true)}<span>vers <b>${esc(d.dest)}</b></span></button>`).join("") || `<div class="empty">Aucun passage à cet arrêt pour le moment : réessayez plus tard ou choisissez un autre arrêt.</div>`);
+  } else {
+    const favs = S.fav.map(stopById).filter((s): s is Stop => !!s && (!q || fold(s.name).includes(q)));
+    const others = q ? STOPS.filter(s => !S.fav.includes(s.id) && fold(s.name).includes(q)).sort((a, b) => a.name.localeCompare(b.name, "fr")).slice(0, 50) : [];
+    const row = (s: Stop): string => `<button class="item" data-wpick="stop:${esc(s.id)}">${pinIcon()}<span>${esc(s.name)}</span><span class="ml">${s.lines.slice(0, 5).map(l => lineChip(l, true)).join("")}</span></button>`;
+    body = search("Rechercher un arrêt…") + `<p style="color:var(--mute);margin-top:0">${w.type === "stop" ? "Choisissez l’arrêt dont le widget affichera les passages." : "Choisissez votre arrêt de départ, puis la ligne et la direction."}</p>` +
+      (favs.length ? `<div class="sub">Mes favoris</div>${favs.map(row).join("")}` : "") +
+      (others.length ? `<div class="sub">Arrêts</div>${others.map(row).join("")}` : "") +
+      (!favs.length && !others.length ? `<div class="empty">${q ? "Aucun arrêt trouvé" : "Tapez le nom d’un arrêt"}</div>` : "");
+  }
+  return `<div class="overlay">${bar(title)}<main><div class="pad">${body}</div></main></div>`;
+}
+
 /** Favoris : recherche d'un arrêt (sans accents ni majuscules), favoris actuels en haut, puis tous les arrêts par ordre alphabétique */
 const FAV_MAX = 80;
 export function overlayFavs(): string {
