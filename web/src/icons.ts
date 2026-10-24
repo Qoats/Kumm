@@ -27,6 +27,7 @@ export const I = {
   plus:'<path d="M12 5v14M5 12h14"/>',
   minus:'<path d="M5 12h14"/>',
   swap:'<path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/>',
+  navigate: '<path d="M3 11 21 3l-8 18-2-8-8-2z"/>',
   target:'<circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.500"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
   phone:'<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
   train:'<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l2-4M15 21l-2-4"/><circle cx="9" cy="14" r=".7"/><circle cx="15" cy="14" r=".7"/>',

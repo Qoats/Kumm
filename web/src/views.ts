@@ -18,7 +18,7 @@ import type { JLeg, Journey } from "./transit";
 import { TRIP, tripReady } from "./trip";
 import type { PlanCtx } from "./trip";
 import type { LL } from "./geo";
-import { esc } from "./util";
+import { esc, fold } from "./util";
 import { VEHICLES, followInfo, serverNow } from "./vehicles";
 import { NATIVE, PUSH_READY } from "./alerts";
 import { CAN_UPDATE } from "./update";
@@ -111,7 +111,7 @@ export function screenHome(): string {
     ["Points de vente", "#C0892F", "store", CTS_POINTS_DE_VENTE], ["Plans", "#D582E1", "map"], ["Vélo", "#86B80B", "bike"], ["FAQ/ Contact", "#AAB4BC", "help"]
   ];
   return `<div class="pad">
-    <div class="qa"><button data-tab="trips"><span class="qi">${ic("route")}</span>Itinéraire</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>À proximité</button><button data-tab="buy"><span class="qi">${ic("ticket")}</span>Billets</button></div>
+    <div class="qa"><button data-tab="search"><span class="qi">${ic("navigate")}</span>Naviguer</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>À proximité</button><button data-tab="buy"><span class="qi">${ic("ticket")}</span>Billets</button></div>
     <h2>Prochains passages <button class="pill" data-act="favs">Personnaliser</button></h2>
     ${favStops.length ? favStops.map(s => `<div id="fav-${esc(s.id)}"></div>`).join("") :
       `<div class="box"><span>Affichez les prochains passages à vos arrêts favoris</span><span class="rb">${ic("heart")}</span></div>`}
@@ -132,15 +132,21 @@ export function screenHome(): string {
 }
 
 export function screenSearch(): string {
-  const q = S.q.trim().toLowerCase();
-  const stops = STOPS.filter(s => !q || s.name.toLowerCase().includes(q)).slice(0, 40);
-  const lines = ALL_LINES.filter(l => !q || l.toLowerCase() === q || dirs(l).some(d => d.toLowerCase().includes(q)));
+  const q = fold(S.q);
+  const stops = STOPS.filter(s => !q || fold(s.name).includes(q)).slice(0, 40);
+  const lines = ALL_LINES.filter(l => !q || l.toLowerCase() === q || dirs(l).some(d => fold(d).includes(q)));
+  // lieux de la carte (P+R, Vélhop, Véloparks…) et adresses : chaque résultat mène à l'écran des itinéraires (« Naviguer »)
+  const pois = q.length > 1 ? POIS.filter(p => fold(p.name).includes(q)).slice(0, 8) : [];
+  const addr = q.length > 2 && S.searchAddr && fold(S.searchAddr.q) === q ? S.searchAddr.items : [];
+  const goBtn = (ref: string): string => `<button class="sgo" data-goto="${esc(ref)}" aria-label="Naviguer">${ic("navigate")}</button>`;
   const results = !q
-    ? `<div class="empty">Ici, vous pouvez rechercher un arrêt, un point de vente et beaucoup d’autres choses.<div class="ico">${ic("store")}${ic("bus")}${ic("parking")}${ic("bike")}${ic("clock")}</div></div>`
+    ? `<div class="empty">Cherchez un arrêt, une adresse ou un lieu, puis touchez « Naviguer » pour choisir votre itinéraire.<div class="ico">${ic("store")}${ic("bus")}${ic("parking")}${ic("bike")}${ic("clock")}</div></div>`
     : (lines.length ? `<div class="sub">Lignes</div>` + lines.map(l => `<button class="item" data-line="${esc(l)}">${lineChip(l, true)}<span>${esc(dirs(l)[0])} ⇄ ${esc(dirs(l)[1])}</span></button>`).join("") : "") +
-      (stops.length ? `<div class="sub">Arrêts</div>` + stops.map(s => `<button class="item" data-stop="${esc(s.id)}">${pinIcon()}<span>${esc(s.name)}</span><span class="ml">${s.lines.slice(0, 6).map(l => lineChip(l, true)).join("")}</span></button>`).join("") : "") +
-      (!stops.length && !lines.length ? `<div class="empty">Aucun résultat pour « ${esc(S.q)} »</div>` : "");
-  return `<div class="bar" style="padding:calc(10px + var(--safe-top)) 14px 10px"><div class="search" style="flex:1"><input id="sq" value="${esc(S.q)}" placeholder="Recherche…" autocomplete="off"><span class="go">${ic("search")}</span></div></div>
+      (stops.length ? `<div class="sub">Arrêts</div>` + stops.map(s => `<div class="srow"><button class="item" data-stop="${esc(s.id)}">${pinIcon()}<span>${esc(s.name)}</span><span class="ml">${s.lines.slice(0, 6).map(l => lineChip(l, true)).join("")}</span></button>${goBtn("stop:" + s.id)}</div>`).join("") : "") +
+      (pois.length ? `<div class="sub">Lieux</div>` + pois.map(p => `<button class="item" data-poi="${esc(p.id)}">${markerIcon(p.kind, 26)}<span>${esc(p.name)}<br><small style="color:var(--mute)">${esc(KINDS[p.kind].label)}</small></span></button>`).join("") : "") +
+      (addr.length ? `<div class="sub">Adresses</div>` + addr.map((a, i) => `<button class="item" data-goto="addr:${i}">${pinIcon()}<span>${esc(a.label)}</span></button>`).join("") : "") +
+      (!stops.length && !lines.length && !pois.length && !addr.length ? `<div class="empty">${q.length > 2 && (!S.searchAddr || fold(S.searchAddr.q) !== q) ? "Recherche…" : `Aucun résultat pour « ${esc(S.q)} »`}</div>` : "");
+  return `<div class="bar" style="padding:calc(10px + var(--safe-top)) 14px 10px"><div class="search" style="flex:1"><input id="sq" value="${esc(S.q)}" placeholder="Arrêt, adresse, lieu…" autocomplete="off"><span class="go">${ic("search")}</span></div></div>
   <div class="pad" style="padding-top:6px">
     <button class="box" style="border:0;background:none;padding:6px 0;font-size:24px" data-tab="lines"><span>Voir toutes les lignes</span>${ic("chev", 'width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"')}</button>
     ${results}
@@ -478,7 +484,8 @@ export function overlayStop(id: string): string {
   const fav = S.fav.includes(id);
   return `<div class="overlay">${bar(s.name)}
    <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
-   <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div><div id="stopdeps"></div></div></main></div>`;
+   <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div>
+   <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')} Naviguer</button><div id="stopdeps"></div></div></main></div>`;
 }
 
 export function overlayMsgs(): string {

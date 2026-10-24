@@ -116,7 +116,7 @@ Les fonds de carte viennent des serveurs publics d'OpenStreetMap, faits pour un 
 | Gares TER, horaires et temps réel des trains | SNCF, données ouvertes (transport.data.gouv.fr) : horaires GTFS `Export_OpenData_SNCF_GTFS_NewTripId.zip` (téléchargés une fois par jour, gardés dans `state/ter-gtfs.zip`) et temps réel GTFS-RT `sncf-gtfs-rt-trip-updates` (toutes les `TER_POLL_S` secondes) ; voir `server/ter.ts` |
 | Voies ferrées (trains sur la carte) | © contributeurs OpenStreetMap (ODbL) : voies principales autour de Strasbourg extraites par `node scripts/build-rail.mjs` dans `data/rail.json` (relancé chaque nuit avec les tracés) |
 | Fonds de carte, marche à pied | © contributeurs OpenStreetMap (tuiles relayées par le serveur ; routage `routing.openstreetmap.de`) |
-| Adresses | Base Adresse Nationale (`api-adresse.data.gouv.fr`) |
+| Adresses | Base Adresse Nationale, via la Géoplateforme de l'IGN (`data.geopf.fr/geocodage`) |
 | Trajets avec correspondances | Transitous / MOTIS (`api.transitous.org`) |
 | Tracés des lignes (véhicules sur la carte) | © contributeurs OpenStreetMap (ODbL) : itinéraires CTS extraits par `npm run build:shapes` dans `data/shapes.json` (à relancer quand le réseau change) |
 | Carte 3D du guidage | OpenFreeMap (`tiles.openfreemap.org`, tuiles vectorielles OpenMapTiles, © contributeurs OpenStreetMap), affichée avec MapLibre GL ; repli sur la carte 2D si le téléphone ne sait pas l'afficher |
@@ -133,12 +133,13 @@ Pas encore branchés : Flex'hop (zones de transport à la demande) ; les TGV et 
 Chaque catégorie a sa couleur, sa forme et son symbole : Tram (cercle bleu), Bus (carré turquoise), Vélhop (cercle vert), Vélopark (losange vert foncé, « P »), P+R (hexagone bleu), Flex'hop (écusson rose) et Gare TER (octogone violet). Les boutons en haut de la carte affichent ou masquent chaque catégorie.
 
 Sources de données réelles :
-- **Tram / bus / gares TER** : liste d'arrêts de la CTS. Un arrêt est classé « TER » si sa ligne commence par `TER` ou `RER`.
+- **Tram / bus** : liste d'arrêts de la CTS. **Gares TER** : gares SNCF de l'Eurométropole (`shared/ter.ts`).
 - **P+R et Vélopark** : endpoints `park-and-ride` et `veloparc` de l'API CTS.
 - **Vélhop et Flex'hop** : pas encore branchés (le bouton est grisé et l'indique).
 Si une catégorie reste vide, ouvrez `http://localhost:3000/api/veloparc` (ou `park-and-ride`) et regardez ce que renvoie la CTS.
 
 ## Itinéraires avec correspondances
+Il n'y a pas d'onglet Itinéraires : on cherche un arrêt, une adresse ou un lieu dans **Recherche**, puis **Naviguer** (sur la fiche de l'arrêt ou au bout de la ligne de résultat) ouvre l'écran de choix (transports, à pied, vélo) ; son bouton retour ramène à l'écran d'origine.
 L'écran Itinéraires calcule de vrais trajets en transports (avec correspondances) grâce à **Transitous**, un service public et gratuit basé sur MOTIS (`api.transitous.org`), qui utilise les horaires ouverts du réseau. Chaque trajet montre les étapes, les horaires et les arrêts ; « Guider à pied jusqu'à l'arrêt » lance la navigation, puis propose la marche finale jusqu'à la destination.
 - Si le service est injoignable, l'app se replie sur les lignes directes et affiche la cause.
 - Usage raisonnable seulement (service communautaire). Les réponses sont gardées 60 secondes par le serveur.

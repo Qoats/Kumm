@@ -12,3 +12,7 @@ export function cmpVersion(a: string, b: string): number {
   }
   return 0;
 }
+
+/** Texte comparable pour la recherche : sans accents ni majuscules, « œ » → « oe », tirets et apostrophes → espaces */
+export const fold = (t: string): string =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/œ/g, "oe").replace(/æ/g, "ae").replace(/[-’'/]+/g, " ").replace(/\s+/g, " ").trim();

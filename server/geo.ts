@@ -1,6 +1,7 @@
 /** Relais vers les services d'adresses (BAN) et de marche à pied (OSRM, profil « foot »). */
 
-const ADDR = process.env.GEO_ADDRESS_BASE ?? "https://api-adresse.data.gouv.fr/search/";
+// Base Adresse Nationale : l'ancienne adresse api-adresse.data.gouv.fr ne répond plus, le service est sur la Géoplateforme de l'IGN
+const ADDR = process.env.GEO_ADDRESS_BASE ?? "https://data.geopf.fr/geocodage/search";
 const WALK = process.env.GEO_WALK_BASE ?? "https://routing.openstreetmap.de/routed-foot/route/v1/foot";
 const BIKE = process.env.GEO_BIKE_BASE ?? "https://routing.openstreetmap.de/routed-bike/route/v1/bike";
 export const TRANSIT = process.env.TRANSIT_BASE ?? "https://api.transitous.org/api/v5/plan";

@@ -68,7 +68,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
       body = `<h1>Ce que vous pouvez faire</h1>
         ${row(ic("clock"), "Passages en direct", "Les prochains départs à chaque arrêt, en temps réel.")}
         ${row(ic("pin"), "Carte", "Les arrêts autour de vous et les trams et bus en circulation.")}
-        ${row(ic("route"), "Itinéraires", "Le trajet jusqu’à votre destination, puis le guidage jusqu’à l’arrêt.")}
+        ${row(ic("route"), "Itinéraires", "Cherchez un arrêt, une adresse ou un lieu, touchez « Naviguer » : en transports, à pied ou à vélo, avec le guidage.")}
         ${row(ic("mail"), "Infos trafic", "Les perturbations et travaux en cours sur le réseau.")}
         ${row(ic("bike"), "Vélhop et parkings relais", "Les vélos et les places disponibles.")}`;
       actions = next();
@@ -90,7 +90,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
         ${row(ic("heart"), "Favoris", "Touchez le cœur sur la fiche d’un arrêt pour voir ses passages dès l’accueil.")}
         ${row(ic("mail"), "Infos trafic", "En haut de l’accueil, toutes les perturbations en cours.")}
         ${row(ic("pin"), "À proximité", "En bas de l’écran : la carte et les arrêts autour de vous.")}
-        ${row(ic("route"), "Itinéraires", "En bas de l’écran : choisissez votre destination et l’heure de départ ou d’arrivée.")}`;
+        ${row(ic("search"), "Recherche et « Naviguer »", "En bas de l’écran : un arrêt, une adresse ou un lieu, puis « Naviguer » pour choisir l’itinéraire et l’heure.")}`;
       actions = next();
       break;
     case "location":

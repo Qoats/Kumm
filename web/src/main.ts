@@ -22,7 +22,7 @@ import {
   debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
-import { cmpVersion, esc } from "./util";
+import { cmpVersion, esc, fold } from "./util";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { stopNav } from "./nav";
@@ -46,7 +46,7 @@ import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, s
 const app = document.getElementById("app") as HTMLElement;
 
 const NAV: [Tab, string, IconName][] = [
-  ["home", "Accueil", "home"], ["search", "Recherche", "search"], ["nearby", "A Proximité", "pin"], ["trips", "Itinéraires", "route"], ["buy", "Billets", "ticket"]
+  ["home", "Accueil", "home"], ["search", "Recherche", "search"], ["nearby", "A Proximité", "pin"], ["buy", "Billets", "ticket"]
 ];
 
 /* ============ RENDU ============ */
@@ -219,7 +219,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poinav],[data-poibike],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -279,14 +279,15 @@ app.addEventListener("click", e => {
   if (d.poibike) { void bikeToPoi(d.poibike); return; }
   if (d.poitrip) {
     const p = POIS.find(x => x.id === d.poitrip);
-    if (p) {
-      S.trip.dest = { label: p.name, lat: p.lat, lon: p.lon };
-      S.trip.toText = p.name;
-      S.trip.mode = "transit";
-      S.overlay = null;
-      S.tab = "trips";
-      render();
-    }
+    if (p) openTrip({ label: p.name, lat: p.lat, lon: p.lon });
+    return;
+  }
+  if (d.goto) {
+    // « Naviguer » : arrêt (fiche ou recherche) ou adresse trouvée par la recherche
+    const [kind, ref] = [d.goto.slice(0, d.goto.indexOf(":")), d.goto.slice(d.goto.indexOf(":") + 1)];
+    const s = kind === "stop" ? stopById(ref) : undefined, a = kind === "addr" ? S.searchAddr?.items[Number(ref)] : undefined;
+    if (s) openTrip({ label: s.name, lat: s.lat, lon: s.lon, stop: s });
+    else if (a) openTrip(a);
     return;
   }
   if (d.themePick || d.accentPick || d.darkmap || d.reset) {
@@ -310,7 +311,10 @@ app.addEventListener("click", e => {
   if (d.more) { toast(d.more + " : bientôt disponible"); return; }
   switch (d.act) {
     case "closeOverlay": S.overlay = null; break;
-    case "tabHome": S.tab = S.tab === "lines" ? "search" : "home"; break;
+    case "tabHome":
+      // écran des itinéraires ouvert par « Naviguer » : retour à la fiche ou à la recherche d'où l'on vient
+      if (S.tab === "trips" && S.tripBack) { S.tab = S.tripBack.tab; S.overlay = S.tripBack.overlay; S.tripBack = null; break; }
+      S.tab = S.tab === "lines" ? "search" : "home"; break;
     case "swap": swapTrip(); break;
     case "when": S.trip.whenDraft = { ...S.trip.when, at: S.trip.when.at || Math.ceil(Date.now() / 300_000) * 300_000 }; break;
     case "whenClose": S.trip.whenDraft = null; break;
@@ -450,12 +454,32 @@ function swapTrip(): void {
 /* suggestions : arrêts connus tout de suite, adresses un instant plus tard */
 let sgTimer = 0;
 const textOf = (f: "from" | "to"): string => (f === "from" ? S.trip.fromText : S.trip.toText);
+/** Ouvre l'écran des itinéraires vers ce lieu, depuis ma position ; son bouton retour ramène à l'écran actuel */
+function openTrip(dest: Place): void {
+  S.tripBack = { tab: S.tab, overlay: S.overlay };
+  Object.assign(S.trip, { dest, toText: dest.label, mode: "transit", sugg: null, sel: 0 });
+  if (!S.trip.from && !S.trip.fromIsMe) Object.assign(S.trip, { fromIsMe: true, fromText: "Ma position" });
+  S.overlay = null; S.tab = "trips";
+  render();
+}
+
+/** Adresses pour la recherche (Base Adresse Nationale), à partir de 3 lettres, après une courte pause de frappe */
+let addrTimer = 0;
+function searchAddresses(): void {
+  window.clearTimeout(addrTimer);
+  const q = S.q.trim();
+  if (q.length < 3 || CONFIG.USE_MOCK) { if (S.searchAddr) { S.searchAddr = null; render(); } return; }
+  addrTimer = window.setTimeout(() => {
+    geocode(q).then(items => { if (S.q.trim() === q) { S.searchAddr = { q, items }; render(); } }).catch(() => { /* adresses indisponibles : arrêts et lieux seulement */ });
+  }, 350);
+}
+
 function askSuggestions(field: "from" | "to"): void {
   window.clearTimeout(sgTimer);
   const q = textOf(field).trim();
   if (q.length < 2) { S.trip.sugg = null; render(); return; }
-  const ql = q.toLowerCase();
-  const stops: Place[] = STOPS.filter(s => s.name.toLowerCase().includes(ql)).slice(0, 4).map(s => ({ label: s.name, lat: s.lat, lon: s.lon, stop: s }));
+  const ql = fold(q);
+  const stops: Place[] = STOPS.filter(s => fold(s.name).includes(ql)).slice(0, 4).map(s => ({ label: s.name, lat: s.lat, lon: s.lon, stop: s }));
   S.trip.sugg = { field, items: stops };
   render();
   sgTimer = window.setTimeout(() => {
@@ -467,7 +491,7 @@ function askSuggestions(field: "from" | "to"): void {
 
 app.addEventListener("input", e => {
   const t = e.target as HTMLInputElement;
-  if (t.id === "sq") { S.q = t.value; render(); }
+  if (t.id === "sq") { S.q = t.value; render(); searchAddresses(); }
   if (t.id === "tto" || t.id === "tfrom") {
     if (CONFIG.USE_MOCK) {
       if (t.id !== "tto") return;
@@ -493,8 +517,9 @@ app.addEventListener("change", e => {
 app.addEventListener("focusin", e => {
   const t = e.target as HTMLInputElement;
   if (t.id === "hq") {
-    t.blur(); S.tab = "trips"; S.overlay = null; render();
-    setTimeout(() => document.getElementById("tto")?.focus(), 50);
+    // « Où voulez-vous aller ? » : la recherche (arrêts, adresses, lieux), puis « Naviguer »
+    t.blur(); S.tab = "search"; S.overlay = null; render();
+    setTimeout(() => document.getElementById("sq")?.focus(), 50);
   }
   if (t.id === "tfrom" && S.trip.fromIsMe) t.select();
 });
