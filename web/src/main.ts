@@ -36,6 +36,7 @@ import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { refreshVehicles } from "./vehicles";
+import { hideSplash } from "./splash";
 import { followFromSearch, mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
@@ -684,3 +685,4 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
 if (CONFIG.USE_MOCK) { MESSAGES.push(...MOCK_MESSAGES); MSG_STATE.status = "ok"; }
 else void initReal();
 render();
+hideSplash();   // l'application est affichée sous l'animation de lancement : elle peut s'effacer
