@@ -73,7 +73,8 @@ function create(): void {
   // Important : le style doit être posé avant L.map(). Un élément pas encore dans la page n'a aucun style calculé :
   // Leaflet lui imposerait « position: relative » et la carte se retrouverait avec une hauteur de 0.
   host.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;z-index:0";
-  map = L.map(host, { zoomControl: false, attributionControl: false }).setView([USER.lat, USER.lon], 16);
+  // minZoom 9 : on ne peut plus se retrouver avec toute l'Europe à l'écran (cadrage calculé sur une carte sans taille, ou geste)
+  map = L.map(host, { zoomControl: false, attributionControl: false, minZoom: 9 }).setView([USER.lat, USER.lon], 16);
   useBaseLayer(map);
   markers = L.layerGroup().addTo(map);
   vehLayer = L.layerGroup().addTo(map);
@@ -270,6 +271,7 @@ export function showOnMap(kinds: Layer[], near = false): void {
   const pts = POIS.filter(p => kinds.includes(p.kind)).map(p => [p.lat, p.lon] as L.LatLngTuple);
   if (!pts.length) toast("Données momentanément indisponibles");
   if (!map) return;
+  map.invalidateSize();                                       // taille réelle de la carte avant de la cadrer
   if (near) map.setView([USER.lat, USER.lon], ICON_ZOOM - 1, { animate: false });
   else if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 15, animate: false });
   // la rangée des catégories montre celles qui sont affichées
@@ -287,6 +289,7 @@ export function followFromSearch(id: string): void {
   if (S.sheet === 0) S.sheet = 1;
   render();                                                   // affiche la carte
   if (!map) return;
+  map.invalidateSize();
   map.setView(vehiclePos(v), Math.max(map.getZoom(), 16), { animate: false });
   map.panTo(aboveSheet(map, map.getCenter()), { animate: false });
 }

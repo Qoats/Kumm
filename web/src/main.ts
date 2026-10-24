@@ -148,7 +148,18 @@ const sortByTime = (a: StopDeparture, b: StopDeparture): number => a.d.times[0] 
 const matchesFilter = (s: { name: string }): boolean =>
   S.filter === "all" || isHub(s) || (S.filter === "tram" ? kindOfStop(s) === "tram" : kindOfStop(s) === "bus");
 
+/** Un seul chargement des passages à la fois ; un redessin pendant le chargement en relance un seul à la fin */
+let depsRunning = false, depsAgain = false;
 async function loadDeps(): Promise<void> {
+  if (depsRunning) { depsAgain = true; return; }
+  depsRunning = true;
+  try { await loadDepsNow(); } finally {
+    depsRunning = false;
+    if (depsAgain) { depsAgain = false; void loadDeps(); }
+  }
+}
+
+async function loadDepsNow(): Promise<void> {
   try {
     if (S.tab === "nearby" && !S.overlay) {
       // les 12 arrêts les plus proches sont interrogés, et les 4 plus proches qui ont encore des passages sont affichés :

@@ -18,7 +18,7 @@ Les adresses des API (CTS, OpenStreetMap, Transitous…) ne sont pas des secrets
 - Avant chaque publication : `npm run check:secrets` (cherche jetons, clés privées et fichiers sensibles ; code de sortie 1 si quelque chose est trouvé).
 - Si un jeton a été publié, même quelques minutes : **supprimez-le sur le portail CTS et générez-en un nouveau**. Effacer le fichier ou le commit ne suffit pas, l'historique reste lisible.
 - Sur GitHub : Settings → Code security → activez *Secret scanning* et *Push protection*.
-- Un serveur public est protégé par une **limite de requêtes par adresse** (`RATE_LIMIT_PER_MIN`, 240 par défaut) et ne relaie qu'une liste fixe de services. La page `/diag` n'existe que si `ENABLE_DIAG=1` : ne l'activez pas sur un serveur public.
+- Un serveur public est protégé par une **limite de requêtes par adresse** (`RATE_LIMIT_PER_MIN`, 600 par défaut) et ne relaie qu'une liste fixe de services. La page `/diag` n'existe que si `ENABLE_DIAG=1` : ne l'activez pas sur un serveur public.
 - Un APK contient l'adresse de votre serveur (jamais le jeton) : n'importe qui peut la lire. Publiez votre APK seulement si votre serveur est prêt à être utilisé par d'autres, ou laissez chacun compiler le sien avec sa propre adresse.
 
 ## Licences et données

@@ -16,7 +16,7 @@ export const PORT = num(process.env.PORT, 3000);
 export const APP_KEY = process.env.APP_KEY ?? "";
 
 /* protection et capacité */
-export const LIMIT = num(process.env.RATE_LIMIT_PER_MIN, 240);          // API, adresses, trajets, parkings… par adresse (0 = aucune limite)
+export const LIMIT = num(process.env.RATE_LIMIT_PER_MIN, 600);          // API, adresses, trajets, parkings… par adresse (0 = aucune limite)
 export const TILE_LIMIT = num(process.env.TILE_LIMIT_PER_MIN, 1500);    // tuiles de carte
 export const TRUST_PROXY = process.env.TRUST_PROXY === "1";             // derrière un hébergeur : lit la vraie adresse dans X-Forwarded-For
 export const ENABLE_DIAG = process.env.ENABLE_DIAG === "1";             // page /diag (jamais sur un serveur public)

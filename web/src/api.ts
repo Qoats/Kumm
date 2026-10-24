@@ -17,7 +17,11 @@ class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
+/** Serveur qui a répondu « trop de requêtes » (429) : plus aucun appel avant cette heure, pour ne pas aggraver la situation */
+let pausedUntil = 0;
+
 async function get<T>(path: string): Promise<T> {
+  if (Date.now() < pausedUntil) throw new HttpError(429, "Trop de requêtes : nouvel essai dans quelques secondes");
   let err: unknown;
   for (let i = 0; i < 2; i++) {            // 2 essais, 9 s maximum chacun
     const ctl = new AbortController();
@@ -26,6 +30,7 @@ async function get<T>(path: string): Promise<T> {
       const r = await fetch(CONFIG.CTS_BASE + path, { signal: ctl.signal, headers: appHeaders() });
       // version web privée : session expirée → page de connexion
       if (r.status === 401 && !Capacitor.isNativePlatform()) { location.href = "/connexion"; }
+      if (r.status === 429) pausedUntil = Date.now() + Math.min(60, Number(r.headers.get("Retry-After")) || 30) * 1000;
       if (!r.ok) {
         const body = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
         throw new HttpError(r.status, `CTS ${r.status}${body ? " : " + body : ""}`);
@@ -42,8 +47,32 @@ async function get<T>(path: string): Promise<T> {
   throw err;
 }
 
+/**
+ * Passages déjà chargés, réutilisés pendant 20 s : l'écran se redessine à chaque geste, et chaque redessin relançait
+ * l'interrogation des 12 arrêts proches (et de tous leurs quais) ; quelques gestes suffisaient à dépasser la limite du serveur.
+ * Deux demandes simultanées pour le même arrêt partagent aussi la même réponse.
+ */
+const DEPS_TTL = 20_000;
+const depsCache = new Map<string, { t: number; p: Promise<Departure[]>; dbg?: { last: unknown[]; info: unknown } }>();
+
+export function nextDepartures(stop: Stop): Promise<Departure[]> {
+  const c = depsCache.get(stop.id);
+  if (c && Date.now() - c.t < DEPS_TTL) {
+    if (c.dbg) { debug.last = c.dbg.last; debug.info = c.dbg.info; }
+    return c.p;
+  }
+  const entry: { t: number; p: Promise<Departure[]>; dbg?: { last: unknown[]; info: unknown } } = { t: Date.now(), p: Promise.resolve([]) };
+  entry.p = fetchDepartures(stop).then(
+    r => { entry.dbg = { last: debug.last, info: debug.info }; return r; },
+    e => { depsCache.delete(stop.id); throw e; }   // erreur : pas gardée, nouvel essai au prochain affichage
+  );
+  depsCache.set(stop.id, entry);
+  if (depsCache.size > 300) for (const [k, v] of depsCache) if (Date.now() - v.t > DEPS_TTL) depsCache.delete(k);
+  return entry.p;
+}
+
 /** Prochains passages à un arrêt : on essaie le code de l'arrêt, puis ceux de ses quais, jusqu'à obtenir des passages */
-export async function nextDepartures(stop: Stop): Promise<Departure[]> {
+async function fetchDepartures(stop: Stop): Promise<Departure[]> {
   if (CONFIG.USE_MOCK) return mockDepartures(stop);
   const candidates = [...new Set(stop.refs ?? [stop.id])];
   const map: Record<string, Departure> = {};
