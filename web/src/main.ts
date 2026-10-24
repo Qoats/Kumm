@@ -356,8 +356,8 @@ async function startUpdate(rel: Release): Promise<void> {
       waitingPermission = rel;
       S.upd = { rel, phase: "perm", pct: 0 };
     } else {
-      // l'installateur d'Android est ouvert ; si on l'annule, la page propose de recommencer
-      S.upd = { rel, phase: "ready", pct: 0 };
+      // l'installateur d'Android est ouvert ; si on l'annule ou s'il échoue, la page propose de le relancer
+      S.upd = { rel, phase: "launched", pct: 0 };
     }
     render();
   } catch (e) {

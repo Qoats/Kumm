@@ -80,9 +80,13 @@ public class KummUpdater extends Plugin {
         Context ctx = getContext();
         File dir = new File(ctx.getCacheDir(), "updates");
         if (!dir.isDirectory() && !dir.mkdirs()) throw new Exception("Espace de stockage indisponible");
+        // un fichier par version : un nouvel appui pendant que l'installateur d'Android lit le fichier ne l'efface plus
+        // (sinon Android répond « Application non installée ») ; une version déjà téléchargée et vérifiée est réutilisée
+        File out = new File(dir, "kumm-" + sha.substring(0, 16) + ".apk");
         File[] old = dir.listFiles();
-        if (old != null) for (File f : old) f.delete();
-        File out = new File(dir, "kumm-update.apk");
+        if (old != null) for (File f : old) if (!f.getName().equals(out.getName())) f.delete();
+        if (out.isFile() && sha.equals(sha256(out))) { progress(out.length(), out.length()); return checked(ctx, out); }
+        File part = new File(dir, out.getName() + ".part");
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(15000);
         c.setReadTimeout(30000);
@@ -90,7 +94,7 @@ public class KummUpdater extends Plugin {
             if (c.getResponseCode() != 200) throw new Exception("Le serveur a répondu " + c.getResponseCode());
             long total = c.getContentLengthLong(), done = 0, lastSent = 0;
             MessageDigest md = MessageDigest.getInstance("SHA-256");
-            try (InputStream in = c.getInputStream(); OutputStream os = new FileOutputStream(out)) {
+            try (InputStream in = c.getInputStream(); OutputStream os = new FileOutputStream(part)) {
                 byte[] buf = new byte[64 * 1024];
                 int n;
                 while ((n = in.read(buf)) > 0) {
@@ -104,13 +108,33 @@ public class KummUpdater extends Plugin {
             progress(done, total);
             StringBuilder hex = new StringBuilder();
             for (byte b : md.digest()) hex.append(String.format("%02x", b));
-            if (!hex.toString().equals(sha)) { out.delete(); throw new Exception("Fichier abîmé pendant le téléchargement : réessayez"); }
+            if (!hex.toString().equals(sha)) { part.delete(); throw new Exception("Fichier abîmé pendant le téléchargement : réessayez"); }
         } finally {
             c.disconnect();
         }
-        PackageInfo info = ctx.getPackageManager().getPackageArchiveInfo(out.getAbsolutePath(), 0);
-        if (info == null || !ctx.getPackageName().equals(info.packageName)) { out.delete(); throw new Exception("Ce fichier n'est pas une version de Kumm"); }
-        return out;
+        // le fichier n'est rendu visible à l'installateur qu'une fois complet et vérifié
+        if (!part.renameTo(out)) { part.delete(); throw new Exception("Espace de stockage indisponible"); }
+        return checked(ctx, out);
+    }
+
+    private File checked(Context ctx, File apk) throws Exception {
+        PackageInfo info = ctx.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), 0);
+        if (info == null || !ctx.getPackageName().equals(info.packageName)) { apk.delete(); throw new Exception("Ce fichier n'est pas une version de Kumm"); }
+        return apk;
+    }
+
+    private static String sha256(File f) {
+        try (InputStream in = new java.io.FileInputStream(f)) {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+            StringBuilder hex = new StringBuilder();
+            for (byte b : md.digest()) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private void progress(long done, long total) {

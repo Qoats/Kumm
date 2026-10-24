@@ -59,7 +59,7 @@ export interface State {
 export interface UpdatePage {
   /** version à installer (null : version trop ancienne pour le serveur, sans mise à jour téléchargeable) */
   rel: Release | null;
-  phase: "ready" | "down" | "perm" | "error";
+  phase: "ready" | "down" | "perm" | "error" | "launched";
   pct: number;
   err?: string;
 }

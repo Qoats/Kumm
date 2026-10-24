@@ -429,3 +429,4 @@ a.box,.more a{text-decoration:none;color:inherit}
 .vwait span{color:var(--accent-ink);font-weight:800}
 .vno{margin:0 0 10px;font-size:15.5px}
 .vno small{display:block;color:var(--mute);font-size:13px;margin-top:2px}
+.upd-alt{display:block;text-align:center;color:var(--accent-ink);font-weight:700;font-size:15px;padding:8px}

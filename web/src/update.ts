@@ -49,7 +49,7 @@ const mo = (b: number): string => (b / 1e6).toFixed(1).replace(".", ",") + " Mo"
 const escText = (t: string): string => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
 /** Page affichée tant que l'application n'est pas à jour : télécharger et installer, ou quitter */
-export function updateView(p: { rel: Release | null; phase: "ready" | "down" | "perm" | "error"; pct: number; err?: string }, current: string): string {
+export function updateView(p: { rel: Release | null; phase: "ready" | "down" | "perm" | "error" | "launched"; pct: number; err?: string }, current: string): string {
   const web = !Capacitor.isNativePlatform();
   const title = p.rel ? "Mise à jour disponible" : "Mise à jour nécessaire";
   const text = p.rel
@@ -64,9 +64,12 @@ export function updateView(p: { rel: Release | null; phase: "ready" | "down" | "
   } else {
     if (p.phase === "perm") status = `<p class="upd-msg">Android demande d’autoriser Kumm à installer des applications : activez « Autoriser depuis cette source », puis revenez ici. L’installation reprendra toute seule.</p>`;
     if (p.phase === "error") status = `<p class="upd-msg upd-err" role="alert">${escText(p.err ?? "Le téléchargement a échoué.")} Vérifiez votre connexion et réessayez.</p>`;
+    if (p.phase === "launched") status = `<p class="upd-msg">L’installateur d’Android s’est ouvert : touchez « Mettre à jour ». S’il a été fermé ou affiche « Application non installée », relancez l’installation ci-dessous.</p>`;
+    const label = p.phase === "error" ? "Réessayer" : p.phase === "launched" ? "Relancer l’installation" : "Télécharger et installer";
     actions = web
       ? `<button class="onb-main" data-upd="reload">Recharger</button>`
-      : `${p.rel ? `<button class="onb-main" data-upd="go">${p.phase === "error" ? "Réessayer" : "Télécharger et installer"}</button>` : ""}<button class="onb-sec" data-upd="quit">Quitter</button>`;
+      : `${p.rel ? `<button class="onb-main" data-upd="go">${label}</button>` : ""}<button class="onb-sec" data-upd="quit">Quitter</button>
+        ${p.phase === "launched" || p.phase === "error" ? `<a class="upd-alt" href="${url("/app/kumm.apk")}" target="_blank" rel="noopener">Télécharger l’APK avec le navigateur</a>` : ""}`;
   }
   return `<div class="onb upd" role="dialog" aria-modal="true" aria-label="${title}">
     <div class="onb-top"></div>
