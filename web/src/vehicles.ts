@@ -105,4 +105,16 @@ export function vehicleHeading(v: Vehicle, t = serverNow()): number {
   return (Math.atan2((p1[1] - p0[1]) * Math.cos(rad(p0[0])), p1[0] - p0[0]) * 180 / Math.PI + 360) % 360;
 }
 
+/** Ce qu'affiche le panneau d'un véhicule suivi : état, vitesse moyenne estimée sur le tronçon, prochains arrêts */
+export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed: number | null; next: [string, number][] } {
+  const next = v.next.filter(([, at]) => at > t - 30_000).map(([name, at]) => [name, Math.max(0, Math.round((at - t) / 60000))] as [string, number]);
+  if (v.w) return { state: "Au terminus", speed: 0, next };
+  const atStop = v.a[0] === v.b[0] && v.a[1] === v.b[1];
+  if (atStop) return { state: "À quai", speed: 0, next };
+  // vitesse moyenne entre l'arrêt quitté et le suivant : longueur du tracé / temps prévu par les horaires
+  const meters = v.p && v.p.length > 1 ? cumOf(v, v.p)[v.p.length - 1] * 111_320 : len([v.a[0], v.a[1]], [v.b[0], v.b[1]]) * 111_320;
+  const secs = (v.b[2] - v.a[2]) / 1000;
+  return { state: "En route", speed: secs > 0 ? Math.round((meters / secs) * 3.6) : null, next };
+}
+
 export const vehicleKind = (v: Vehicle): "tram" | "bus" => (v.m === "tram" ? "tram" : v.m === "bus" ? "bus" : isTram(v.line) ? "tram" : "bus");

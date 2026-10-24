@@ -18,7 +18,7 @@ import { TRIP, tripReady } from "./trip";
 import type { PlanCtx } from "./trip";
 import type { LL } from "./geo";
 import { esc } from "./util";
-import { VEHICLES, serverNow } from "./vehicles";
+import { VEHICLES, followInfo, serverNow } from "./vehicles";
 import { NATIVE, PUSH_READY } from "./alerts";
 import { CAN_UPDATE } from "./update";
 
@@ -184,18 +184,44 @@ export function screenNearby(): string {
     ${CONFIG.USE_MOCK ? "" : `<div class="tools zoom"><button data-act="zoomIn" aria-label="Zoomer">${ic("plus", 'stroke="currentColor"')}</button><button data-act="zoomOut" aria-label="Dézoomer">${ic("minus", 'stroke="currentColor"')}</button></div>`}</div>
     <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
       <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
-      <h3${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>
+      ${S.follow ? followPanel(S.follow) : `<h3${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>
       <div class="seg">
         <button data-f="bus" class="${S.filter === "bus" ? "on" : ""}">${ic("bus")}Bus</button>
         <button data-f="tram" class="${S.filter === "tram" ? "on" : ""}">${ic("tram")}Tram</button>
         <button data-f="all" class="${S.filter === "all" ? "on" : ""}">${ic("bus")}Tous</button>
       </div>
-      <div class="list" id="nearlist"></div>
+      <div class="list" id="nearlist"></div>`}
     </div>
   </div>`;
 }
 
 /** Fiche d'un tram ou bus en circulation : destination et prochains arrêts */
+/** Arrêts à venir du véhicule suivi (le panneau est mis à jour chaque seconde par la carte, voir livemap.ts) */
+export function followStops(next: [string, number][]): string {
+  return next.length
+    ? next.map(([name, m]) => `<div class="stopline vn"><span class="d"></span><span class="r">${esc(name)}</span><b>${m < 1 ? "à l'approche" : m + " min"}</b></div>`).join("")
+    : '<div class="empty">Arrivée au terminus.</div>';
+}
+
+/** Case de vitesse : la vitesse estimée en route, « À quai » ou « Au terminus » à l'arrêt */
+export const speedText = (i: { state: string; speed: number | null }): string => (i.speed ? String(i.speed) : i.state === "En route" ? "—" : i.state);
+
+/** Panneau « À proximité » remplacé par le véhicule suivi : ligne, trajet, vitesse estimée, prochains arrêts */
+function followPanel(f: { id: string; paused: boolean }): string {
+  const v = VEHICLES.get(f.id);
+  if (!v) return `<h3>Véhicule</h3><div class="empty">Ce véhicule n'est plus en circulation.</div>`;
+  const info = followInfo(v), first = info.next[0];
+  return `<div class="fhead">${lineChip(v.line)}<div class="ft"><b>vers ${esc(v.dest)}</b>${v.n ? `<small>Trajet ${esc(v.n)}</small>` : ""}</div>
+      <button class="fclose" data-act="unfollow" aria-label="Arrêter de suivre"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="fstats">
+      <div><b id="fv-speed">${esc(speedText(info))}</b><small id="fv-speedlbl">${info.speed ? "km/h estimés" : "à l'arrêt"}</small></div>
+      <div><b id="fv-next">${first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—"}</b><small id="fv-nextname">${first ? esc(first[0]) : "terminus"}</small></div>
+    </div>
+    ${f.paused ? `<button class="go fre" data-act="refollow">${ic("target", 'stroke="currentColor"')} Suivre de nouveau</button>` : ""}
+    <div class="list"><div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div><div id="fv-stops">${followStops(info.next)}</div></div>
+      <small class="src" style="display:block;margin-top:10px">Position et vitesse estimées d'après les horaires de la CTS : ce n'est pas un GPS.</small></div>`;
+}
+
 export function overlayVehicle(id: string): string {
   const v = VEHICLES.get(id);
   if (!v) return `<div class="overlay">${bar("Véhicule")}<main><div class="pad"><div class="empty">Ce véhicule n'est plus en circulation.</div></div></main></div>`;

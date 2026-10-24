@@ -5,10 +5,11 @@ import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { markerIcon } from "./markers";
 import { makeBaseLayer, wantsDarkMap } from "./tiles";
-import { POIS, S, STOPS, USER, render } from "./store";
+import { POIS, S, STOPS, USER, render, toast } from "./store";
 import { COLORS, lineLabel, lineText } from "./data";
 import { esc } from "./util";
-import { VEHICLES, refreshVehicles, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
+import { VEHICLES, followInfo, refreshVehicles, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
+import { followStops, speedText } from "./views";
 import type { Vehicle } from "./vehicles";
 
 /**
@@ -79,6 +80,8 @@ function create(): void {
   dots = L.canvas({ padding: 0.3 });
   // pendant l'animation du zoom, on ne déplace pas les véhicules (sinon saccades)
   map.on("zoomstart", () => { zooming = true; });
+  // l'utilisateur déplace la carte : le suivi se met en pause (bouton « Suivre de nouveau » dans le panneau)
+  map.on("dragstart", () => { if (S.follow && !S.follow.paused) { S.follow.paused = true; render(); } });
   map.on("zoomend", () => { zooming = false; });
   me = L.marker([USER.lat, USER.lon], {
     icon: L.divIcon({ html: '<div class="me-dot"></div>', className: "lm-icon", iconSize: [22, 22], iconAnchor: [11, 11] }),
@@ -219,7 +222,7 @@ function syncVehicles(): void {
     let m = vehMarkers.get(v.id);
     if (!m) {
       m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}${v.w ? " · au terminus" : ""}${v.n ? ` · trajet ${v.n}` : ""}` })
-        .on("click", () => { S.overlay = { k: "veh", id: v.id }; render(); })
+        .on("click", () => { startFollow(v.id); })
         .addTo(vehLayer);
       m.getElement()?.setAttribute("data-vid", v.id);   // pour scripts/check-map.mjs
       m.getElement()?.classList.toggle("vwaiting", !!v.w);
@@ -233,6 +236,45 @@ function syncVehicles(): void {
     }
   }
   for (const [id, m] of vehMarkers) if (!seen.has(id)) { vehLayer.removeLayer(m); vehMarkers.delete(id); }
+  followTick();
+}
+
+/* ---------- suivi d'un véhicule : la carte l'accompagne sur son trajet, le panneau affiche ses informations ---------- */
+export function startFollow(id: string): void {
+  S.follow = { id, paused: false };
+  S.overlay = null;
+  if (S.sheet === 0) S.sheet = 1;
+  render();
+  const m = vehMarkers.get(id);
+  if (map && m) { map.setZoom(Math.max(map.getZoom(), 16), { animate: false }); map.panTo(aboveSheet(map, m.getLatLng()), { animate: true }); }
+}
+
+/** Point à viser pour que le véhicule soit au milieu de la partie visible de la carte, au-dessus du panneau */
+function aboveSheet(m: L.Map, ll: L.LatLng): L.LatLng {
+  const sheet = document.querySelector<HTMLElement>(".sheet")?.offsetHeight ?? 0;
+  return m.containerPointToLatLng(m.latLngToContainerPoint(ll).add([0, sheet / 2]));
+}
+
+/** Chaque seconde : recentre la carte sur le véhicule suivi et met à jour son panneau (sans redessiner la page) */
+function followTick(): void {
+  for (const [id, m] of vehMarkers) m.getElement()?.classList.toggle("vfollow", id === S.follow?.id);
+  const f = S.follow;
+  if (!f || !map) return;
+  const v = VEHICLES.get(f.id), m = vehMarkers.get(f.id);
+  if (!v) {
+    // course terminée (ou véhicule sorti de la carte)
+    S.follow = null; render(); toast("Le véhicule a terminé son trajet");
+    return;
+  }
+  if (m && !f.paused) map.panTo(aboveSheet(map, m.getLatLng()), { animate: true, duration: 0.9, easeLinearity: 1 });
+  const info = followInfo(v), first = info.next[0];
+  const set = (id: string, t: string): void => { const el = document.getElementById(id); if (el && el.textContent !== t) el.textContent = t; };
+  set("fv-speed", speedText(info));
+  set("fv-speedlbl", info.speed ? "km/h estimés" : "à l'arrêt");
+  set("fv-next", first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—");
+  set("fv-nextname", first ? first[0] : "terminus");
+  const stops = document.getElementById("fv-stops"), html = followStops(info.next);
+  if (stops && stops.dataset["h"] !== html) { stops.innerHTML = html; stops.dataset["h"] = html; }
 }
 
 /** Animation : une fois par seconde tant que la carte est affichée ; nouvelles positions toutes les 20 s */

@@ -220,7 +220,7 @@ app.addEventListener("click", e => {
   if (d.dirk !== undefined && d.dirv !== undefined) { pickDir(d.dirk, d.dirv); render(); return; }   // direction d'une ligne, sans ouvrir l'arrêt
   if (d.mb !== undefined) { const m = S.modal; S.modal = null; if (d.mb === "1" && m?.go) m.go(); render(); return; }
   if (d.tab) {
-    S.tab = d.tab as Tab; S.overlay = null;
+    S.tab = d.tab as Tab; S.overlay = null; S.follow = null;
     render(); return;
   }
   if (d.sg) {
@@ -312,6 +312,8 @@ app.addEventListener("click", e => {
     case "account": toast("Mon compte : bientôt disponible"); return;
     case "prefs": S.overlay = { k: "settings" }; break;
     case "checkUpdate": void offerUpdate(true); return;
+    case "unfollow": S.follow = null; break;
+    case "refollow": if (S.follow) S.follow.paused = false; break;
     case "replayOnb": S.overlay = null; S.onb = { steps: allSteps(), i: 0, refused: false }; break;
   }
   render();
@@ -598,6 +600,7 @@ if (Capacitor.isNativePlatform()) {
     else if (S.modal) { S.modal = null; render(); }
     else if (S.trip.whenDraft) { S.trip.whenDraft = null; render(); }
     else if (S.overlay) { S.overlay = null; render(); }
+    else if (S.follow) { S.follow = null; render(); }   // arrête de suivre le véhicule
     else if (S.tab !== "home") { S.tab = "home"; render(); }
     else void CapApp.exitApp();
   });
