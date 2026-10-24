@@ -73,8 +73,8 @@ function create(): void {
   // Important : le style doit être posé avant L.map(). Un élément pas encore dans la page n'a aucun style calculé :
   // Leaflet lui imposerait « position: relative » et la carte se retrouverait avec une hauteur de 0.
   host.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;z-index:0";
-  // minZoom 9 : on ne peut plus se retrouver avec toute l'Europe à l'écran (cadrage calculé sur une carte sans taille, ou geste)
-  map = L.map(host, { zoomControl: false, attributionControl: false, minZoom: 9 }).setView([USER.lat, USER.lon], 16);
+  // pas de zoom minimal : il faisait « rezoomer » la carte toute seule quand on dézoomait au-delà
+  map = L.map(host, { zoomControl: false, attributionControl: false }).setView([USER.lat, USER.lon], 16);
   useBaseLayer(map);
   markers = L.layerGroup().addTo(map);
   vehLayer = L.layerGroup().addTo(map);
