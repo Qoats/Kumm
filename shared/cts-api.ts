@@ -5,6 +5,9 @@ export interface MonitoredCall {
   AimedDepartureTime?: string;
   ExpectedArrivalTime?: string;
   AimedArrivalTime?: string;
+  /** « cancelled » : passage supprimé (SIRI) */
+  DepartureStatus?: string;
+  ArrivalStatus?: string;
 }
 
 export interface MonitoredStopVisit {

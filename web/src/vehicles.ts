@@ -30,6 +30,8 @@ export interface Vehicle {
   g?: boolean;
   /** retard sur l'horaire prévu, en secondes (négatif : en avance), d'après la position partagée */
   d?: number;
+  /** immobilisé (panne, accident, bouchon) depuis cette heure (ms), d'après les horaires repoussés par la CTS */
+  x?: number;
 }
 
 export const VEHICLES = new Map<string, Vehicle>();
@@ -115,6 +117,7 @@ export function vehicleHeading(v: Vehicle, t = serverNow()): number {
 export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed: number | null; next: [string, number][] } {
   const next = v.next.filter(([, at]) => at > t - 30_000).map(([name, at]) => [name, Math.max(0, Math.round((at - t) / 60000))] as [string, number]);
   if (v.w) return { state: "Au terminus", speed: 0, next };
+  if (v.x) return { state: "Immobilisé", speed: 0, next };   // la durée est dans l'encadré au-dessus
   const atStop = v.a[0] === v.b[0] && v.a[1] === v.b[1];
   if (atStop) return { state: "À quai", speed: 0, next };
   // vitesse calculée par le serveur sur les 3 prochains tronçons (plus fiable) ; sinon, sur le tronçon en cours

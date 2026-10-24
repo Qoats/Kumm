@@ -10,6 +10,7 @@ import { pathBetween } from "./shapes.js";
 import { locateOnCourse, sharedPosition } from "./ride.js";
 import { railBetween } from "./rail.js";
 import { roadBetween } from "./roads.js";
+import { stallOf } from "./stalls.js";
 import { terCourses, trainCode } from "./ter.js";
 
 /** [latitude, longitude, heure en ms] */
@@ -42,6 +43,8 @@ export interface Vehicle {
   g?: boolean;
   /** retard sur l'horaire annoncé par la CTS, en secondes (négatif : en avance), d'après la position partagée */
   d?: number;
+  /** véhicule immobilisé (panne, accident, bouchon) depuis cette heure (ms) : la CTS repousse sans cesse son arrivée */
+  x?: number;
 }
 
 /**
@@ -51,6 +54,18 @@ export interface Vehicle {
 function segmentPath(mode: string, line: string, key: string, a: Pt, b: Pt): Pt[] | null {
   if (mode === "ter") return railBetween(a, b);
   return pathBetween(line, key, a, b) ?? (mode === "tram" ? null : roadBetween(a, b));
+}
+
+/** Point à la fraction f (0 à 1) de la longueur d'un tracé */
+function pointAlong(path: Pt[], f: number): Pt {
+  const total = lengthM(path);
+  let left = Math.max(0, Math.min(1, f)) * total;
+  for (let k = 1; k < path.length; k++) {
+    const seg = lengthM([path[k - 1], path[k]]);
+    if (left <= seg && seg > 0) { const t = left / seg; return [path[k - 1][0] + (path[k][0] - path[k - 1][0]) * t, path[k - 1][1] + (path[k][1] - path[k - 1][1]) * t]; }
+    left -= seg;
+  }
+  return path[path.length - 1];
 }
 
 /** Longueur en mètres d'une suite de points */
@@ -173,6 +188,20 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
         d: Math.round((aimed !== null ? shared.t - aimed : shift) / 1000),
         next: calls.slice(k + 1, k + 7).map(x => [x.name, Math.round(x.arr + shift)]),
         ...(vno ? { n: vno } : {})
+      });
+      continue;
+    }
+    // immobilisé (stalls.ts) : affiché à l'arrêt, là où il se trouvait au début du blocage
+    const st = c.mode === "ter" ? null : stallOf(c.id);
+    const si = st ? calls.findIndex(k => k.code === c.calls[st.k]?.code) : -1;
+    if (st && si >= 0) {
+      const s = calls[si], n = calls[si + 1];
+      const pt: Pt = !st.quay && n
+        ? pointAlong(segmentPath(c.mode, c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) ?? [[s.p.lat, s.p.lon], [n.p.lat, n.p.lon]], st.f)
+        : [s.p.lat, s.p.lon];
+      out.push({
+        id: c.id, line: c.line, dest: c.dest, rt: true, m: c.mode, a: [pt[0], pt[1], now], b: [pt[0], pt[1], now],
+        h: n ? heading(s.p, n.p) : 0, s: 0, x: st.since, next: calls.slice(si + 1, si + 7).map(k => [k.name, k.arr]), ...(vno ? { n: vno } : {})
       });
       continue;
     }

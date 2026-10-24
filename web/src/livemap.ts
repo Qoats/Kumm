@@ -224,17 +224,19 @@ function syncVehicles(): void {
     seen.add(v.id);
     let m = vehMarkers.get(v.id);
     if (!m) {
-      m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}${v.w ? " · au terminus" : ""}${v.n ? ` · trajet ${v.n}` : ""}` })
+      m = L.marker(p, { icon: vehIcon(v.line, h), zIndexOffset: 500, keyboard: false, title: `${lineLabel(v.line)} vers ${v.dest}${v.w ? " · au terminus" : ""}${v.x ? " · immobilisé" : ""}${v.n ? ` · trajet ${v.n}` : ""}` })
         .on("click", () => { startFollow(v.id); })
         .addTo(vehLayer);
       m.getElement()?.setAttribute("data-vid", v.id);   // pour scripts/check-map.mjs
       m.getElement()?.classList.toggle("vwaiting", !!v.w);
       m.getElement()?.classList.toggle("vshared", !!v.g);
+      m.getElement()?.classList.toggle("vstall", !!v.x);
       vehMarkers.set(v.id, m);
     } else {
       m.setLatLng(p);
       m.getElement()?.classList.toggle("vwaiting", !!v.w);   // en attente au terminus, puis en route
       m.getElement()?.classList.toggle("vshared", !!v.g);    // position partagée par un voyageur à bord
+      m.getElement()?.classList.toggle("vstall", !!v.x);     // immobilisé (panne, accident, bouchon)
       // la flèche suit les virages du tracé, sans recréer l'icône
       const arrow = m.getElement()?.querySelector<HTMLElement>(".va");
       if (arrow) arrow.style.transform = `rotate(${h}deg)`;

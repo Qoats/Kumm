@@ -233,6 +233,7 @@ function followPanel(f: { id: string; paused: boolean }): string {
   return `<div class="fhead">${lineChip(v.line)}<div class="ft"><b>vers ${esc(v.dest)}</b>${v.n ? `<small>Trajet ${esc(v.n)}</small>` : ""}</div>
       <button class="fclose" data-act="unfollow" aria-label="Arrêter de suivre"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     ${v.g ? `<div class="fshared"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
+    ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : ""}
     <div class="fstats">
       <div><b id="fv-speed">${esc(speedText(info))}</b><small>km/h estimés</small></div>
       <div><b id="fv-next">${first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—"}</b><small id="fv-nextname">${first ? esc(first[0]) : "terminus"}</small></div>
@@ -255,6 +256,7 @@ export function overlayVehicle(id: string): string {
   return `<div class="overlay">${bar(v.m === "ter" ? "Train TER" : "Ligne " + lineLabel(v.line))}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(v.line)}<b style="font-size:18px">vers ${esc(v.dest)}</b></div>
     ${v.g ? `<div class="fshared" style="margin:0 0 10px"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
+    ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : ""}
     ${wait !== null ? `<div class="box vwait"><b>Au terminus</b><span>Départ ${wait < 1 ? "imminent" : `dans ${wait} min`}</span></div>` : ""}
     ${v.n ? `<div class="vno">Trajet <b>${esc(v.n)}</b><small>${v.m === "ter" ? "TER d’Alsace (Elsàss en alsacien) et numéro du train." : "Terminus de départ, ligne, date et heure de départ prévue."}</small></div>` : ""}
     <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small>
@@ -569,12 +571,14 @@ export function pickDir(key: string, dest: string): void {
 /** Une tuile par ligne et par arrêt : si la ligne part dans plusieurs directions, un sélecteur permet de choisir la sienne */
 export function depCards(list: StopDeparture[], max = Infinity): string {
   const now = Date.now();
-  const groups = new Map<string, { stop: StopDeparture["stop"]; line: string; dests: Map<string, number[]> }>();
+  const groups = new Map<string, { stop: StopDeparture["stop"]; line: string; dests: Map<string, number[]>; cx: Map<string, number[]> }>();
   for (const { stop, d } of list) {
     const t = d.times.filter(x => x > now - 30000);
     if (!t.length) continue;
     const k = stop.id + "|" + d.line;
-    const g = groups.get(k) ?? groups.set(k, { stop, line: d.line, dests: new Map() }).get(k)!;
+    const g = groups.get(k) ?? groups.set(k, { stop, line: d.line, dests: new Map(), cx: new Map() }).get(k)!;
+    const cx = (d.cancelled ?? []).filter(x => x > now - 60_000 && x < now + 3600_000);
+    if (cx.length) g.cx.set(d.dest, [...(g.cx.get(d.dest) ?? []), ...cx].sort((a, b) => a - b));
     g.dests.set(d.dest, [...(g.dests.get(d.dest) ?? []), ...t].sort((a, b) => a - b));   // même direction sur deux quais : horaires réunis
   }
   const cards = [...groups].map(([k, g]) => {
@@ -593,6 +597,7 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
     return `<div class="dep" role="button" tabindex="0" style="--lc:${c};--lt:${lineText(COLORS[g.line] ? g.line : lineLabel(g.line))}" data-stop="${esc(g.stop.id)}">
       <div class="h">${lineChip(g.line, true, hasAlert(g.line))}<b>${esc(g.stop.name)}</b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
       ${picker}
+      ${g.cx.get(dest)?.length ? `<div class="cxl">Supprimé : ${g.cx.get(dest)!.slice(0, 3).map(x => hm(x)).join(", ")}</div>` : ""}
       ${picker && t.length < 2 ? "" : `<div class="f">${picker
         // la direction est déjà dans le sélecteur : seulement les passages suivants
         ? `<span>Ensuite</span>`

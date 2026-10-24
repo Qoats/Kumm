@@ -99,7 +99,9 @@ async function fetchDepartures(stop: Stop): Promise<Departure[]> {
           const dest = m.DestinationName ?? "";
           const t = Date.parse(c.ExpectedDepartureTime ?? c.AimedDepartureTime ?? c.ExpectedArrivalTime ?? c.AimedArrivalTime ?? "");
           if (isNaN(t)) continue;
-          (map[line + "|" + dest] ??= { line, dest, times: [] }).times.push(t);
+          const d = (map[line + "|" + dest] ??= { line, dest, times: [] });
+          if (/cancel/i.test(c.DepartureStatus ?? "") || /cancel/i.test(c.ArrivalStatus ?? "")) (d.cancelled ??= []).push(t);   // supprimé
+          else d.times.push(t);
           n++;
         }
       }

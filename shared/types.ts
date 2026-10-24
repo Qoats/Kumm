@@ -25,6 +25,8 @@ export interface Departure {
   line: LineId;
   dest: string;
   times: number[];
+  /** passages supprimés (heures prévues), si l'exploitant les signale */
+  cancelled?: number[];
 }
 
 export interface StopDeparture {

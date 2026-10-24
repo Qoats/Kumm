@@ -5,6 +5,7 @@
  */
 import { AUTH, BASE, ET_POLL_S, REQUESTOR, STALE_REALTIME_S } from "./config.js";
 import { describeError, fetchCts } from "./cts.js";
+import { updateStalls } from "./stalls.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,7 +21,17 @@ interface Visit {
   arrival?: string;
   time: number;
   realTime: boolean;
+  /** passage supprimé (course annulée, ou arrêt non desservi) */
+  cancelled?: boolean;
 }
+
+/**
+ * Suppressions au format SIRI : course entière (Cancellation) ou arrêt non desservi (statut « cancelled »). La CTS n'en
+ * publie pas à ce jour (ses courses supprimées disparaissent simplement) ; lues au cas où elle le ferait.
+ */
+const isCancelledJourney = (jr: Record<string, unknown>): boolean => jr["Cancellation"] === true || jr["Cancellation"] === "true";
+const isCancelledCall = (c: Record<string, unknown>): boolean =>
+  c["Cancellation"] === true || /cancel/i.test(str(c["DepartureStatus"])) || /cancel/i.test(str(c["ArrivalStatus"]));
 
 /** Une course complète (tous ses arrêts, dans l'ordre) : sert à situer les véhicules (vehicles.ts) */
 export interface Course {
@@ -130,8 +141,9 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
           line: str(jr["PublishedLineName"]) || str(jr["LineRef"]), dest: "", realTime: false,
           mode: str(isObj(jr["Extension"]) ? jr["Extension"]["VehicleMode"] : "").toLowerCase(), calls: []
         };
+        const journeyCancelled = isCancelledJourney(jr);
         for (const c of calls) {
-          if (!isObj(c)) continue;
+          if (!isObj(c) || isCancelledCall(c)) continue;      // arrêt non desservi : ni passage, ni position sur la carte
           const dep = Date.parse(str(c["ExpectedDepartureTime"]) || str(c["AimedDepartureTime"]));
           const arr = Date.parse(str(c["ExpectedArrivalTime"]) || str(c["AimedArrivalTime"]));
           const a = Number.isNaN(arr) ? dep : arr, d = Number.isNaN(dep) ? arr : dep;
@@ -142,7 +154,7 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
           course.dest ||= str(c["DestinationName"]);
           if (isObj(c["Extension"]) && c["Extension"]["IsRealTime"] === true) course.realTime = true;
         }
-        if (course.calls.length >= 2) list.push(course);
+        if (course.calls.length >= 2 && !journeyCancelled) list.push(course);   // course supprimée : pas de véhicule
         calls.forEach((c, i) => {
           if (!isObj(c)) return;
           const departure = str(c["ExpectedDepartureTime"]) || str(c["AimedDepartureTime"]);
@@ -153,7 +165,8 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
           const v: Visit = {
             line: str(jr["PublishedLineName"]) || str(jr["LineRef"]), lineRef: str(jr["LineRef"]), direction: jr["DirectionRef"],
             dest: str(c["DestinationName"]), stopCode: code, stopName: str(c["StopPointName"]),
-            departure, arrival: str(c["ExpectedArrivalTime"]) || undefined, time, realTime: ext["IsRealTime"] === true
+            departure, arrival: str(c["ExpectedArrivalTime"]) || undefined, time, realTime: ext["IsRealTime"] === true,
+            ...(journeyCancelled || isCancelledCall(c) ? { cancelled: true } : {})
           };
           (map.get(code) ?? map.set(code, []).get(code)!).push(v);
           passages++;
@@ -175,6 +188,7 @@ async function refresh(): Promise<void> {
     const now = Date.now(), ids = new Set(p.list.map(c => c.id));
     const recent = courses.filter(c => !ids.has(c.id) && c.calls[c.calls.length - 1].arr > now - 45 * 60_000);
     byCode = p.byCode; courses = [...p.list, ...recent]; validUntil = p.validUntil; loadedAt = now; lastError = "";
+    updateStalls(p.list, now);
     for (const c of p.list) for (const call of c.calls) { if (c.mode) learn(quayModes, call.code, c.mode); if (c.line) learn(quayLines, call.code, c.line); }
     Object.assign(counts, { courses: p.courses, passages: p.passages, quais: p.byCode.size });
     if (counts.chargements++ === 0) console.log(`Passages du réseau chargés : ${p.courses} courses, ${p.byCode.size} quais`);
@@ -213,7 +227,7 @@ export function stopMonitoringFromSnapshot(ref: string, now = Date.now()): strin
           MonitoringRef: ref,
           MonitoredVehicleJourney: {
             LineRef: v.lineRef, PublishedLineName: v.line, DirectionRef: v.direction, DestinationName: v.dest,
-            MonitoredCall: { StopPointRef: v.stopCode, StopPointName: v.stopName, ExpectedDepartureTime: v.departure, ExpectedArrivalTime: v.arrival },
+            MonitoredCall: { StopPointRef: v.stopCode, StopPointName: v.stopName, ExpectedDepartureTime: v.departure, ExpectedArrivalTime: v.arrival, ...(v.cancelled ? { DepartureStatus: "cancelled" } : {}) },
             Extension: { IsRealTime: v.realTime }
           }
         }))
