@@ -6,8 +6,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const OUT = path.join(process.cwd(), "data", "rail.json");
-// voies principales et secondaires (pas les voies de service, de garage ou de triage), de Molsheim à Kehl, d'Erstein à Brumath
-const QUERY = '[out:json][timeout:180];way["railway"="rail"]["usage"~"^(main|branch)$"][!"service"](48.38,7.45,48.78,7.95);out geom;';
+// voies ferrées de Molsheim à Kehl, d'Erstein à Brumath : voies principales, voies de gare et aiguillages (sans « usage » dans OSM),
+// mais pas les voies de garage, de triage ni les embranchements industriels, militaires ou touristiques
+const QUERY = '[out:json][timeout:180];way["railway"="rail"]["service"!~"^(yard|siding|spur)$"]["usage"!~"^(industrial|military|tourism|test)$"](48.38,7.45,48.78,7.95);out geom;';
 const SERVERS = ["https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
 const TOLERANCE_M = 4;
 
