@@ -236,6 +236,32 @@ export function stopMonitoringFromSnapshot(ref: string, now = Date.now()): strin
   });
 }
 
+/* ---------- widgets Android (server/widgets.ts) : passages tirés de la photo du réseau, sans appel à la CTS ---------- */
+export interface WidgetVisit { line: string; dest: string; time: number; rt: boolean; cancelled?: boolean; stopName: string }
+const fresh = (now: number): boolean => !!loadedAt && now - loadedAt <= (ET_POLL_S + STALE_REALTIME_S) * 1000;
+
+/** Passages à venir pour des codes d'arrêt (codes de l'arrêt et de ses quais, comme dans l'application) */
+export function upcomingFor(refs: string[], now = Date.now()): WidgetVisit[] | null {
+  if (!fresh(now)) return null;
+  const codes = new Set(refs.flatMap(r => aliases.get(r) ?? (byCode.has(r) ? [r] : [])));
+  return [...codes].flatMap(c => byCode.get(c) ?? []).filter(v => v.time > now - 30_000)
+    .map(v => ({ line: v.line, dest: v.dest, time: v.time, rt: v.realTime, stopName: v.stopName, ...(v.cancelled ? { cancelled: true } : {}) }));
+}
+
+/** Arrêt le plus proche (≤ 800 m) qui a encore des passages dans l'heure et demie ; ses quais du même nom sont réunis */
+export function nearestWithDepartures(lat: number, lon: number, now = Date.now()): { name: string; dist: number; codes: string[] } | null {
+  if (!fresh(now)) return null;
+  const m = (p: { lat: number; lon: number }): number => Math.hypot((p.lon - lon) * 111_320 * Math.cos((lat * Math.PI) / 180), (p.lat - lat) * 110_540);
+  const near = [...stopPos].map(([code, p]) => ({ code, p, d: m(p) })).filter(x => x.d < 800).sort((a, b) => a.d - b.d);
+  const soon = (code: string): Visit[] => (byCode.get(code) ?? []).filter(v => v.time > now && v.time < now + 90 * 60_000);
+  const first = near.find(x => soon(x.code).length);
+  if (!first) return null;
+  const name = soon(first.code)[0].stopName, key = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const fromFirst = (p: { lat: number; lon: number }): number => Math.hypot((p.lon - first.p.lon) * 111_320 * Math.cos((lat * Math.PI) / 180), (p.lat - first.p.lat) * 110_540);
+  const codes = near.filter(x => fromFirst(x.p) < 400 && (byCode.get(x.code) ?? []).some(v => v.stopName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === key)).map(x => x.code);
+  return { name, dist: Math.round(first.d), codes };
+}
+
 /** Courses et positions des quais, si la photo est assez récente (null sinon) */
 export function snapshot(now = Date.now()): { courses: Course[]; stopPos: Map<string, { lat: number; lon: number }>; at: number } | null {
   if (!loadedAt || now - loadedAt > (ET_POLL_S + STALE_REALTIME_S) * 1000 || !stopPos.size) return null;

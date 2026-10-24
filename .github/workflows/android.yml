@@ -78,7 +78,7 @@ jobs:
           '; fi
           # icône et écran de démarrage Kumm (au lieu de ceux de Capacitor) ; fond vert de l'écran de démarrage (Android 12+)
           cp -r android-res/. android/app/src/main/res/
-          # module natif de mise à jour (téléchargement de l'APK puis installation), enregistré dans MainActivity
+          # modules natifs (mise à jour de l'APK, widgets de l'écran d'accueil), enregistrés dans MainActivity
           cp android-src/*.java android/app/src/main/java/fr/kumm/app/
           STYLES=android/app/src/main/res/values/styles.xml
           grep -q windowSplashScreenBackground "$STYLES" || sed -i 's|<item name="android:background">@drawable/splash</item>|<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">#136342</item>|' "$STYLES"
@@ -86,6 +86,8 @@ jobs:
           MANIFEST=android/app/src/main/AndroidManifest.xml
           grep -q "ACCESS_FINE_LOCATION" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />|' "$MANIFEST"
           grep -q "REQUEST_INSTALL_PACKAGES" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />|' "$MANIFEST"
+          # widgets de l'écran d'accueil : déclarés juste avant </application>
+          grep -q "StopWidget" "$MANIFEST" || python3 -c 'import sys; m=open(sys.argv[1]).read(); open(sys.argv[1],"w").write(m.replace("</application>", open(sys.argv[2]).read() + "    </application>", 1))' "$MANIFEST" android-src/widgets-manifest.xml
           grep -q "default_notification_icon" "$MANIFEST" || sed -i 's|</application>|    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_kumm" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="alertes" />\n    </application>|' "$MANIFEST"
           npx cap sync android
 

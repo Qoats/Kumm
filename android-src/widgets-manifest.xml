@@ -1,0 +1,43 @@
+        <!-- widgets de l'écran d'accueil (android-src/WidgetCore.java) : ajoutés au manifeste par .github/workflows/android.yml -->
+        <receiver android:name=".StopWidget" android:exported="false" android:label="Kumm · Arrêt favori">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_info_stop" />
+        </receiver>
+        <receiver android:name=".TripWidget" android:exported="false" android:label="Kumm · Mon trajet">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_info_trip" />
+        </receiver>
+        <receiver android:name=".TripSmallWidget" android:exported="false" android:label="Kumm · Mon trajet (petit)">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_info_tripmini" />
+        </receiver>
+        <receiver android:name=".NearbyWidget" android:exported="false" android:label="Kumm · Arrêt le plus proche">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_info_nearby" />
+        </receiver>
+        <receiver android:name=".TrafficWidget" android:exported="false" android:label="Kumm · Infos trafic">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_info_traffic" />
+        </receiver>
+        <receiver android:name=".BikeWidget" android:exported="false" android:label="Kumm · Vélhop / P+R">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_info_poi" />
+        </receiver>
+        <receiver android:name=".ShortcutsWidget" android:exported="false" android:label="Kumm · Raccourcis">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_info_shortcuts" />
+        </receiver>

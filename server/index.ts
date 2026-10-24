@@ -20,6 +20,7 @@ import { parseGeneralMessages } from "./messages.js";
 import { allCourses, vehiclesAt } from "./vehicles.js";
 import { startTer, terStatus, trainDepartures } from "./ter.js";
 import { roadStatus } from "./roads.js";
+import { widgetData } from "./widgets.js";
 import { stallStatus } from "./stalls.js";
 import { TER_STATIONS_EMS } from "../shared/ter.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
@@ -169,6 +170,11 @@ function upstreamFor(name: string, search: string): () => Promise<CtsResult> {
 function api(res: ServerResponse, url: URL): Promise<void> | void {
   const name = url.pathname.slice("/api/".length);
   if (name === "messages") return cached(res, "info:messages", 60, 3600, trafficMessages);
+  // widgets Android (écran d'accueil) : réponses courtes depuis la mémoire, gardées 20 à 60 s
+  if (name.startsWith("widget/")) {
+    const w = name.slice("widget/".length), ttl = w === "traffic" || w === "poi" ? 60 : 20;
+    return cached(res, "widget:" + w + url.search, ttl, 0, () => widgetData(w, url, currentMessages, async kind => (kind === "velhop" ? velhopItems() : prItems())));
+  }
   // position estimée des véhicules, depuis la photo du réseau en mémoire : recalculée au plus toutes les 5 s
   // mode des quais (tram ou bus) : place le repère d'une station de tram sur ses quais de tram, pas entre le tram et les bus
   if (name === "quay-lines") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(quayLinesJson()), undefined, { cache: "public, max-age=600" });
@@ -215,6 +221,22 @@ async function currentMessages(): Promise<TrafficMessage[]> {
   if (r.status !== 200) throw new Error("HTTP " + r.status);
   msgMemo = { at: Date.now(), items: (JSON.parse(r.body) as { items: TrafficMessage[] }).items };
   return msgMemo.items;
+}
+
+/** P+R pour les widgets (gardés 2 min) */
+let prMemo: { at: number; items: Awaited<ReturnType<typeof parkingsRelais>> } = { at: 0, items: [] };
+async function prItems(): Promise<Awaited<ReturnType<typeof parkingsRelais>>> {
+  if (Date.now() - prMemo.at < 120_000) return prMemo.items;
+  prMemo = { at: Date.now(), items: await parkingsRelais() };
+  return prMemo.items;
+}
+
+/** Vélhop pour les widgets (gardés 60 s : un widget par station ne déclenche pas un appel chacun) */
+let veloMemo: { at: number; items: Awaited<ReturnType<typeof velhop>> } = { at: 0, items: [] };
+async function velhopItems(): Promise<Awaited<ReturnType<typeof velhop>>> {
+  if (Date.now() - veloMemo.at < 60_000) return veloMemo.items;
+  veloMemo = { at: Date.now(), items: await velhop() };
+  return veloMemo.items;
 }
 
 /** Corps d'une requête POST (4 Ko au plus) */
