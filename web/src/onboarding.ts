@@ -24,6 +24,11 @@ export function onboardingSteps(): StepId[] {
   const s = load();
   if (s.done && s.terms === TERMS_VERSION) return [];
   if (s.done) return ["terms"];
+  return allSteps();
+}
+
+/** Toutes les étapes (premier lancement, ou « Revoir la présentation » dans les réglages) */
+export function allSteps(): StepId[] {
   const all: StepId[] = ["welcome", "features", "map", "where", "location", "alerts", "terms"];
   return all.filter(id => id !== "alerts" || (NATIVE && PUSH_READY));   // alertes push : application Android seulement
 }

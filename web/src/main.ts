@@ -38,7 +38,7 @@ import { startNav } from "./nav";
 import { mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
-import { acceptTerms, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
+import { acceptTerms, allSteps, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
 import type { Release } from "./update";
 import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
 
@@ -302,6 +302,7 @@ app.addEventListener("click", e => {
     case "account": toast("Mon compte : bientôt disponible"); return;
     case "prefs": S.overlay = { k: "settings" }; break;
     case "checkUpdate": void offerUpdate(true); return;
+    case "replayOnb": S.overlay = null; S.onb = { steps: allSteps(), i: 0, refused: false }; break;
   }
   render();
 });
