@@ -13,7 +13,7 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { loadLineInfo, loadMessages, loadPois, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
+import { loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
@@ -187,7 +187,8 @@ async function loadDeps(): Promise<void> {
           const tabs = modes.length > 1 ? stopTabs(modes, cur) : "";
           const h = tabs + depCards(cur ? all.filter(x => lineKind(x.d.line) === cur) : all);
           // sans passage : souvent un arrêt non desservi (travaux, déviation) ; l'info trafic l'explique mieux que les détails techniques
-          return stopNotice(s.name) + (h.includes('class="dep"') ? h : h + debugBox());
+          const none = !h.includes('class="dep"');
+          return stopNotice(s, none) + (none ? h + debugBox() : h);
         });
       }
     }
@@ -525,6 +526,18 @@ async function refreshMessages(): Promise<void> {
   }
 }
 
+/* Lignes de chaque quai, apprises par le serveur au fil des passages : complètent les arrêts (la liste de la CTS ne les donne pas) */
+let quayLines: Record<string, string[]> = {};
+try { quayLines = JSON.parse(localStorage.getItem("quayLines") ?? "{}") as Record<string, string[]>; } catch { /* rien */ }
+function applyQuayLines(): void {
+  for (const s of STOPS) {
+    if (s.lines.length || !s.quays?.length) continue;
+    const set = new Set<string>();
+    for (const q of s.quays) for (const l of quayLines[q.code] ?? []) set.add(l);
+    if (set.size) s.lines = [...set].sort((a, b) => a.localeCompare(b, "fr", { numeric: true }));
+  }
+}
+
 /* Mode de chaque quai (tram / bus) : les stations de tram sont placées sur leurs quais de tram (gardé sur le téléphone) */
 let quayModes: Record<string, string> = {};
 try { quayModes = JSON.parse(localStorage.getItem("quayModes") ?? "{}") as Record<string, string>; } catch { /* rien */ }
@@ -558,6 +571,13 @@ async function initReal(): Promise<void> {
     console.error(e);
     if (!STOPS.length) toast("Connexion à l’API CTS impossible");
   }
+  applyQuayLines();
+  void loadQuayLines().then(m => {
+    if (!Object.keys(m).length) return;
+    quayLines = m;
+    try { localStorage.setItem("quayLines", JSON.stringify(m)); } catch { /* ignoré */ }
+    applyQuayLines(); render();
+  }).catch(() => { /* on garde les lignes connues */ });
   // modes des quais à jour (le serveur les connaît dès sa première photo du réseau)
   void loadQuayModes().then(m => {
     if (!Object.keys(m).length) return;

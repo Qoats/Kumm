@@ -125,6 +125,11 @@ export async function loadStops(): Promise<Stop[]> {
 }
 
 /** Mode de chaque quai (« 319A » → « tram », « bus » ou « bus+tram »), d'après les passages en temps réel */
+/** Lignes de chaque quai (« 527C » → ["B", "C", "F"]), apprises par le serveur au fil des passages */
+export async function loadQuayLines(): Promise<Record<string, string[]>> {
+  return get<Record<string, string[]>>("/quay-lines");
+}
+
 export async function loadQuayModes(): Promise<Record<string, string>> {
   return get<Record<string, string>>("/quay-modes");
 }

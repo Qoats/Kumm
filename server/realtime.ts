@@ -5,6 +5,9 @@
  */
 import { AUTH, BASE, ET_POLL_S, REQUESTOR, STALE_REALTIME_S } from "./config.js";
 import { describeError, fetchCts } from "./cts.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 interface Visit {
   line: string;
@@ -40,6 +43,34 @@ let courses: Course[] = [];
 let stopPos = new Map<string, { lat: number; lon: number }>();
 /** Modes des véhicules qui desservent chaque quai (« 319A » → tram), d'après les courses vues ; cumulé d'un chargement à l'autre */
 const quayModes = new Map<string, Set<string>>();
+/** Lignes qui desservent chaque quai (« 527C » → A, B…) : la liste des arrêts de la CTS ne le dit pas */
+const quayLines = new Map<string, Set<string>>();
+
+/* Modes et lignes des quais, gardés dans le dossier d'état : un redémarrage (ou une journée sans tram) ne les fait pas oublier */
+const here = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.basename(path.dirname(here)) === "dist" ? path.join(here, "..", "..") : path.join(here, "..");
+const QUAYS_FILE = path.join(process.env.STATE_DIR ?? path.join(ROOT, "state"), "quays.json");
+let quaysDirty = false;
+try {
+  const saved = JSON.parse(fs.readFileSync(QUAYS_FILE, "utf8")) as Record<string, { m?: string[]; l?: string[] }>;
+  for (const [code, q] of Object.entries(saved)) {
+    if (q.m?.length) quayModes.set(code, new Set(q.m));
+    if (q.l?.length) quayLines.set(code, new Set(q.l));
+  }
+} catch { /* premier démarrage */ }
+setInterval(() => {
+  if (!quaysDirty) return;
+  quaysDirty = false;
+  const codes = new Set([...quayModes.keys(), ...quayLines.keys()]);
+  const out = Object.fromEntries([...codes].map(c => [c, { m: [...(quayModes.get(c) ?? [])], l: [...(quayLines.get(c) ?? [])] }]));
+  try { fs.mkdirSync(path.dirname(QUAYS_FILE), { recursive: true }); fs.writeFileSync(QUAYS_FILE + ".tmp", JSON.stringify(out)); fs.renameSync(QUAYS_FILE + ".tmp", QUAYS_FILE); }
+  catch (e) { console.warn("Quais : état non enregistré :", e instanceof Error ? e.message : e); }
+}, 5 * 60_000).unref();
+
+const learn = (map: Map<string, Set<string>>, code: string, value: string): void => {
+  const set = map.get(code) ?? map.set(code, new Set()).get(code)!;
+  if (!set.has(value)) { set.add(value); quaysDirty = true; }
+};
 let loadedAt = 0;
 let validUntil = "";
 let lastError = "";
@@ -142,7 +173,7 @@ async function refresh(): Promise<void> {
     const now = Date.now(), ids = new Set(p.list.map(c => c.id));
     const recent = courses.filter(c => !ids.has(c.id) && c.calls[c.calls.length - 1].arr > now - 45 * 60_000);
     byCode = p.byCode; courses = [...p.list, ...recent]; validUntil = p.validUntil; loadedAt = now; lastError = "";
-    for (const c of p.list) if (c.mode) for (const call of c.calls) (quayModes.get(call.code) ?? quayModes.set(call.code, new Set()).get(call.code)!).add(c.mode);
+    for (const c of p.list) for (const call of c.calls) { if (c.mode) learn(quayModes, call.code, c.mode); if (c.line) learn(quayLines, call.code, c.line); }
     Object.assign(counts, { courses: p.courses, passages: p.passages, quais: p.byCode.size });
     if (counts.chargements++ === 0) console.log(`Passages du réseau chargés : ${p.courses} courses, ${p.byCode.size} quais`);
   } catch (e) {
@@ -196,6 +227,11 @@ export function snapshot(now = Date.now()): { courses: Course[]; stopPos: Map<st
 }
 
 /** Mode de chaque quai : « tram », « bus », ou « tram+bus » si les deux s'y arrêtent */
+/** Lignes de chaque quai, triées (« 527C » → ["B", "C", "F"]) */
+export function quayLinesJson(): Record<string, string[]> {
+  return Object.fromEntries([...quayLines].map(([k, v]) => [k, [...v].sort()]));
+}
+
 export function quayModesJson(): Record<string, string> {
   return Object.fromEntries([...quayModes].map(([k, v]) => [k, [...v].sort().join("+")]));
 }

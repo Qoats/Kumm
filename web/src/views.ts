@@ -1,6 +1,6 @@
 import type { Place, Stop, StopDeparture } from "../../shared/types";
 import { CONFIG, VERSION } from "./config";
-import { ALL_LINES, COLORS, DIRS, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
+import { ALL_LINES, COLORS, DIRS, TRAMS, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES } from "./themes";
@@ -547,8 +547,18 @@ export function stopTabs(modes: readonly ("tram" | "bus" | "ter")[], cur: "tram"
 }
 
 /** Fiche d'un arrêt : infos trafic qui le concernent (un arrêt sans passage est souvent un arrêt non desservi) */
-export function stopNotice(name: string): string {
-  return messagesForStop(name).slice(0, 3).map(m => `<button class="stopnote" data-act="msgs">
+export function stopNotice(s: { name: string; lines: string[] }, noDeparture = false): string {
+  let list = messagesForStop(s.name);
+  if (noDeparture) {
+    // aucun passage : on montre aussi les infos trafic des lignes de l'arrêt (ex. réseau tram interrompu), qui ne citent pas
+    // forcément son nom ; incidents comme changements prévus (la CTS classe « réseau tram interrompu » dans les seconds).
+    // Station de tram dont les lignes ne sont pas encore connues : lignes de tram A à F.
+    const lines = s.lines.length ? s.lines.map(l => lineLabel(l)) : kindOfStop(s) === "tram" ? TRAMS : [];
+    const cited = new Set(list);
+    const score = (m: typeof MESSAGES[number]): number => m.lines.filter(l => lines.includes(lineLabel(l))).length + (cited.has(m) ? 1 : 0);
+    list = MESSAGES.filter(m => score(m) > 0).sort((a, b) => score(b) - score(a));
+  }
+  return list.slice(0, noDeparture ? 4 : 3).map(m => `<button class="stopnote" data-act="msgs">
       <span class="sn-i">!</span><span><b>${esc(m.title)}</b>${m.period ? `<small>${esc(m.period)}</small>` : ""}${m.lines.length ? `<span class="sn-l">${m.lines.slice(0, 6).map(l => lineChip(l, true)).join("")}</span>` : ""}</span></button>`).join("");
 }
 
