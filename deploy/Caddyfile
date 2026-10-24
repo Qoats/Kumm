@@ -5,6 +5,9 @@ kumm.fr {
 	root * /srv/site
 	encode zstd gzip
 	file_server
+	# pages : le navigateur redemande toujours si elles ont changé (sinon il garde l'ancienne version des heures)
+	@pages path / *.html
+	header @pages Cache-Control "no-cache"
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin

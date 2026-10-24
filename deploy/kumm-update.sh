@@ -9,7 +9,16 @@ main() {
   cd "$(dirname "$(readlink -f "$0")")/.." || exit 1
   exec 9>/tmp/kumm-update.lock; flock -n 9 || exit 0
   update_apk
+  update_caddy
   update_server
+}
+
+# Caddyfile modifié depuis le dernier passage : Caddy redémarre pour le relire (git remplace le fichier, et un conteneur
+# déjà lancé garderait l'ancien). Lancé avant update_server, qui s'arrête quand main n'a pas bougé.
+update_caddy() {
+  local h; h=$(sha256sum deploy/Caddyfile | cut -d' ' -f1)
+  [ "$h" = "$(cat ~/.kumm-caddy 2>/dev/null)" ] && return 0
+  docker compose restart caddy > /dev/null && echo "$h" > ~/.kumm-caddy && echo "Caddy : configuration rechargée"
 }
 
 update_apk() {
@@ -36,6 +45,7 @@ update_server() {
   git reset -q --hard "$new"
   if docker compose up -d --build && sleep 60 && curl -fsS -m 10 https://app.kumm.fr/health > /dev/null; then
     echo "OK : version ${new:0:7} en ligne"
+    update_caddy
     rm -f ~/.kumm-echec
     docker image prune -f > /dev/null
   else
