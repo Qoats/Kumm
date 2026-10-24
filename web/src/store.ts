@@ -31,6 +31,8 @@ export interface State {
   modal: Modal | null;
   /** adresses trouvées par la recherche (Base Adresse Nationale), pour le texte `q` */
   searchAddr: { q: string; items: Place[] } | null;
+  /** texte cherché dans « Mes arrêts favoris » */
+  favQ: string;
   /** écran à retrouver en quittant l'écran des itinéraires (ouvert par « Naviguer ») */
   tripBack: { tab: Tab; overlay: Overlay } | null;
   trip: {
@@ -88,7 +90,7 @@ export const stopById = (id: string): Stop | undefined => STOPS.find(s => s.id =
 export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now()) / 60000));
 
 export const S: State = {
-  tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null, searchAddr: null, tripBack: null,
+  tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null, searchAddr: null, favQ: "", tripBack: null,
   trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", ridePrompt: null, riding: null, follow: null, onb: null, upd: null
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }

@@ -539,8 +539,21 @@ export function overlayHelp(): string {
   </div></main></div>`;
 }
 
+/** Favoris : recherche d'un arrêt (sans accents ni majuscules), favoris actuels en haut, puis tous les arrêts par ordre alphabétique */
+const FAV_MAX = 80;
 export function overlayFavs(): string {
-  return `<div class="overlay">${bar("Mes arrêts favoris")}<main><div class="pad"><p style="color:var(--mute);margin-top:0">Touchez le cœur pour afficher un arrêt dans « Prochains passages ».</p>${STOPS.slice(0, 200).map(s => `<div class="item"><span style="flex:1">${esc(s.name)}</span><button class="star ${S.fav.includes(s.id) ? "on" : ""}" data-fav="${esc(s.id)}" aria-label="Favori">${ic("heart")}</button></div>`).join("")}</div></main></div>`;
+  const q = fold(S.favQ);
+  const row = (s: Stop): string => `<div class="item"><span style="flex:1;min-width:0">${esc(s.name)}<span class="ml fl">${s.lines.slice(0, 5).map(l => lineChip(l, true)).join("")}</span></span><button class="star ${S.fav.includes(s.id) ? "on" : ""}" data-fav="${esc(s.id)}" aria-label="${S.fav.includes(s.id) ? "Retirer des favoris" : "Ajouter aux favoris"}">${ic("heart")}</button></div>`;
+  const mine = S.fav.map(stopById).filter((s): s is Stop => !!s);
+  const all = STOPS.filter(s => !S.fav.includes(s.id) && (!q || fold(s.name).includes(q))).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  return `<div class="overlay">${bar("Mes arrêts favoris")}<main><div class="pad">
+    <div class="search" style="margin-bottom:12px"><input id="fq" value="${esc(S.favQ)}" placeholder="Rechercher un arrêt…" autocomplete="off" enterkeyhint="search"><span class="go">${ic("search")}</span></div>
+    <p style="color:var(--mute);margin-top:0">Touchez le cœur pour afficher un arrêt dans « Prochains passages ».</p>
+    ${mine.length && !q ? `<div class="sub">Mes favoris</div>${mine.map(row).join("")}` : ""}
+    <div class="sub">${q ? "Résultats" : "Tous les arrêts"}</div>
+    ${all.length ? all.slice(0, FAV_MAX).map(row).join("") : `<div class="empty">Aucun arrêt pour « ${esc(S.favQ)} »</div>`}
+    ${all.length > FAV_MAX ? `<p class="src" style="text-align:center;margin-top:12px">${all.length - FAV_MAX} autres arrêts : précisez la recherche.</p>` : ""}
+  </div></main></div>`;
 }
 
 /* ============ PASSAGES ============ */

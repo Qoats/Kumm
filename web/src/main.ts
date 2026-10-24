@@ -321,7 +321,7 @@ app.addEventListener("click", e => {
     case "whenOk": if (S.trip.whenDraft) S.trip.when = S.trip.whenDraft; S.trip.whenDraft = null; S.trip.sel = 0; break;
     case "sheet": if (S.swiped) return; S.sheet = S.sheet === 0 ? 1 : S.sheet === 2 ? 1 : 0; break;
     case "msgs": S.overlay = { k: "msgs" }; break;
-    case "favs": S.overlay = { k: "favs" }; break;
+    case "favs": S.overlay = { k: "favs" }; S.favQ = ""; break;
     case "locate": recenter(); toast("Position centrée"); return;
     case "zoomIn": zoomBy(1); return;
     case "zoomOut": zoomBy(-1); return;
@@ -494,6 +494,7 @@ function askSuggestions(field: "from" | "to"): void {
 
 app.addEventListener("input", e => {
   const t = e.target as HTMLInputElement;
+  if (t.id === "fq") { S.favQ = t.value; render(); return; }
   if (t.id === "sq") {
     S.q = t.value; render(); searchAddresses();
     // codes de trajet des véhicules : positions chargées au besoin (au plus toutes les 20 s)
