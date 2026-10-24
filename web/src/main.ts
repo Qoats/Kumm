@@ -19,7 +19,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
+  overlayAccount, overlayHelp, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -37,7 +37,7 @@ import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { refreshVehicles } from "./vehicles";
 import { hideSplash } from "./splash";
-import { followFromSearch, mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
+import { followFromSearch, showOnMap, mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
 import { answerRide, rideBanner, rideDebug, startRideDetection, stopRideDetection, stopSharing } from "./ride";
@@ -78,7 +78,7 @@ function draw(): void {
   else body = `<main>${screenBuy()}</main>`;
 
   const o = S.overlay;
-  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : overlayFavs();
+  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : overlayFavs();
 
   // positions de défilement de toutes les zones (listes, fiches, rangées de catégories…), par écran : voir scroll.ts
   const screen = o ? `${t}|${o.k}:${"id" in o ? String(o.id) : ""}` : t;
@@ -221,7 +221,7 @@ async function loadDeps(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-more],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -309,7 +309,6 @@ app.addEventListener("click", e => {
   if (d.stop) { S.overlay = { k: "stop", id: d.stop }; render(); return; }
   if (d.f) { S.filter = d.f as Filter; render(); return; }
   if (d.fav) { toggleFav(d.fav); return; }
-  if (d.more) { toast(d.more + " : bientôt disponible"); return; }
   switch (d.act) {
     case "closeOverlay": S.overlay = null; break;
     case "tabHome":
@@ -326,7 +325,10 @@ app.addEventListener("click", e => {
     case "locate": recenter(); toast("Position centrée"); return;
     case "zoomIn": zoomBy(1); return;
     case "zoomOut": zoomBy(-1); return;
-    case "account": toast("Mon compte : bientôt disponible"); return;
+    case "account": S.overlay = { k: "account" }; break;
+    case "help": S.overlay = { k: "help" }; break;
+    case "mapParkings": showOnMap(["pr"]); return;
+    case "mapBikes": showOnMap(["velhop", "velopark"], true); return;
     case "prefs": S.overlay = { k: "settings" }; break;
     case "checkUpdate": void offerUpdate(true); return;
     case "unfollow": S.follow = null; break;

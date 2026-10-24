@@ -451,6 +451,11 @@ a.box,.more a{text-decoration:none;color:inherit}
 .srow{display:flex;align-items:stretch;gap:8px}.srow .item{flex:1;min-width:0}
 .sgo{flex:none;align-self:center;width:48px;height:44px;border:0;border-radius:14px;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer}
 .sgo svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2}
+.hlink{display:flex;align-items:center;gap:12px;margin-bottom:10px;width:100%;text-decoration:none;color:inherit}
+.hlink small{display:block;color:var(--mute);font-size:13.5px;margin-top:2px}
+.hl-i{flex:none;width:40px;height:40px;border-radius:12px;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center}
+.hl-i svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}
+.faq{display:block;margin-bottom:10px}.faq summary{font-weight:700;cursor:pointer}.faq p{margin:8px 0 0;color:var(--mute)}
 .stalenote{margin:0 0 10px;padding:8px 12px;border-radius:12px;background:var(--chip);color:var(--mute);font-size:13.5px;font-weight:700;text-align:center}
 /* véhicule suivi sur la carte : repère mis en avant, panneau à sa place */
 .vfollow{z-index:2000!important}

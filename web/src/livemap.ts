@@ -259,6 +259,23 @@ function aboveSheet(m: L.Map, ll: L.LatLng): L.LatLng {
   return m.containerPointToLatLng(m.latLngToContainerPoint(ll).add([0, sheet / 2]));
 }
 
+/**
+ * « Parkings », « Vélo » : la carte avec seulement ces catégories. near : autour de vous, d'assez près pour voir les stations
+ * (les Vélhop ne s'affichent pas de loin) ; sinon cadrée sur tous les points (les 12 P+R restent visibles de loin).
+ */
+export function showOnMap(kinds: Layer[], near = false): void {
+  for (const k of Object.keys(S.layers) as Layer[]) S.layers[k] = kinds.includes(k);
+  Object.assign(S, { tab: "nearby", overlay: null, follow: null, sheet: 0 });
+  render();
+  const pts = POIS.filter(p => kinds.includes(p.kind)).map(p => [p.lat, p.lon] as L.LatLngTuple);
+  if (!pts.length) toast("Données momentanément indisponibles");
+  if (!map) return;
+  if (near) map.setView([USER.lat, USER.lon], ICON_ZOOM - 1, { animate: false });
+  else if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 15, animate: false });
+  // la rangée des catégories montre celles qui sont affichées
+  document.querySelector<HTMLElement>(`.lyr[data-layer="${kinds[0]}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
+}
+
 /** Véhicule trouvé par la recherche (code du trajet) : la carte s'ouvre centrée sur lui, et le suit */
 export function followFromSearch(id: string): void {
   const v = VEHICLES.get(id);

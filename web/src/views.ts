@@ -5,7 +5,7 @@ import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, h
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES } from "./themes";
-import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_POINTS_DE_VENTE, CTS_SITE, isIOS } from "./links";
+import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_FLEXHOP, CTS_OBJETS_TROUVES, CTS_PLANS, CTS_POINTS_DE_VENTE, CTS_SITE, KUMM_CONTACT, isIOS } from "./links";
 import type { Layer } from "./kinds";
 import { marker, markerIcon } from "./markers";
 import { ic, type IconName } from "./icons";
@@ -106,9 +106,10 @@ export function bar(title: string, back?: string): string {
 /* ============ ÉCRANS ============ */
 export function screenHome(): string {
   const favStops = S.fav.map(stopById).filter((s): s is Stop => !!s);
-  const more: [string, string, IconName, string?][] = [
-    ["Mon compte", "#EF8B00", "user2"], ["Flex’hop", "#fff", "clock"], ["Objets perdus", "#00BFA5", "lost"], ["Parkings", "#1B6EC2", "parking"],
-    ["Points de vente", "#C0892F", "store", CTS_POINTS_DE_VENTE], ["Plans", "#D582E1", "map"], ["Vélo", "#86B80B", "bike"], ["FAQ/ Contact", "#AAB4BC", "help"]
+  // [libellé, couleur, icône, lien officiel ou action de l'application]
+  const more: [string, string, IconName, string][] = [
+    ["Mon compte", "#EF8B00", "user2", "act:account"], ["Flex’hop", "#fff", "clock", CTS_FLEXHOP], ["Objets perdus", "#00BFA5", "lost", CTS_OBJETS_TROUVES], ["Parkings", "#1B6EC2", "parking", "act:mapParkings"],
+    ["Points de vente", "#C0892F", "store", CTS_POINTS_DE_VENTE], ["Plans", "#D582E1", "map", CTS_PLANS], ["Vélo", "#86B80B", "bike", "act:mapBikes"], ["FAQ/ Contact", "#AAB4BC", "help", "act:help"]
   ];
   return `<div class="pad">
     <div class="qa"><button data-tab="search"><span class="qi">${ic("navigate")}</span>Naviguer</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>Carte</button><button data-tab="buy"><span class="qi">${ic("ticket")}</span>Billets</button></div>
@@ -125,7 +126,7 @@ export function screenHome(): string {
     <button class="box" data-tab="search"><span>Trouvez les horaires d’une ligne à un arrêt</span><span class="rb">${ic("clock")}</span></button>
 
     <h2>En plus</h2>
-    <div class="more">${more.map(m => { const inner = `<div class="c" style="background:${m[1]}">${m[1] === "#fff" ? '<b style="color:#999;font-size:20px;line-height:1">flex<br>hop</b>' : ic(m[2])}</div>${m[0].replace(" ", "<br>")}`; return m[3] ? `<a href="${m[3]}" target="_blank" rel="noopener noreferrer">${inner}</a>` : `<button data-more="${m[0]}">${inner}</button>`; }).join("")}</div>
+    <div class="more">${more.map(m => { const inner = `<div class="c" style="background:${m[1]}">${m[1] === "#fff" ? '<b style="color:#999;font-size:20px;line-height:1">flex<br>hop</b>' : ic(m[2])}</div>${m[0].replace(" ", "<br>")}`; return m[3].startsWith("act:") ? `<button data-act="${m[3].slice(4)}">${inner}</button>` : `<a href="${m[3]}" target="_blank" rel="noopener noreferrer">${inner}</a>`; }).join("")}</div>
 
     <p class="ver">Kumm v${VERSION}${CONFIG.USE_MOCK ? " · démonstration : données fictives" : ""}</p>
   </div>`;
@@ -500,6 +501,42 @@ export function overlayMsgs(): string {
     ${MESSAGES.length ? "" : `<div class="empty">${empty}</div>`}
     <button class="go" data-act="prefs" style="margin:6px 0 12px">🔔 ${S.alerts.enabled ? "Gérer mes alertes" : "Recevoir une alerte en cas de perturbation"}</button>
     <small style="color:var(--mute);display:block">${CONFIG.USE_MOCK ? "Messages fictifs (mode démonstration)." : "Source : CTS, infos trafic en temps réel (mises à jour toutes les 5 minutes)."}</small></div></main></div>`;
+}
+
+const ext = (href: string, label: string, sub: string, icon: IconName): string =>
+  `<a class="box hlink" href="${esc(href)}" target="_blank" rel="noopener noreferrer"><span class="hl-i">${ic(icon)}</span><span style="flex:1"><b>${esc(label)}</b><small>${esc(sub)}</small></span>${ic("chev", 'width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"')}</a>`;
+const act = (a: string, label: string, sub: string, icon: IconName): string =>
+  `<button class="box hlink" data-act="${a}"><span class="hl-i">${ic(icon)}</span><span style="flex:1;text-align:left"><b>${esc(label)}</b><small>${esc(sub)}</small></span>${ic("chev", 'width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"')}</button>`;
+
+/** « Mon compte » : Kumm ne demande aucun compte ; tout reste sur le téléphone. Le compte Badgéo se gère chez la CTS. */
+export function overlayAccount(): string {
+  return `<div class="overlay">${bar("Mon compte")}<main><div class="pad">
+    <div class="box" style="display:block;margin-bottom:16px"><b>Pas besoin de compte</b><p style="margin:6px 0 0;color:var(--mute)">Vos favoris, vos alertes et vos réglages restent sur ce téléphone. Kumm ne demande ni nom, ni adresse e-mail, ni mot de passe.</p></div>
+    ${act("favs", "Mes arrêts favoris", `${S.fav.length} arrêt${S.fav.length > 1 ? "s" : ""} affiché${S.fav.length > 1 ? "s" : ""} à l’accueil`, "heart")}
+    ${act("prefs", "Alertes et réglages", S.alerts.enabled ? "Alertes trafic activées" : "Thème, alertes trafic, présentation", "sliders")}
+    <div class="sub">Compte CTS (carte Badgéo, abonnements)</div>
+    ${ext(isIOS() ? CTS_APP_IOS : CTS_APP_ANDROID, "Application officielle CTS", "Votre compte, vos titres et votre carte Badgéo", "ticket")}
+  </div></main></div>`;
+}
+
+/** « FAQ / Contact » : questions fréquentes sur Kumm, contact de Kumm, et aide de la CTS pour les titres de transport */
+export function overlayHelp(): string {
+  const qa: [string, string][] = [
+    ["Les horaires sont-ils en temps réel ?", "Oui quand la CTS ou la SNCF les publient en temps réel (petit signal à côté des minutes) ; sinon ce sont les horaires prévus."],
+    ["La position des trams, bus et trains est-elle un GPS ?", "Non : elle est estimée d’après les horaires. Quand un voyageur partage son trajet, la position devient réelle pour tout le monde."],
+    ["Comment aller quelque part ?", "Cherchez un arrêt, une adresse ou un lieu dans Recherche, puis touchez « Naviguer » : transports, à pied ou à vélo."],
+    ["Kumm vend-il des billets ?", "Non. Les titres de transport s’achètent dans l’application officielle de la CTS, en agence ou dans les points de vente."],
+    ["Mes données sont-elles collectées ?", "Non : pas de compte, pas de publicité, pas de pistage. Le détail est dans la page confidentialité."]
+  ];
+  return `<div class="overlay">${bar("FAQ et contact")}<main><div class="pad">
+    ${qa.map(([q, a]) => `<details class="box faq"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}
+    <div class="sub">Contacter Kumm</div>
+    ${ext("mailto:" + KUMM_CONTACT + "?subject=Kumm", "Écrire à Kumm", KUMM_CONTACT + " · un bug, une idée, une question sur l’application", "mail")}
+    <div class="sub">Titres de transport, carte Badgéo, réclamations</div>
+    ${ext(CTS_FAQ, "Aide de la CTS", "Questions fréquentes sur le réseau et les abonnements", "help")}
+    ${ext(CTS_CONTACT, "Contacter la CTS", "Pour tout ce qui concerne les titres de transport et le réseau", "phone")}
+    <p class="src" style="margin-top:14px">Kumm est une application indépendante, non affiliée à la CTS.</p>
+  </div></main></div>`;
 }
 
 export function overlayFavs(): string {
