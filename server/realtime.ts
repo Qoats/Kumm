@@ -28,12 +28,14 @@ export interface Course {
   line: string;
   dest: string;
   realTime: boolean;
-  /** « tram » ou « bus », d'après la CTS (Extension.VehicleMode) */
+  /** « tram » ou « bus », d'après la CTS (Extension.VehicleMode) ; « ter » pour les trains */
   mode: string;
   /** arr, dep : horaires estimés (temps réel) ; aim : horaire prévu (théorique), pour calculer un retard */
   calls: { code: string; name: string; arr: number; dep: number; aim?: number }[];
   /** départ prévu (horaire théorique, qui ne bouge pas avec les retards) : sert au code du trajet */
   aimed?: number;
+  /** numéro du train (trains TER seulement) */
+  num?: string;
 }
 
 /** Passages à venir, par code de quai CTS (« 412D ») */

@@ -91,9 +91,10 @@ Pour ajouter une couleur ou un thème : tout est dans `web/src/style.css` (varia
 
 ## Comment un arrêt est classé tram / bus / TER
 Par son **nom**, d'après des listes trouvées sur internet (fichier `web/src/network.ts`) :
-- stations de tram : index des stations du plan du tramway de Strasbourg (version du 19 janvier 2026) + les stations de la ligne F prolongée vers Wolfisheim citées par la CTS ;
-- gares TER : les 13 gares de l'Eurométropole de la FAQ officielle de la CTS.
-Un arrêt absent des listes est un arrêt de bus. L'écriture n'a pas d'importance (accents, majuscules, tirets, « / » sont ignorés).
+- stations de tram : index des stations du plan du tramway de Strasbourg (version du 19 janvier 2026) + les stations de la ligne F prolongée vers Wolfisheim citées par la CTS.
+Un arrêt CTS absent de la liste est un arrêt de bus.
+Les **gares TER** sont les 13 gares SNCF de l'Eurométropole (`shared/ter.ts`, code UIC et position) : elles ont leur propre
+repère et leur tableau des départs. Strasbourg-Ville est rattachée à « Gare Centrale » (onglets Tous / Tram / Bus / Train). L'écriture n'a pas d'importance (accents, majuscules, tirets, « / » sont ignorés).
 Si une station de tram s'affiche comme un bus, ajoutez son nom dans `TRAM_STATIONS`. Pour trouver les oublis, dans la console du navigateur (F12) :
 
     __kumm.STOPS.filter(s => __kumm.kindOfStop(s)==="bus" && s.lines.some(l => /^[A-F]$/.test(l))).map(s => s.name)
@@ -112,13 +113,21 @@ Les fonds de carte viennent des serveurs publics d'OpenStreetMap, faits pour un 
 | Stations Vélhop + vélos disponibles | flux GBFS `gbfs.nextbike.net/maps/gbfs/v2/nextbike_ae/fr/` (jeu « VLS Vélhop Strasbourg » sur transport.data.gouv.fr, Licence Ouverte 2.0) |
 | Véloparks | page « Véloparcs CTS (P+V) » de cts-strasbourg.eu (sites, placés sur les arrêts du même nom) ; VéloParcs Gare et Sainte-Aurélie : strasbourg.eu « Où garer son vélo à Strasbourg ? » |
 | Stations de tram | index du plan du tramway de Strasbourg v2.12 (cartometro.com) + avis CTS (ligne F prolongée) |
-| Gares TER | FAQ de la CTS : les 13 gares de l'Eurométropole |
+| Gares TER, horaires et temps réel des trains | SNCF, données ouvertes (transport.data.gouv.fr) : horaires GTFS `Export_OpenData_SNCF_GTFS_NewTripId.zip` (téléchargés une fois par jour, gardés dans `state/ter-gtfs.zip`) et temps réel GTFS-RT `sncf-gtfs-rt-trip-updates` (toutes les `TER_POLL_S` secondes) ; voir `server/ter.ts` |
+| Voies ferrées (trains sur la carte) | © contributeurs OpenStreetMap (ODbL) : voies principales autour de Strasbourg extraites par `node scripts/build-rail.mjs` dans `data/rail.json` (relancé chaque nuit avec les tracés) |
 | Fonds de carte, marche à pied | © contributeurs OpenStreetMap (tuiles relayées par le serveur ; routage `routing.openstreetmap.de`) |
 | Adresses | Base Adresse Nationale (`api-adresse.data.gouv.fr`) |
 | Trajets avec correspondances | Transitous / MOTIS (`api.transitous.org`) |
 | Tracés des lignes (véhicules sur la carte) | © contributeurs OpenStreetMap (ODbL) : itinéraires CTS extraits par `npm run build:shapes` dans `data/shapes.json` (à relancer quand le réseau change) |
 | Carte 3D du guidage | OpenFreeMap (`tiles.openfreemap.org`, tuiles vectorielles OpenMapTiles, © contributeurs OpenStreetMap), affichée avec MapLibre GL ; repli sur la carte 2D si le téléphone ne sait pas l'afficher |
-Pas encore branchés : Flex'hop (zones de transport à la demande) ; les gares TER n'ont pas de position dans cette version.
+Pas encore branchés : Flex'hop (zones de transport à la demande) ; les TGV et Intercités (seuls les TER sont affichés).
+
+## Trains TER
+- Seuls les trains qui desservent une gare de l'Eurométropole sont gardés en mémoire (environ 1 000 par semaine).
+- Un train absent du temps réel SNCF roule à l'heure ; un retard annoncé à une gare est reporté sur les gares suivantes.
+- Sur la carte, la position d'un train est estimée d'après ses horaires (comme les trams et bus), le long des voies de `data/rail.json`
+  (en ligne droite si ce fichier manque). Son code de trajet est `terelsass` + numéro du train (« Elsàss » : l'Alsace en alsacien).
+- `/health` → `trains_ter` : nombre de trains, âge du temps réel, dernière erreur. `TER_POLL_S=0` désactive les trains.
 
 ## Carte : catégories de points
 Chaque catégorie a sa couleur, sa forme et son symbole : Tram (cercle bleu), Bus (carré turquoise), Vélhop (cercle vert), Vélopark (losange vert foncé, « P »), P+R (hexagone bleu), Flex'hop (écusson rose) et Gare TER (octogone violet). Les boutons en haut de la carte affichent ou masquent chaque catégorie.

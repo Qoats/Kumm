@@ -124,4 +124,4 @@ export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed:
   return { state: "En route", speed: secs > 0 ? Math.round((meters / secs) * 3.6) : null, next };
 }
 
-export const vehicleKind = (v: Vehicle): "tram" | "bus" => (v.m === "tram" ? "tram" : v.m === "bus" ? "bus" : isTram(v.line) ? "tram" : "bus");
+export const vehicleKind = (v: Vehicle): "tram" | "bus" | "ter" => (v.m === "ter" ? "ter" : v.m === "tram" ? "tram" : v.m === "bus" ? "bus" : isTram(v.line) ? "tram" : "bus");

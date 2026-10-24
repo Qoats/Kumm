@@ -9,6 +9,9 @@ import type { Course } from "./realtime.js";
 const KEEP_MS = 2 * 60_000;
 const MAX_OFF_ROUTE_M = 300;
 
+/** Position d'un arrêt d'après son code (quai CTS ou gare « SNCF:… ») */
+export interface StopPos { get(code: string): { lat: number; lon: number } | undefined }
+
 export interface RideReport { lat: number; lon: number; t: number; speed: number | null }
 
 /** course → dernières positions partagées (une par voyageur anonyme, au plus 5) */
@@ -47,7 +50,7 @@ export function locateOnCourse(p: { lat: number; lon: number }, calls: { p: { la
  * Position envoyée par un voyageur : { trip, lat, lon, speed? }. Refusée si la course est inconnue ou terminée, ou si la
  * position est trop loin de son trajet (erreur de détection, ou fausse position).
  */
-export function receiveRide(body: unknown, courses: Course[], stopPos: Map<string, { lat: number; lon: number }>): { status: number; msg: string } {
+export function receiveRide(body: unknown, courses: Course[], stopPos: StopPos): { status: number; msg: string } {
   const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
   const trip = typeof b["trip"] === "string" ? b["trip"].slice(0, 120) : "";
   const lat = Number(b["lat"]), lon = Number(b["lon"]);

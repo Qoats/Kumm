@@ -17,10 +17,12 @@ import { serveUpdate, updateStatus } from "./updates.js";
 import { WEB_PRIVATE, allowed, loginRoute, logoutRoute } from "./access.js";
 import { serveTile } from "./tiles.js";
 import { parseGeneralMessages } from "./messages.js";
-import { vehiclesAt } from "./vehicles.js";
+import { allCourses, vehiclesAt } from "./vehicles.js";
+import { startTer, terStatus, trainDepartures } from "./ter.js";
+import { TER_STATIONS_EMS } from "../shared/ter.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
 import type { TrafficMessage } from "./messages.js";
-import { quayLinesJson, quayModesJson, realtimeStatus, setStopIndex, snapshot, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
+import { quayLinesJson, quayModesJson, realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
 import { receiveRide, rideStatus } from "./ride.js";
 import type { CtsResult } from "./cts.js";
 
@@ -169,6 +171,12 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
   // mode des quais (tram ou bus) : place le repère d'une station de tram sur ses quais de tram, pas entre le tram et les bus
   if (name === "quay-lines") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(quayLinesJson()), undefined, { cache: "public, max-age=600" });
   if (name === "quay-modes") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(quayModesJson()), undefined, { cache: "public, max-age=600" });
+  // départs des trains d'une gare de l'Eurométropole (horaires SNCF recalés en temps réel), recalculés au plus toutes les 20 s
+  if (name === "trains") {
+    const uic = url.searchParams.get("gare") ?? "";
+    if (!TER_STATIONS_EMS.some(s => s.uic === uic)) return send(res, 404, "text/plain", "Gare inconnue");
+    return cached(res, "info:trains:" + uic, 20, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify({ now: Date.now(), trains: trainDepartures(uic) }) }));
+  }
   if (name === "vehicles") return cached(res, "info:vehicles", 5, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(vehiclesAt()) }));
   const conf = ALLOWED[name];
   if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
@@ -263,6 +271,7 @@ function health(res: ServerResponse): Promise<void> {
     alertes: alertsStatus(),
     apk: updateStatus(),
     trajets_partages: rideStatus(),
+    trains_ter: terStatus(),
     acces_web_prive: WEB_PRIVATE,
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });
@@ -316,8 +325,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     try { body = JSON.parse(await readBody(req)); } catch { return send(res, 400, "text/plain", "Requête invalide"); }
     if (url.pathname === "/api/ride") {
       // position partagée par un voyageur à bord (voir ride.ts)
-      const snap = snapshot();
-      const r = snap ? receiveRide(body, snap.courses, snap.stopPos) : { status: 503, msg: "Réseau indisponible" };
+      const all = allCourses();
+      const r = all.courses.length ? receiveRide(body, all.courses, all.stopPos) : { status: 503, msg: "Réseau indisponible" };
       return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
     }
     const r = subscribe(body);
@@ -367,6 +376,7 @@ server.listen(PORT, () => {
   console.log(`Kumm ${VERSION} : http://localhost:${PORT}`);
   void prefetch();
   startRealtime();
+  startTer();
   startAlerts(currentMessages);
   setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
 });

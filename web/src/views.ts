@@ -1,6 +1,7 @@
 import type { Place, Stop, StopDeparture } from "../../shared/types";
+import type { TrainDeparture } from "../../shared/ter";
 import { CONFIG, VERSION } from "./config";
-import { ALL_LINES, COLORS, DIRS, TRAMS, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
+import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES } from "./themes";
@@ -227,7 +228,7 @@ function followPanel(f: { id: string; paused: boolean }): string {
     </div>
     ${f.paused ? `<button class="go fre" data-act="refollow">${ic("target", 'stroke="currentColor"')} Suivre de nouveau</button>` : ""}
     <div class="list"><div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div><div id="fv-stops">${followStops(info.next)}</div></div>
-      <small class="src" style="display:block;margin-top:10px">Position et vitesse estimées d'après les horaires de la CTS : ce n'est pas un GPS.</small></div>`;
+      <small class="src" style="display:block;margin-top:10px">Position et vitesse estimées d'après les horaires ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small></div>`;
 }
 
 export function overlayVehicle(id: string): string {
@@ -239,12 +240,12 @@ export function overlayVehicle(id: string): string {
     return `<div class="stopline vn"><span class="d"></span><span class="r">${esc(name)}</span><b>${m < 1 ? "à l'approche" : m + " min"}</b></div>`;
   }).join("");
   const wait = v.w ? Math.max(0, Math.round((v.a[2] - now) / 60000)) : null;
-  return `<div class="overlay">${bar("Ligne " + lineLabel(v.line))}<main><div class="pad">
+  return `<div class="overlay">${bar(v.m === "ter" ? "Train TER" : "Ligne " + lineLabel(v.line))}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(v.line)}<b style="font-size:18px">vers ${esc(v.dest)}</b></div>
     ${v.g ? `<div class="fshared" style="margin:0 0 10px"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
     ${wait !== null ? `<div class="box vwait"><b>Au terminus</b><span>Départ ${wait < 1 ? "imminent" : `dans ${wait} min`}</span></div>` : ""}
-    ${v.n ? `<div class="vno">Trajet <b>${esc(v.n)}</b><small>Terminus de départ, ligne, date et heure de départ prévue.</small></div>` : ""}
-    <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} de la CTS : ce n'est pas un GPS.</small>
+    ${v.n ? `<div class="vno">Trajet <b>${esc(v.n)}</b><small>${v.m === "ter" ? "TER d’Alsace (Elsàss en alsacien) et numéro du train." : "Terminus de départ, ligne, date et heure de départ prévue."}</small></div>` : ""}
+    <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small>
     ${messagesFor(v.line).map(m => `<button class="box" data-act="msgs" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;text-align:left${m.channel === "disruption" ? ";border-color:#E8402F" : ""}"><span class="warn">!</span><span style="flex:1"><b>${esc(m.title)}</b>${m.period ? `<br><small style="color:var(--mute)">${esc(m.period)}</small>` : ""}</span></button>`).join("")}
     <div class="sub" style="margin-top:0">Prochains arrêts</div>
     <div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div>${next || '<div class="empty">Arrivée au terminus.</div>'}</div>
@@ -525,7 +526,8 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
   const rows = cards.slice(0, max).map(({ k, g, dests, dest, t }) => {
     const m = mins(t[0]), c = COLORS[g.line] ?? COLORS[lineLabel(g.line)] ?? "#999";
     const picker = dests.length > 1
-      ? `<div class="dirs${dests.length > 2 ? " many" : ""}" role="group" aria-label="Direction">${dests.map(x =>
+      // repère stable (data-scroll) : la position du sélecteur est gardée même si l'ordre des cartes change entre deux redessins
+      ? `<div class="dirs${dests.length > 2 ? " many" : ""}" role="group" aria-label="Direction" data-scroll="dirs-${esc(k)}">${dests.map(x =>
           `<button data-dirk="${esc(k)}" data-dirv="${esc(x)}" class="${x === dest ? "on" : ""}" aria-pressed="${x === dest}">${esc(x)}</button>`).join("")}</div>`
       : "";
     return `<div class="dep" role="button" tabindex="0" style="--lc:${c};--lt:${lineText(COLORS[g.line] ? g.line : lineLabel(g.line))}" data-stop="${esc(g.stop.id)}">
@@ -539,6 +541,23 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
   return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
 }
 
+/** Tableau des départs d'une gare, comme sur les écrans en gare : heure prévue, retard ou suppression, destination, numéro du train */
+export function trainBoard(list: TrainDeparture[], max = 15): string {
+  const now = Date.now();
+  const rows = list.filter(t => t.t > now - 60_000).slice(0, max).map(t => {
+    const late = !t.cancelled && (t.delay ?? 0) >= 60, m = mins(t.t);
+    const state = t.cancelled ? `<b class="tb-x">Supprimé</b>`
+      : late ? `<b class="tb-late">+${Math.round(t.delay! / 60)} min</b>`
+      : t.delay !== undefined ? `<span class="tb-ok">À l’heure</span>` : "";
+    return `<div class="tb-row${t.cancelled ? " off" : ""}">
+      <span class="tb-t">${late ? `<s>${hm(t.aim)}</s>${hm(t.t)}` : hm(t.aim)}</span>
+      <span class="tb-d"><b>${esc(t.dest)}</b><small>TER ${esc(t.num)} · ${esc(t.route)}</small></span>
+      <span class="tb-s">${state}${t.cancelled ? "" : `<small>${m < 1 ? "À quai" : m + " min"}</small>`}</span></div>`;
+  });
+  if (!rows.length) return '<div class="empty" style="padding:24px">Aucun train au départ dans les 4 prochaines heures</div>';
+  return `<div class="tboard"><div class="tb-h">${ic("train")}<span>Trains au départ</span><small>Horaires SNCF</small></div>${rows.join("")}</div>`;
+}
+
 /** Onglets des départs d'un arrêt desservi par plusieurs modes */
 export function stopTabs(modes: readonly ("tram" | "bus" | "ter")[], cur: "tram" | "bus" | "ter" | null): string {
   const lab = { tram: "Tram", bus: "Bus", ter: "Train" } as const, icn = { tram: "tram", bus: "bus", ter: "train" } as const;
@@ -547,7 +566,8 @@ export function stopTabs(modes: readonly ("tram" | "bus" | "ter")[], cur: "tram"
 }
 
 /** Fiche d'un arrêt : infos trafic qui le concernent (un arrêt sans passage est souvent un arrêt non desservi) */
-export function stopNotice(s: { name: string; lines: string[] }, noDeparture = false): string {
+export function stopNotice(s: { name: string; lines: string[]; sncf?: string }, noDeparture = false): string {
+  if (s.sncf && !isHub(s)) return "";   // gare SNCF seule : les infos trafic de la CTS ne la concernent pas
   let list = messagesForStop(s.name);
   if (noDeparture) {
     // aucun passage : on montre aussi les infos trafic des lignes de l'arrêt (ex. réseau tram interrompu), qui ne citent pas
@@ -613,7 +633,7 @@ export function overlaySettings(): string {
     ${S.alerts.enabled ? alertSettings() : ""}
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
-      <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro ; gares TER : CTS<br>Application indépendante, non affiliée à la CTS ni à l’Eurométropole</div>
+      <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires, temps réel) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
       <div class="src" style="margin-top:10px"><a href="https://kumm.fr/mentions-legales.html" target="_blank" rel="noopener">Mentions légales</a> · <a href="https://kumm.fr/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></div></div>
     <button class="ghost" data-act="replayOnb">Revoir la présentation</button>
     ${CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher une mise à jour</button>` : ""}

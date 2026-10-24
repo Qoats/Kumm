@@ -3,7 +3,9 @@ import type { Departure, Poi, PoiKind, Stop } from "../../shared/types";
 import type { AnnotatedStopPoint, SiriStopMonitoring, SiriStopPoints } from "../../shared/cts-api";
 import { appHeaders, CONFIG, url } from "./config";
 import { DIRS, isTram, kindOfStop } from "./data";
-import { stopKey } from "./network";
+import { isHubName, stopKey } from "./network";
+import { STRASBOURG_VILLE, TER_STATIONS_EMS } from "../../shared/ter";
+import type { TrainDeparture } from "../../shared/ter";
 import { parseLineInfo } from "./lines";
 import type { LineInfo } from "./lines";
 import type { TrafficMsg } from "./data";
@@ -48,6 +50,13 @@ export async function nextDepartures(stop: Stop): Promise<Departure[]> {
   debug.last = [];
   debug.info = { id: stop.id, name: stop.name, lines: stop.lines, kind: kindOfStop(stop), essais: candidates };
   let answered = false, lastError: unknown = null;
+  if (stop.sncf) {
+    // trains : une ligne « TER » par destination (le tableau détaillé de la fiche utilise TRAINS)
+    try {
+      for (const t of await nextTrains(stop.sncf)) if (!t.cancelled) (map["TER|" + t.dest] ??= { line: "TER", dest: t.dest, times: [] }).times.push(t.t);
+      answered = true;
+    } catch (e) { lastError = e; debug.last.push({ gare: stop.sncf, error: e instanceof Error ? e.message : String(e) }); }
+  }
   for (const ref of candidates) {
     try {
       const j = await get<SiriStopMonitoring>("/stop-monitoring?MonitoringRef=" + encodeURIComponent(ref));
@@ -119,9 +128,26 @@ export async function loadStops(): Promise<Stop[]> {
       if (id) g.lines.add(id);
     }
   }
-  return Object.values(by).map(g => ({
+  const stops: Stop[] = Object.values(by).map(g => ({
     id: g.id, name: g.name, refs: [...g.codes, ...g.quays], lat: g.lat / g.n, lon: g.lon / g.n, x: 0, y: 0, lines: [...g.lines], quays: g.pos
   }));
+  // gares TER de l'Eurométropole ; Strasbourg-Ville est rattachée à Gare Centrale (une seule fiche : trams, bus et trains)
+  for (const t of TER_STATIONS_EMS) {
+    const hub = t.uic === STRASBOURG_VILLE ? stops.find(s => isHubName(s.name)) : undefined;
+    if (hub) { hub.sncf = t.uic; hub.lines.push("TER"); continue; }
+    stops.push({ id: "SNCF:" + t.uic, name: t.name, refs: [], lat: t.lat, lon: t.lon, x: 0, y: 0, lines: ["TER"], sncf: t.uic });
+  }
+  return stops;
+}
+
+/** Derniers départs de trains connus de chaque gare (code UIC), pour le tableau des départs de sa fiche */
+export const TRAINS: Record<string, TrainDeparture[]> = {};
+
+/** Départs des trains d'une gare (horaires SNCF recalés en temps réel par le serveur) */
+export async function nextTrains(uic: string): Promise<TrainDeparture[]> {
+  const j = await get<{ trains: TrainDeparture[] }>("/trains?gare=" + encodeURIComponent(uic));
+  TRAINS[uic] = j.trains;
+  return j.trains;
 }
 
 /** Mode de chaque quai (« 319A » → « tram », « bus » ou « bus+tram »), d'après les passages en temps réel */

@@ -16,6 +16,8 @@ export interface Stop {
   refs?: string[];
   /** quais de l'arrêt (code StopCode et position) : sert à placer le repère d'une station de tram sur ses quais de tram */
   quays?: { code: string; lat: number; lon: number }[];
+  /** gare SNCF (code UIC) : départs des trains TER ; Gare Centrale est reliée à la gare de Strasbourg */
+  sncf?: string;
 }
 
 /** Prochains passages d'une ligne dans une direction (heures en millisecondes) */

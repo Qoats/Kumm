@@ -1,5 +1,5 @@
-# Tracés des lignes CTS (véhicules sur la carte) : téléchargés chaque nuit depuis OpenStreetMap.
-# Si le réseau a changé (nouvelle ligne, itinéraire modifié durablement), data/shapes.json est mis à jour sur main,
+# Tracés des lignes CTS et voies ferrées (véhicules et trains sur la carte) : téléchargés chaque nuit depuis OpenStreetMap.
+# Si le réseau a changé (nouvelle ligne, itinéraire modifié durablement), data/shapes.json ou data/rail.json est mis à jour sur main,
 # puis le serveur l'installe tout seul (mise à jour automatique du VPS). Sinon, rien n'est enregistré.
 name: Tracés des lignes
 
@@ -24,11 +24,15 @@ jobs:
       - name: Télécharger les tracés depuis OpenStreetMap
         run: node scripts/build-shapes.mjs
 
+      - name: Télécharger les voies ferrées depuis OpenStreetMap
+        continue-on-error: true     # sans elles, les trains vont en ligne droite : les tracés des lignes sont enregistrés quand même
+        run: node scripts/build-rail.mjs
+
       - name: Enregistrer s'ils ont changé
         run: |
-          if git diff --quiet -- data/shapes.json; then echo "Réseau inchangé : rien à enregistrer."; exit 0; fi
+          if [ -z "$(git status --porcelain -- data/shapes.json data/rail.json)" ]; then echo "Réseau inchangé : rien à enregistrer."; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/shapes.json
+          git add data/shapes.json data/rail.json
           git commit -m "Tracés des lignes mis à jour depuis OpenStreetMap"
           git push

@@ -5,8 +5,11 @@
  */
 import { snapshot } from "./realtime.js";
 import type { Course } from "./realtime.js";
+import type { StopPos } from "./ride.js";
 import { pathBetween } from "./shapes.js";
 import { locateOnCourse, sharedPosition } from "./ride.js";
+import { railBetween } from "./rail.js";
+import { terCourses, trainCode } from "./ter.js";
 
 /** [latitude, longitude, heure en ms] */
 type At = [number, number, number];
@@ -17,7 +20,7 @@ export interface Vehicle {
   dest: string;
   /** horaires recalés en temps réel par la CTS (sinon théoriques) */
   rt: boolean;
-  /** « tram » ou « bus » selon la CTS (vide si inconnu) */
+  /** « tram » ou « bus » selon la CTS, « ter » pour un train (vide si inconnu) */
   m: string;
   /** départ et arrivée du tronçon en cours (identiques si le véhicule est à quai) */
   a: At;
@@ -28,7 +31,7 @@ export interface Vehicle {
   next: [string, number][];
   /** tracé de la ligne entre a et b ([latitude, longitude][]), absent si inconnu (ligne droite) */
   p?: [number, number][];
-  /** code du trajet (« hoeb2610240612 » : terminus, ligne, date, heure de départ prévue) */
+  /** code du trajet (« hoeb2610240612 » : terminus, ligne, date, heure de départ prévue ; « terelsass830860 » pour un train) */
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course (a = b = quai et heure de départ) */
   w?: boolean;
@@ -52,16 +55,17 @@ function lengthM(pts: Pt[]): number {
  * donne des valeurs absurdes, car les horaires sont souvent arrondis à la minute. Plafonnée à une vitesse plausible.
  */
 function speedAhead(line: string, mode: string, calls: { code: string; dep: number; arr: number; p: { lat: number; lon: number } }[], i: number): number | null {
+  const pathOf = mode === "ter" ? (_l: string, _k: string, a: Pt, b: Pt) => railBetween(a, b) : pathBetween;
   let meters = 0;
   const last = Math.min(calls.length - 1, i + 3);
   for (let k = i; k < last; k++) {
     const a: Pt = [calls[k].p.lat, calls[k].p.lon], b: Pt = [calls[k + 1].p.lat, calls[k + 1].p.lon];
-    const path = pathBetween(line, `${calls[k].code}>${calls[k + 1].code}`, a, b);
+    const path = pathOf(line, `${calls[k].code}>${calls[k + 1].code}`, a, b);
     meters += path ? lengthM(path) : lengthM([a, b]) * 1.2;
   }
   const secs = (calls[last].arr - calls[i].dep) / 1000;
   if (last <= i || secs < 30) return null;
-  return Math.round(Math.min(mode === "tram" ? 70 : 60, (meters / secs) * 3.6));
+  return Math.round(Math.min(mode === "ter" ? 160 : mode === "tram" ? 70 : 60, (meters / secs) * 3.6));
 }
 
 /* ---------- code de chaque trajet et attente au terminus ----------
@@ -80,6 +84,7 @@ const parisParts = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", 
 
 /** Code lisible du trajet : terminus + ligne + date + heure de départ prévue */
 export function tripCode(c: Course): string {
+  if (c.num) return trainCode(c.num);
   const t = c.aimed ?? c.calls[0]?.dep;
   if (!t) return "";
   const parts = Object.fromEntries(parisParts.formatToParts(new Date(t)).map(x => [x.type, x.value]));
@@ -112,13 +117,23 @@ function heading(a: { lat: number; lon: number }, b: { lat: number; lon: number 
   return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
 }
 
+/**
+ * Trams et bus de la CTS, et trains TER : courses en cours et position de leurs arrêts (les gares SNCF ont des codes « SNCF:… »).
+ * Sert aussi au partage d'un trajet (ride.ts).
+ */
+export function allCourses(now = Date.now()): { courses: Course[]; stopPos: StopPos; at: number | null } {
+  const snap = snapshot(now), ter = terCourses(now);
+  const stopPos: StopPos = { get: code => snap?.stopPos.get(code) ?? ter.stopPos.get(code) };
+  return { courses: [...(snap?.courses ?? []), ...ter.courses], stopPos, at: snap?.at ?? null };
+}
+
 export function vehiclesAt(now = Date.now()): { now: number; at: number | null; vehicles: Vehicle[] } {
   const snap = snapshot(now);
-  if (!snap) return { now, at: null, vehicles: [] };
-  if (chainsAt !== snap.at) { buildChains(snap.courses); chainsAt = snap.at; }
+  if (snap && chainsAt !== snap.at) { buildChains(snap.courses); chainsAt = snap.at; }
+  const { courses, stopPos, at } = allCourses(now);
   const out: Vehicle[] = [];
-  for (const c of snap.courses) {
-    const calls = c.calls.map(k => ({ ...k, p: snap.stopPos.get(k.code) })).filter(k => k.p) as (typeof c.calls[number] & { p: { lat: number; lon: number } })[];
+  for (const c of courses) {
+    const calls = c.calls.map(k => ({ ...k, p: stopPos.get(k.code) })).filter(k => k.p) as (typeof c.calls[number] & { p: { lat: number; lon: number } })[];
     if (calls.length < 2 || now > calls[calls.length - 1].arr) continue;
     const vno = tripCode(c);
     if (now < calls[0].dep) {
@@ -164,7 +179,9 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
         h = heading(s.p, n.p);
       }
       if (!a || !b) continue;
-      const p = a !== b && n ? pathBetween(c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : null;
+      const p = a !== b && n
+        ? (c.mode === "ter" ? railBetween([s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : pathBetween(c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]))
+        : null;
       const sp = a !== b ? speedAhead(c.line, c.mode, calls, i) : 0;
       out.push({
         id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp !== null ? { s: sp } : {}),
@@ -174,5 +191,5 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       break;
     }
   }
-  return { now, at: snap.at, vehicles: out };
+  return { now, at, vehicles: out };
 }

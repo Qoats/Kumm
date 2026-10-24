@@ -130,7 +130,7 @@ function sync(): void {
       if (!S.layers.tram && !S.layers.bus && !S.layers.ter) continue;
     } else {
       if (!S.layers[k] || (S.filter === "tram" && k !== "tram") || (S.filter === "bus" && k !== "bus")) continue;
-      if (mode === "far" && k !== "tram") continue;
+      if (mode === "far" && k !== "tram" && k !== "ter") continue;   // de loin : stations de tram et gares seulement
     }
     place("s:" + s.id, s.lat, s.lon, k, `${isHub(s) ? "Gare" : KINDS[k].label} · ${s.name}`, () => { S.overlay = { k: "stop", id: s.id }; render(); });
   }
@@ -210,10 +210,12 @@ function syncVehicles(): void {
   const mp = map, stopPts: L.Point[] = [];
   for (const [id, layer] of shown) if (id.startsWith("s:")) stopPts.push(mp.latLngToContainerPoint((layer as L.Marker).getLatLng()));
   const clearance = shownMode === "icons" ? 33 : 20;
-  const show = map.getZoom() >= DOT_ZOOM;
+  // de loin, seuls les trains restent affichés (peu nombreux, ils traversent toute la carte)
+  const show = map.getZoom() >= DOT_ZOOM, trainsOnly = !show && map.getZoom() >= 10;
   let count = 0;
-  for (const v of show ? VEHICLES.values() : []) {
+  for (const v of show || trainsOnly ? VEHICLES.values() : []) {
     const k = vehicleKind(v);
+    if (trainsOnly && k !== "ter") continue;
     if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
     const h = Math.round(vehicleHeading(v)), raw = vehiclePos(v);
     if (!b.contains(raw) || ++count > 150) continue;

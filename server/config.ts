@@ -24,6 +24,8 @@ export const CACHE_MAX = num(process.env.CACHE_MAX_ENTRIES, 4000);      // répo
 export const STALE_REALTIME_S = num(process.env.STALE_REALTIME_S, 120); // en panne, on ressert les passages « temps réel » au plus 2 min
 /** Passages de tout le réseau rechargés toutes les N secondes (la CTS indique 20 s au minimum) ; 0 = désactivé, appel arrêt par arrêt */
 export const ET_POLL_S = (n => (n <= 0 ? 0 : Math.max(20, n)))(num(process.env.ET_POLL_S, 30));
+/** Temps réel des trains TER (SNCF) rechargé toutes les N secondes ; 0 = pas de trains */
+export const TER_POLL_S = (n => (n <= 0 ? 0 : Math.max(30, n)))(num(process.env.TER_POLL_S, 60));
 export const UPSTREAM_QUEUE_MAX = num(process.env.UPSTREAM_QUEUE_MAX, 300);
 /** Requêtes simultanées vers l'extérieur, par file (CTS d'un côté, autres services de l'autre) */
 export const UPSTREAM_PARALLEL = Math.max(1, num(process.env.UPSTREAM_PARALLEL, 4));

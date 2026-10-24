@@ -13,13 +13,13 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
+import { TRAINS, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  debugBox, depCards, pickDir, stopNotice, stopTabs, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
+  debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc } from "./util";
@@ -129,7 +129,11 @@ async function fillSlot(id: string, load: () => Promise<string>): Promise<void> 
   if (slotKey(id) !== key) return;
   slotCache.set(key, html);
   const el = document.getElementById(id);
-  if (el) el.innerHTML = html;
+  if (!el) return;
+  // les zones défilantes à l'intérieur (sélecteur de direction…) gardent leur position quand la liste se met à jour
+  saveScroll(app, lastScreen);
+  el.innerHTML = html;
+  restoreScroll(app, lastScreen);
 }
 function restoreSlots(): void {
   document.querySelectorAll<HTMLElement>("#nearlist,#stopdeps,#trips,[id^=fav-]").forEach(el => {
@@ -185,9 +189,13 @@ async function loadDeps(): Promise<void> {
           const modes = (["tram", "bus", "ter"] as const).filter(m => all.some(x => lineKind(x.d.line) === m));
           const cur = S.overlay?.k === "stop" && S.overlay.mode && modes.includes(S.overlay.mode) ? S.overlay.mode : null;
           const tabs = modes.length > 1 ? stopTabs(modes, cur) : "";
-          const h = tabs + depCards(cur ? all.filter(x => lineKind(x.d.line) === cur) : all);
+          // gare : tableau des départs des trains (retards, suppressions), sous les trams et bus dans l'onglet « Tous »
+          const trains = s.sncf ? TRAINS[s.sncf] ?? [] : [], others = all.filter(x => lineKind(x.d.line) !== "ter");
+          const h = tabs + (cur === "ter" ? trainBoard(trains)
+            : cur ? depCards(all.filter(x => lineKind(x.d.line) === cur))
+            : (others.length || !s.sncf ? depCards(others) : "") + (s.sncf && (trains.length || !others.length) ? trainBoard(trains, others.length ? 6 : 15) : ""));
           // sans passage : souvent un arrêt non desservi (travaux, déviation) ; l'info trafic l'explique mieux que les détails techniques
-          const none = !h.includes('class="dep"');
+          const none = !h.includes('class="dep"') && !h.includes("tb-row");
           return stopNotice(s, none) + (none ? h + debugBox() : h);
         });
       }
@@ -531,8 +539,8 @@ let quayLines: Record<string, string[]> = {};
 try { quayLines = JSON.parse(localStorage.getItem("quayLines") ?? "{}") as Record<string, string[]>; } catch { /* rien */ }
 function applyQuayLines(): void {
   for (const s of STOPS) {
-    if (s.lines.length || !s.quays?.length) continue;
-    const set = new Set<string>();
+    if (s.lines.some(l => l !== "TER") || !s.quays?.length) continue;
+    const set = new Set<string>(s.lines);
     for (const q of s.quays) for (const l of quayLines[q.code] ?? []) set.add(l);
     if (set.size) s.lines = [...set].sort((a, b) => a.localeCompare(b, "fr", { numeric: true }));
   }
