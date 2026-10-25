@@ -37,8 +37,11 @@ export interface Vehicle {
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course (a = b = quai et heure de départ) */
   w?: boolean;
-  /** vitesse moyenne estimée en km/h (0 à quai) ; absente si elle ne peut pas être calculée */
+  /** vitesse estimée en km/h : croisière sur le tronçon pour un tram ou un bus, moyenne pour un train (0 à quai) ;
+      absente si elle ne peut pas être calculée */
   s?: number;
+  /** tram ou bus : vitesse de roulage moyenne (km/h, hors arrêt à quai), d'où l'application tire accélération et freinage */
+  r?: number;
   /** position partagée par un voyageur à bord (moins de 45 s) : a = b = cette position */
   g?: boolean;
   /** retard sur l'horaire annoncé par la CTS, en secondes (négatif : en avance), d'après la position partagée */
@@ -91,6 +94,37 @@ function speedAhead(line: string, mode: string, calls: { code: string; dep: numb
   const secs = (calls[last].arr - calls[i].dep) / 1000;
   if (last <= i || secs < 30) return null;
   return Math.round(Math.min(mode === "ter" ? 160 : mode === "tram" ? 70 : 60, (meters / secs) * 3.6));
+}
+
+/* Vitesse d'un tram ou d'un bus. La moyenne entre arrêts (speedAhead) compte l'arrêt à quai, le démarrage et le freinage :
+   autour de 20 km/h pour un tram CTS, alors qu'il roule à 40 ou 50 entre deux stations. Ici : vitesse de roulage moyenne
+   (sans les ~20 s à quai que la CTS compte souvent dans l'horaire), d'où la vitesse de croisière sur le tronçon en cours,
+   avec accélération et freinage (profil en trapèze). L'application refait ce profil à chaque instant (champ r) pour la
+   vitesse affichée et l'avancée du repère. La CTS ne publie pas la vitesse réelle : c'est une estimation. */
+const ACCEL = { tram: 1.0, bus: 0.9 } as Record<string, number>;
+const DWELL_S = 20;
+function speedNow(line: string, mode: string, calls: { code: string; dep: number; arr: number; p: { lat: number; lon: number } }[], i: number): { s: number; r?: number } | null {
+  const acc = ACCEL[mode];
+  if (!acc) { const s = speedAhead(line, mode, calls, i); return s === null ? null : { s }; }
+  // vitesse de roulage moyenne sur les 3 prochains tronçons (les horaires arrondis à la minute faussent un tronçon seul)
+  const last = Math.min(calls.length - 1, i + 3);
+  let meters = 0, run = 0, cur = 0;
+  for (let k = i; k < last; k++) {
+    const a: Pt = [calls[k].p.lat, calls[k].p.lon], b: Pt = [calls[k + 1].p.lat, calls[k + 1].p.lon];
+    const path = segmentPath(mode, line, `${calls[k].code}>${calls[k + 1].code}`, a, b);
+    const m = path ? lengthM(path) : lengthM([a, b]) * 1.2, t = (calls[k + 1].arr - calls[k].dep) / 1000;
+    const dwell = calls[k].arr === calls[k].dep ? Math.min(DWELL_S, t * 0.3) : 0;   // arrêt à quai compté dans l'horaire
+    meters += m; run += t - dwell;
+    if (k === i) cur = m;
+  }
+  if (last <= i || run < 20 || cur < 30) return null;
+  const vAvg = Math.min(meters / run, mode === "tram" ? 15 : 13);   // m/s, plafonné (54 / 47 km/h de moyenne)
+  const T = cur / vAvg;                                                // durée de roulage sur ce tronçon, à cette moyenne
+  // vitesse de croisière vc : distance = vc·T − vc²/acc (accélération et freinage à acc) ; tronçon trop court : profil en triangle
+  const disc = acc * acc * T * T - 4 * acc * cur;
+  const vc = disc > 0 ? (acc * T - Math.sqrt(disc)) / 2 : (acc * T) / 2;
+  // s : vitesse de croisière (pour les versions de l'application qui affichent s telle quelle) ; r : roulage moyen, en km/h
+  return { s: Math.round(Math.min(mode === "tram" ? 70 : 60, vc * 3.6)), r: Math.round(vAvg * 36) / 10 };
 }
 
 /* ---------- code de chaque trajet et attente au terminus ----------
@@ -219,9 +253,9 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       }
       if (!a || !b) continue;
       const p = a !== b && n ? segmentPath(c.mode, c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : null;
-      const sp = a !== b ? speedAhead(c.line, c.mode, calls, i) : 0;
+      const sp = a !== b ? speedNow(c.line, c.mode, calls, i) : { s: 0 };
       out.push({
-        id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp !== null ? { s: sp } : {}),
+        id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp ?? {}),
         next: calls.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr]),
         ...(p ? { p } : {}), ...(vno ? { n: vno } : {})
       });

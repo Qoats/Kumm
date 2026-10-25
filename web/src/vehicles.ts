@@ -24,8 +24,10 @@ export interface Vehicle {
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course */
   w?: boolean;
-  /** vitesse moyenne estimée par le serveur sur les prochains tronçons (km/h) */
+  /** vitesse estimée par le serveur (km/h) : croisière d'un tram ou d'un bus, moyenne d'un train */
   s?: number;
+  /** tram ou bus : vitesse de roulage moyenne (km/h, hors arrêt à quai), base du profil accélération / croisière / freinage */
+  r?: number;
   /** position partagée par un voyageur à bord */
   g?: boolean;
   /** retard sur l'horaire prévu, en secondes (négatif : en avance), d'après la position partagée */
@@ -69,10 +71,52 @@ function cumOf(v: Vehicle, p: [number, number][]): number[] {
   return c;
 }
 
+/* Profil de vitesse d'un tram ou d'un bus sur le tronçon : quelques secondes encore à quai, accélération, croisière, freinage,
+   arrivée à l'heure annoncée. Sert à la vitesse affichée et à l'avancée du repère (qui démarre doucement et freine). */
+const ACCEL: Record<string, number> = { tram: 1.0, bus: 0.9 };
+interface Profile { wait: number; T: number; D: number; acc: number; vc: number; ramp: number }
+const profiles = new WeakMap<Vehicle, Profile | null>();
+function profileOf(v: Vehicle): Profile | null {
+  if (profiles.has(v)) return profiles.get(v)!;
+  let pr: Profile | null = null;
+  const acc0 = ACCEL[v.m ?? ""], span = (v.b[2] - v.a[2]) / 1000;
+  const D = v.p && v.p.length > 1 ? cumOf(v, v.p)[v.p.length - 1] * 111_320 : len([v.a[0], v.a[1]], [v.b[0], v.b[1]]) * 111_320;
+  if (acc0 && v.r && v.r > 3 && span > 10 && D > 30) {
+    // temps de roulage à la vitesse moyenne de la ligne ; le reste du créneau (au plus 10 s) : encore à quai au départ
+    const wait = Math.min(10, Math.max(0, span - D / (v.r / 3.6))), T = span - wait;
+    // croisière vc : D = vc·T − vc²/acc ; trop court pour cette accélération : on accélère plus (profil en triangle)
+    let acc = acc0;
+    const disc = acc * acc * T * T - 4 * acc * D;
+    let vc: number;
+    if (disc >= 0) vc = (acc * T - Math.sqrt(disc)) / 2;
+    else { acc = (4 * D) / (T * T); vc = (acc * T) / 2; }
+    pr = { wait, T, D, acc, vc, ramp: vc / acc };
+  }
+  profiles.set(v, pr);
+  return pr;
+}
+/** Secondes de roulage écoulées sur le tronçon selon le profil (bornées à 0..T) */
+const runTime = (v: Vehicle, pr: Profile, t: number): number => Math.max(0, Math.min(pr.T, (t - v.a[2]) / 1000 - pr.wait));
+
 /** Avancée sur le tronçon (0 = arrêt quitté, 1 = arrêt suivant) */
 function progress(v: Vehicle, t: number): number {
   const t1 = v.a[2], t2 = v.b[2];
-  return t2 > t1 ? Math.max(0, Math.min(1, (t - t1) / (t2 - t1))) : 1;
+  if (t2 <= t1) return 1;
+  const pr = profileOf(v);
+  if (!pr) return Math.max(0, Math.min(1, (t - t1) / (t2 - t1)));
+  const x = runTime(v, pr, t), { acc, vc, ramp, T, D } = pr;
+  const d = x < ramp ? 0.5 * acc * x * x : x > T - ramp ? D - 0.5 * acc * (T - x) ** 2 : 0.5 * acc * ramp * ramp + vc * (x - ramp);
+  return Math.max(0, Math.min(1, d / D));
+}
+
+/** Vitesse à l'instant t selon le profil (km/h), null sans profil */
+function speedAt(v: Vehicle, t: number): number | null {
+  const pr = profileOf(v);
+  if (!pr) return null;
+  const x = runTime(v, pr, t), { acc, vc, ramp, T } = pr;
+  const ms = x < ramp ? acc * x : x > T - ramp ? acc * (T - x) : vc;
+  // horaire très serré (arrondi à la minute) : on n'affiche pas une vitesse impossible
+  return Math.round(Math.min(v.m === "tram" ? 70 : 60, Math.max(0, ms) * 3.6));
 }
 
 /** Point du tracé à la fraction f, et indice du segment où il se trouve */
@@ -120,7 +164,9 @@ export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed:
   if (v.x) return { state: "Immobilisé", speed: 0, next };   // la durée est dans l'encadré au-dessus
   const atStop = v.a[0] === v.b[0] && v.a[1] === v.b[1];
   if (atStop) return { state: "À quai", speed: 0, next };
-  // vitesse calculée par le serveur sur les 3 prochains tronçons (plus fiable) ; sinon, sur le tronçon en cours
+  // tram ou bus : vitesse du moment (accélération, croisière, freinage) ; train : moyenne calculée par le serveur
+  const now = speedAt(v, t);
+  if (now !== null) return { state: "En route", speed: now, next };
   if (v.s !== undefined) return { state: "En route", speed: v.s, next };
   const meters = v.p && v.p.length > 1 ? cumOf(v, v.p)[v.p.length - 1] * 111_320 : len([v.a[0], v.a[1]], [v.b[0], v.b[1]]) * 111_320;
   const secs = (v.b[2] - v.a[2]) / 1000;
