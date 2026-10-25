@@ -551,25 +551,45 @@ export function overlayTripPick(): string {
   const p = S.tripPick;
   if (!p) return "";
   const d = p.detail, l = lineLabel(d.line), now = Date.now();
-  const rows = d.calls.map((c, i) => ({ c, i })).slice(p.from).map(({ c, i }) => {
-    const m = Math.max(0, Math.round((c.arr - now) / 60000));
-    return `<button class="stopline vn" style="width:100%;text-align:left" data-alight="${i}"><span class="d"></span><span class="r">${esc(c.name)}</span><b>${m < 1 ? "à l'approche" : m + " min"}</b></button>`;
+  // indice de chaque arrêt dans la course de ce véhicule
+  const inCourse = new Map<string, number>();
+  d.calls.forEach((c, i) => { if (!inCourse.has(fold(c.name))) inCourse.set(fold(c.name), i); });
+  // toute la ligne, dans le sens du véhicule (parcours appris par le serveur, tronçons dans l'ordre pendant des travaux)
+  const r = LINE_ROUTES[l] ?? LINE_ROUTES[d.line];
+  let line: { code: string; name: string }[] = [];
+  let best = 0;
+  for (const m of r?.main ?? []) {
+    const seq = orderParts([m, ...(m.extra ?? [])]).flatMap(x => x.codes.map((code, i) => ({ code, name: x.names[i] })));
+    const score = seq.filter(x => inCourse.has(fold(x.name))).length;
+    if (score > best) { best = score; line = seq; }
+  }
+  // arrêts encore devant le véhicule qui manqueraient au parcours de la ligne : on garde la liste de la course
+  const ahead = d.calls.slice(p.from).filter(c => !line.some(x => fold(x.name) === fold(c.name)));
+  if (best < 2 || ahead.length) line = d.calls.map(c => ({ code: c.code, name: c.name }));
+  const seen = new Set<string>();
+  const uniq = line.filter(x => !seen.has(fold(x.name)) && seen.add(fold(x.name)));
+  // arrêts déjà passés : les deux derniers seulement, les autres regroupés (la liste commence près du véhicule)
+  const firstAhead = uniq.findIndex(x => (inCourse.get(fold(x.name)) ?? -1) >= p.from);
+  const hidden = firstAhead > 2 ? firstAhead - 2 : 0;
+  const rows = (hidden ? `<div class="stopline vn tpdone"><span class="d"></span><span class="r">${hidden} arrêt${hidden > 1 ? "s" : ""} déjà passé${hidden > 1 ? "s" : ""}</span></div>` : "") + uniq.slice(hidden).map(x => {
+    const i = inCourse.get(fold(x.name));
+    if (i !== undefined && i >= p.from) {
+      const m = Math.max(0, Math.round((d.calls[i].arr - now) / 60000));
+      return `<button class="stopline vn" style="width:100%;text-align:left" data-alight="${i}"><span class="d"></span><span class="r">${esc(x.name)}</span><b>${m < 1 ? "à l'approche" : m + " min"}</b></button>`;
+    }
+    if (i !== undefined) return `<div class="stopline vn tpdone"><span class="d"></span><span class="r">${esc(x.name)}</span><b>${i === p.board ? "montée" : "passé"}</b></div>`;
+    // arrêt de la ligne que ce véhicule ne dessert pas : prévenu au dernier arrêt utile, pour la correspondance
+    const st = stopForCall(x.code, x.name);
+    return st ? `<button class="stopline vn tpother" style="width:100%;text-align:left" data-alightstop="${esc(st.id)}"><span class="d"></span><span class="r">${esc(x.name)}</span><b>correspondance</b></button>` : "";
   }).join("");
   const from = p.board >= 0 ? `Montée à <b>${esc(d.calls[p.board].name)}</b> (${hm(d.calls[p.board].dep)})` : "Vous êtes à bord";
   // course qui s'arrête avant la destination affichée (travaux, service partiel)
   const end = d.calls[d.calls.length - 1].name, short = fold(end) !== fold(d.dest) && !fold(d.dest).includes(fold(end));
-  // « Mon arrêt n'est pas dans la liste » : n'importe quel arrêt du réseau ; Kumm prévient à l'arrêt du trajet le plus proche
-  const q = fold(S.tpq), onRoute = new Set(d.calls.map(c => fold(c.name)));
-  const found = q.length >= 2 ? STOPS.filter(s => !s.sncf && fold(s.name).includes(q) && !onRoute.has(fold(s.name))).slice(0, 8) : [];
   return `<div class="overlay" style="--c:${COLORS[l] ?? "#777"}">${bar("Où descendez-vous ?")}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(d.line)}<b style="font-size:18px">vers ${esc(d.dest)}</b></div>
     <p class="src" style="margin:6px 0 4px">${from}. Touchez votre arrêt : Kumm compte les arrêts restants et vous prévient juste avant de descendre${p.board >= 0 ? ", et vous rappelle de valider votre titre quand le véhicule arrive" : ""}.</p>
-    ${short ? `<div class="tpnote">Ce ${esc(l)} s’arrête à <b>${esc(end)}</b> (travaux ou service partiel) : il ne va pas jusqu’à ${esc(d.dest)}.</div>` : ""}
+    ${short ? `<div class="tpnote">Ce ${esc(l)} s’arrête à <b>${esc(end)}</b> (travaux ou service partiel) : il ne va pas jusqu’à ${esc(d.dest)}. Pour un arrêt marqué « correspondance », Kumm vous prévient au dernier arrêt utile.</div>` : ""}
     <div style="position:relative;margin-top:10px"><div class="rail"></div>${rows}</div>
-    <div class="sub" style="margin-top:18px">Mon arrêt n’est pas dans la liste</div>
-    <div class="search" style="margin-bottom:8px"><input id="tpq" value="${esc(S.tpq)}" placeholder="Rechercher mon arrêt…" autocomplete="off" enterkeyhint="search"><span class="go">${ic("search")}</span></div>
-    ${found.map(s => `<button class="item" data-alightstop="${esc(s.id)}"><span><b>${esc(s.name)}</b><br><small style="color:var(--mute)">Pas sur ce trajet : prévenu à l’arrêt le plus proche, pour la correspondance</small></span></button>`).join("")}
-    ${q.length >= 2 && !found.length ? `<div class="empty" style="padding:12px">Aucun autre arrêt trouvé</div>` : ""}
     <small class="src" style="display:block;margin-top:14px">Pendant le trajet, votre position (sans nom ni identifiant) est envoyée au serveur : elle donne à tous la vraie position et la vitesse du véhicule, et améliore les estimations des trajets suivants.</small>
   </div></main></div>`;
 }

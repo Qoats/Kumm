@@ -62,7 +62,7 @@ export async function startJourney(alight: number, note?: string): Promise<void>
   const p = S.tripPick;
   if (!p) return;
   const d = p.detail, j: Journey = { detail: d, board: p.board, alight, native: NATIVE, shown: new Set() };
-  S.tripPick = null; S.overlay = null; S.tpq = "";
+  S.tripPick = null; S.overlay = null;
   if (NATIVE) {
     try {
       const r = await Trip.start({

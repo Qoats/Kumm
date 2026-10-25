@@ -115,6 +115,7 @@ function draw(): void {
   restoreScroll(app, screen);
   void loadDeps();
   if (o?.k === "line") ensureLineRoute(o.id, render);
+  if (o?.k === "tripPick" && S.tripPick) ensureLineRoute(lineLabel(S.tripPick.detail.line), render);
   syncWidgets();   // n'envoie rien si les données des widgets n'ont pas changé
 }
 hooks.render = draw;
@@ -556,7 +557,6 @@ function askSuggestions(field: "from" | "to"): void {
 app.addEventListener("input", e => {
   const t = e.target as HTMLInputElement;
   if (t.id === "fq") { S.favQ = t.value; render(); return; }
-  if (t.id === "tpq") { S.tpq = t.value; render(); return; }
   if (t.id === "wq" && S.wsetup) { S.wsetup.q = t.value; render(); return; }
   if (t.id === "sq") {
     S.q = t.value; render(); searchAddresses();
