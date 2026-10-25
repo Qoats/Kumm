@@ -510,6 +510,18 @@ a.box,.more a{text-decoration:none;color:inherit}
 :root[data-scheme="dark"] .fstall b{color:#FF8A80}
 .vshared .veh .vb{box-shadow:0 0 0 3px #1E9E57,0 1px 4px rgba(0,0,0,.45)}
 /* trajet suivi (journey.ts) : bouton dans le panneau d'un véhicule, « Prendre ce bus » sur un départ */
-.go.ftrip{margin:12px 0 0}
+.ftrip{display:flex;gap:8px;margin:10px 14px 4px}
+.ftrip button{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;border-radius:14px;background:var(--chip);color:var(--accent);font-size:14.5px;font-weight:700;border:1px solid var(--line)}
+.ftrip button.stop{flex:0 0 auto;color:var(--mute)}
+.tpnote{margin:10px 0 4px;padding:12px 14px;font-size:14.5px;line-height:1.4;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:14px}
+/* bandeau du trajet suivi (journey.ts) : glisse depuis le haut, fait défiler son texte une fois, puis repart */
+.jbanner{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:3500;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px;
+  background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.35);font-size:14.5px;font-weight:700;
+  transform:translateY(calc(-100% - 40px));opacity:0;transition:transform .35s ease,opacity .35s ease;pointer-events:none}
+.jbanner.show{transform:none;opacity:1;pointer-events:auto}
+.jbanner .jb-t{flex:1;min-width:0;overflow:hidden;white-space:nowrap}
+.jbanner .jb-in{display:inline-block;white-space:nowrap}
+.jbanner button{background:var(--chip);border-radius:14px;padding:8px 12px;font-weight:800;flex:none}
 .dep .take{display:flex;align-items:center;gap:8px;margin-top:10px;width:100%;padding:9px 12px;border-radius:12px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:700;text-align:left}
 .dep .take svg{flex:none}
+.toast{width:max-content;max-width:calc(100% - 32px);text-align:center;line-height:1.35}

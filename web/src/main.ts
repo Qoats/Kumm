@@ -41,7 +41,7 @@ import { configureWidget, initWidgets, stopConfig, syncWidgets } from "./widgets
 import { followFromSearch, showOnMap, mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
-import { journeyBanner, pickFromStop, pickFromVehicle, startJourney, stopJourney } from "./journey";
+import { pickFromStop, pickFromVehicle, startJourney, startJourneyNear, stopJourney } from "./journey";
 import { answerRide, rideBanner, rideDebug, startRideDetection, stopRideDetection, stopSharing } from "./ride";
 import { acceptTerms, allSteps, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
 import type { Release } from "./update";
@@ -94,7 +94,7 @@ function draw(): void {
     `<nav>${NAV.map(n => `<button data-tab="${n[0]}" class="${t === n[0] || (n[0] === "search" && t === "lines") ? "on" : ""}"><span class="ni">${ic(n[2])}</span>${n[1]}</button>`).join("")}</nav>` +
     whenSheet() +
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
-    (S.journey ? journeyBanner() : rideBanner()) +
+    (S.journey ? "" : rideBanner()) +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
 
   if (act) {
@@ -237,7 +237,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-tpick],[data-take],[data-alight],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-tpick],[data-take],[data-alight],[data-alightstop],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -255,6 +255,7 @@ app.addEventListener("click", e => {
   if (d.tpick) { void pickFromVehicle(d.tpick); return; }
   if (d.take) { const [st, line, dest] = d.take.split("|"); void pickFromStop(st ?? "", line ?? "", dest ?? ""); return; }
   if (d.alight !== undefined) { void startJourney(Number(d.alight)); return; }
+  if (d.alightstop) { const st = stopById(d.alightstop); if (st) void startJourneyNear(st); return; }
   if (d.jstop) { stopJourney(); toast("Suivi du trajet arrêté"); return; }
   if (d.upd) { updateAction(d.upd); return; }
   if (d.dirk !== undefined && d.dirv !== undefined) { pickDir(d.dirk, d.dirv); render(); return; }   // direction d'une ligne, sans ouvrir l'arrêt
@@ -555,6 +556,7 @@ function askSuggestions(field: "from" | "to"): void {
 app.addEventListener("input", e => {
   const t = e.target as HTMLInputElement;
   if (t.id === "fq") { S.favQ = t.value; render(); return; }
+  if (t.id === "tpq") { S.tpq = t.value; render(); return; }
   if (t.id === "wq" && S.wsetup) { S.wsetup.q = t.value; render(); return; }
   if (t.id === "sq") {
     S.q = t.value; render(); searchAddresses();

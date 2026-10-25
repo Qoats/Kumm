@@ -37,8 +37,9 @@ import org.json.JSONObject;
  * Trajet suivi (« Me prévenir pour descendre ») : service au premier plan qui continue écran éteint ou application fermée.
  * - Avant de monter : l'heure d'arrivée du véhicule à l'arrêt de départ est relue toutes les 30 s ; 2 min avant, rappel
  *   « Pensez à valider votre titre de transport ».
- * - À bord : la position du téléphone (GPS) situe le voyageur sur le trajet ; la notification indique le nombre d'arrêts
- *   restants, le prochain arrêt et la vitesse ; juste avant l'arrêt de descente, alerte « Descendez au prochain arrêt ».
+ * - À bord : la position du téléphone (GPS) situe le voyageur sur le trajet ; la notification (rangée) indique le nombre
+ *   d'arrêts restants, le prochain arrêt et la vitesse. À 3 arrêts, notification qui s'affiche puis se range ; à 2 arrêts,
+ *   vibration ; juste avant l'arrêt de descente, alerte « Descendez au prochain arrêt » avec une vibration plus forte.
  * - Sa position (sans identifiant) est envoyée toutes les 10 s au serveur (POST /api/ride) : elle donne à tous la vraie
  *   position et la vitesse du véhicule, et apprend au serveur les vitesses réelles de chaque tronçon.
  * Sans position (refusée ou GPS indisponible), le suivi se fait d'après les horaires annoncés.
@@ -46,7 +47,7 @@ import org.json.JSONObject;
  */
 public class TripService extends Service implements LocationListener {
     static final String ACTION_START = "fr.kumm.app.TRIP_START", ACTION_STOP = "fr.kumm.app.TRIP_STOP", EXTRA_TRIP = "trip";
-    private static final String CH_ONGOING = "trajet", CH_ALERT = "trajet_alertes";
+    private static final String CH_ONGOING = "trajet_fond", CH_STEP = "trajet_etapes", CH_ALERT = "trajet_alertes";
     private static final int ID_ONGOING = 4201, ID_ALERT = 4202;
     private static final long POLL_MS = 30_000, SEND_MS = 10_000, TICK_MS = 5_000, MAX_MS = 2 * 3600_000L;
     private static final double ON_ROUTE_M = 150, ALERT_M = 700, ARRIVED_M = 45;
@@ -60,7 +61,9 @@ public class TripService extends Service implements LocationListener {
     private String[] names;
     private long[] arr;
     private int board = -1, alight = 0;
-    private boolean boarded, reminded, warned, arrived, finishing;
+    private boolean boarded, reminded, arrived, finishing;
+    /** dernier nombre d'arrêts annoncé (3, 2, puis 1) */
+    private int announced;
     private double progress = -1;
     private Location last;
     private long started, lastSend, lastPoll;
@@ -112,7 +115,7 @@ public class TripService extends Service implements LocationListener {
             lat[i] = c.getDouble("lat"); lon[i] = c.getDouble("lon"); names[i] = c.optString("name", ""); arr[i] = c.optLong("arr", 0);
         }
         board = t.optInt("board", -1); alight = Math.max(0, Math.min(n - 1, t.optInt("alight", n - 1)));
-        boarded = board < 0; reminded = boarded; warned = false; arrived = false; finishing = false;
+        boarded = board < 0; reminded = boarded; announced = Integer.MAX_VALUE; arrived = false; finishing = false;
         progress = boarded ? -1 : board; started = System.currentTimeMillis(); lastSend = 0; lastPoll = started; misses = 0; last = null;
     }
 
@@ -198,14 +201,19 @@ public class TripService extends Service implements LocationListener {
             double toEnd = gps ? meters(last.getLatitude(), last.getLongitude(), lat[alight], lon[alight]) : Double.MAX_VALUE;
             if (!arrived && (progress >= alight - 0.03 || toEnd < ARRIVED_M)) {
                 arrived = true;
-                alert("Vous y êtes !", "Arrivée à " + names[alight] + ". Bonne journée !", false);
+                step("Vous y êtes !", "Arrivée à " + names[alight] + ". Bonne journée !");
                 finish(4000L);
                 return;
             }
-            int next = (int) Math.floor(progress) + 1;
-            if (!warned && next >= alight && (toEnd < ALERT_M || arr[alight] - now < 100_000)) {
-                warned = true;
-                alert("Descendez au prochain arrêt", names[alight] + " : préparez-vous à descendre.", true);
+            // 3 arrêts avant : notification qui s'affiche puis se range ; à 2 arrêts, vibration ; au dernier, alerte forte
+            int r = remaining();
+            boolean far = toEnd > ALERT_M && arr[alight] - now > 100_000;
+            if (r == 1 && far) r = 0;   // long dernier tronçon : l'alerte attend d'être proche de l'arrêt
+            if (r >= 1 && r <= 3 && r < announced) {
+                announced = r;
+                if (r == 3) step("Plus que 3 arrêts", "Descente à " + names[alight] + ".");
+                else if (r == 2) alert("Plus que 2 arrêts", "Descente à " + names[alight] + " : préparez-vous.", false);
+                else alert("Descendez au prochain arrêt", names[alight] + " : préparez-vous à descendre.", true);
             }
         }
         publish(now, speed);
@@ -300,14 +308,20 @@ public class TripService extends Service implements LocationListener {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
-        NotificationChannel a = new NotificationChannel(CH_ONGOING, "Trajet en cours", NotificationManager.IMPORTANCE_LOW);
+        // notification permanente obligatoire pendant le suivi : rangée, sans icône dans la barre d'état
+        NotificationChannel a = new NotificationChannel(CH_ONGOING, "Trajet en cours", NotificationManager.IMPORTANCE_MIN);
         a.setDescription("Arrêts restants pendant un trajet suivi");
         a.setShowBadge(false);
+        NotificationChannel st = new NotificationChannel(CH_STEP, "Étapes du trajet", NotificationManager.IMPORTANCE_HIGH);
+        st.setDescription("« Plus que 3 arrêts » : s'affiche quelques secondes, sans vibrer");
+        st.enableVibration(false);
+        st.setSound(null, null);
         NotificationChannel b = new NotificationChannel(CH_ALERT, "Descente et validation", NotificationManager.IMPORTANCE_HIGH);
         b.setDescription("Alerte avant votre arrêt de descente, rappel de validation avant de monter");
         b.enableVibration(true);
         b.setVibrationPattern(new long[] { 0, 400, 200, 400 });
         nm.createNotificationChannel(a);
+        nm.createNotificationChannel(st);
         nm.createNotificationChannel(b);
     }
 
@@ -336,8 +350,18 @@ public class TripService extends Service implements LocationListener {
             .setSmallIcon(R.drawable.ic_stat_kumm).setColor(color)
             .setContentTitle(title).setContentText(text).setStyle(new NotificationCompat.BigTextStyle().bigText(text))
             .setSubText(tripCode.isEmpty() ? null : "Trajet " + tripCode)
-            .setOngoing(true).setOnlyAlertOnce(true).setSilent(true).setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+            .setOngoing(true).setOnlyAlertOnce(true).setSilent(true).setPriority(NotificationCompat.PRIORITY_MIN).setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setContentIntent(openApp()).addAction(0, "Arrêter", ps).build();
+    }
+
+    /** Étape du trajet : s'affiche en haut de l'écran quelques secondes, sans son ni vibration, puis se range */
+    private void step(String title, String text) {
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null) return;
+        nm.notify(ID_ALERT, new NotificationCompat.Builder(this, CH_STEP)
+            .setSmallIcon(R.drawable.ic_stat_kumm).setColor(color).setContentTitle(title).setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH).setSilent(true).setAutoCancel(true).setTimeoutAfter(60_000)
+            .setContentIntent(openApp()).build());
     }
 
     private void alert(String title, String text, boolean urgent) {
@@ -348,7 +372,7 @@ public class TripService extends Service implements LocationListener {
             .setContentTitle(title).setContentText(text).setStyle(new NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH).setCategory(urgent ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true).setContentIntent(openApp());
-        if (urgent) b.setVibrate(new long[] { 0, 400, 200, 400, 200, 600 });
+        b.setVibrate(urgent ? new long[] { 0, 400, 200, 400, 200, 600 } : new long[] { 0, 300, 150, 300 });
         nm.notify(ID_ALERT, b.build());
     }
 

@@ -241,7 +241,7 @@ function followPanel(f: { id: string; paused: boolean }): string {
       <div><b id="fv-next">${first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—"}</b><small id="fv-nextname">${first ? esc(first[0]) : "terminus"}</small></div>
       <div class="fstate"><b id="fv-state">${esc(info.state)}</b></div>
     </div>
-    ${v.w ? "" : `<button class="go ftrip" data-tpick="${esc(v.id)}">${ic("bell", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"')}${S.journey?.detail.id === v.id ? "Changer mon arrêt de descente" : "Je suis à bord : me prévenir pour descendre"}</button>`}
+    ${v.w ? "" : `<div class="ftrip"><button data-tpick="${esc(v.id)}">${ic("bell", 'width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"')}${S.journey?.detail.id === v.id ? "Changer mon arrêt" : "Me prévenir pour descendre"}</button>${S.journey?.detail.id === v.id ? `<button class="stop" data-jstop="1">Arrêter</button>` : ""}</div>`}
     ${f.paused ? `<button class="go fre" data-act="refollow">${ic("target", 'stroke="currentColor"')} Suivre de nouveau</button>` : ""}
     <div class="list"><div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div><div id="fv-stops">${followStops(info.next)}</div></div>
       <small class="src" style="display:block;margin-top:10px">Position et vitesse estimées d'après les horaires ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small></div>`;
@@ -556,10 +556,20 @@ export function overlayTripPick(): string {
     return `<button class="stopline vn" style="width:100%;text-align:left" data-alight="${i}"><span class="d"></span><span class="r">${esc(c.name)}</span><b>${m < 1 ? "à l'approche" : m + " min"}</b></button>`;
   }).join("");
   const from = p.board >= 0 ? `Montée à <b>${esc(d.calls[p.board].name)}</b> (${hm(d.calls[p.board].dep)})` : "Vous êtes à bord";
+  // course qui s'arrête avant la destination affichée (travaux, service partiel)
+  const end = d.calls[d.calls.length - 1].name, short = fold(end) !== fold(d.dest) && !fold(d.dest).includes(fold(end));
+  // « Mon arrêt n'est pas dans la liste » : n'importe quel arrêt du réseau ; Kumm prévient à l'arrêt du trajet le plus proche
+  const q = fold(S.tpq), onRoute = new Set(d.calls.map(c => fold(c.name)));
+  const found = q.length >= 2 ? STOPS.filter(s => !s.sncf && fold(s.name).includes(q) && !onRoute.has(fold(s.name))).slice(0, 8) : [];
   return `<div class="overlay" style="--c:${COLORS[l] ?? "#777"}">${bar("Où descendez-vous ?")}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(d.line)}<b style="font-size:18px">vers ${esc(d.dest)}</b></div>
     <p class="src" style="margin:6px 0 4px">${from}. Touchez votre arrêt : Kumm compte les arrêts restants et vous prévient juste avant de descendre${p.board >= 0 ? ", et vous rappelle de valider votre titre quand le véhicule arrive" : ""}.</p>
+    ${short ? `<div class="tpnote">Ce ${esc(l)} s’arrête à <b>${esc(end)}</b> (travaux ou service partiel) : il ne va pas jusqu’à ${esc(d.dest)}.</div>` : ""}
     <div style="position:relative;margin-top:10px"><div class="rail"></div>${rows}</div>
+    <div class="sub" style="margin-top:18px">Mon arrêt n’est pas dans la liste</div>
+    <div class="search" style="margin-bottom:8px"><input id="tpq" value="${esc(S.tpq)}" placeholder="Rechercher mon arrêt…" autocomplete="off" enterkeyhint="search"><span class="go">${ic("search")}</span></div>
+    ${found.map(s => `<button class="item" data-alightstop="${esc(s.id)}"><span><b>${esc(s.name)}</b><br><small style="color:var(--mute)">Pas sur ce trajet : prévenu à l’arrêt le plus proche, pour la correspondance</small></span></button>`).join("")}
+    ${q.length >= 2 && !found.length ? `<div class="empty" style="padding:12px">Aucun autre arrêt trouvé</div>` : ""}
     <small class="src" style="display:block;margin-top:14px">Pendant le trajet, votre position (sans nom ni identifiant) est envoyée au serveur : elle donne à tous la vraie position et la vitesse du véhicule, et améliore les estimations des trajets suivants.</small>
   </div></main></div>`;
 }

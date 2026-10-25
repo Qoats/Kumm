@@ -16,7 +16,9 @@ import { endSharingQuietly, shareAboard } from "./ride";
 export interface TripCall { code: string; name: string; lat: number; lon: number; arr: number; dep: number }
 export interface TripDetail { id: string; line: string; dest: string; mode: string; n: string; calls: TripCall[]; board?: number }
 /** board : indice de l'arrêt de montée (-1 : déjà à bord) ; alight : indice de l'arrêt de descente */
-export interface Journey { detail: TripDetail; board: number; alight: number; native: boolean; reminded?: boolean; warned?: boolean; status?: NativeStatus }
+export interface Journey { detail: TripDetail; board: number; alight: number; native: boolean; status?: NativeStatus;
+  /** étapes déjà annoncées par le bandeau (début, arrivée du véhicule, 3, 2 et 1 arrêts) */
+  shown: Set<string> }
 interface NativeStatus { active: boolean; boarded?: boolean; remaining?: number; next?: string; alight?: string; board?: string; eta?: number; speed?: number }
 
 interface KummTripPlugin {
@@ -56,11 +58,11 @@ export async function pickFromStop(stop: string, line: string, dest: string): Pr
 }
 
 /** Lance le suivi jusqu'à l'arrêt choisi */
-export async function startJourney(alight: number): Promise<void> {
+export async function startJourney(alight: number, note?: string): Promise<void> {
   const p = S.tripPick;
   if (!p) return;
-  const d = p.detail, j: Journey = { detail: d, board: p.board, alight, native: NATIVE };
-  S.tripPick = null; S.overlay = null;
+  const d = p.detail, j: Journey = { detail: d, board: p.board, alight, native: NATIVE, shown: new Set() };
+  S.tripPick = null; S.overlay = null; S.tpq = "";
   if (NATIVE) {
     try {
       const r = await Trip.start({
@@ -75,12 +77,28 @@ export async function startJourney(alight: number): Promise<void> {
   else if (p.board < 0) shareAboard({ id: d.id, line: d.line, dest: d.dest });
   S.journey = j;
   render();
-  toast(`Kumm vous préviendra avant ${d.calls[alight].name}`);
+  toast(note ?? `Kumm vous préviendra avant ${d.calls[alight].name}`);
+  tick();
+}
+
+/** Arrêt qui n'est pas sur le trajet : prévenu à l'arrêt du trajet le plus proche (correspondance) */
+export async function startJourneyNear(stop: { name: string; lat: number; lon: number }): Promise<void> {
+  const p = S.tripPick;
+  if (!p) return;
+  const k = Math.cos((stop.lat * Math.PI) / 180);
+  let best = p.from, dBest = Infinity;
+  p.detail.calls.forEach((c, i) => {
+    if (i < p.from) return;
+    const dd = Math.hypot((c.lon - stop.lon) * k, c.lat - stop.lat);
+    if (dd < dBest) { dBest = dd; best = i; }
+  });
+  await startJourney(best, `${stop.name} n'est pas sur ce trajet : Kumm vous préviendra à ${p.detail.calls[best].name}, l'arrêt le plus proche`);
 }
 
 export function stopJourney(): void {
   if (S.journey?.native) void Trip.stop().catch(() => { /* rien */ });
   S.journey = null;
+  hideBanner(true);
   render();
 }
 
@@ -93,47 +111,86 @@ function state(j: Journey, now = Date.now()): { boarded: boolean; remaining: num
   return { boarded, remaining: Math.max(0, j.alight - at + 1), next: c[Math.min(at, c.length - 1)].name, eta: j.board >= 0 ? c[j.board].arr - now : 0 };
 }
 
-/** Bandeau du trajet en cours, en haut de l'écran */
-export function journeyBanner(): string {
-  const j = S.journey;
-  if (!j) return "";
-  return `<div class="ride sharing jtrip"><span class="ride-dot"></span><span id="jban">${esc(bannerText(j))}</span><button data-jstop="1">Arrêter</button></div>`;
-}
-
 function bannerText(j: Journey): string {
   const s = state(j), c = j.detail.calls, line = lineLabel(j.detail.line), to = c[j.alight].name;
   if (!s.boarded) {
     const m = Math.round(s.eta / 60_000);
-    return `${line} à ${c[j.board].name} ${m < 1 ? "à l'approche" : `dans ${m} min`} · descente à ${to}`;
+    return `${line} à ${c[j.board].name} ${m < 1 ? "à l'approche" : `dans ${m} min`} · pensez à valider votre titre · descente à ${to}`;
   }
-  return s.remaining <= 1 ? `Prochain arrêt : ${to}, préparez-vous à descendre` : `Plus que ${s.remaining} arrêts · descente à ${to}`;
+  return s.remaining <= 1 ? `Descendez au prochain arrêt : ${to}` : `Plus que ${s.remaining} arrêts · descente à ${to}`;
 }
 
-/** Chaque 3 s, application ouverte : bandeau à jour ; sans service natif, rappels et alerte dans l'application */
-setInterval(() => {
+/* ---------- bandeau : apparaît, fait défiler son texte une fois, puis se cache ----------
+   Il apparaît au début du trajet, quand le véhicule arrive (avant de monter), puis à 3, 2 et 1 arrêts de la descente ;
+   à 2 et à 1 arrêt, le téléphone vibre. Il est hors de la page (#app) : les redessins ne relancent pas le défilement. */
+let banner: HTMLElement | null = null, hideTimer = 0;
+
+function showBanner(text: string): void {
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.className = "jbanner";
+    banner.innerHTML = `<span class="ride-dot"></span><span class="jb-t"><span class="jb-in"></span></span><button type="button">Arrêter</button>`;
+    banner.querySelector("button")!.addEventListener("click", () => { stopJourney(); toast("Suivi du trajet arrêté"); });
+    document.body.appendChild(banner);
+  }
+  window.clearTimeout(hideTimer);
+  const box = banner.querySelector<HTMLElement>(".jb-t")!, inner = banner.querySelector<HTMLElement>(".jb-in")!;
+  inner.getAnimations().forEach(a => a.cancel());
+  inner.textContent = text;
+  banner.classList.add("show");
+  requestAnimationFrame(() => {
+    const over = inner.scrollWidth - box.clientWidth;
+    if (over > 4) {
+      const a = inner.animate([{ transform: "translateX(0)" }, { transform: `translateX(-${over + 12}px)` }],
+        { duration: 1200 + over * 28, delay: 1000, easing: "linear", fill: "forwards" });
+      a.onfinish = () => { hideTimer = window.setTimeout(() => hideBanner(), 1800); };
+    } else hideTimer = window.setTimeout(() => hideBanner(), 4500);
+  });
+}
+
+function hideBanner(now = false): void {
+  window.clearTimeout(hideTimer);
+  if (!banner) return;
+  banner.classList.remove("show");
+  if (now) { banner.remove(); banner = null; }
+}
+
+/** Étape du trajet qui fait apparaître le bandeau (une seule fois chacune) */
+function stepOf(j: Journey, now: number): string | null {
+  const s = state(j, now);
+  if (!s.boarded) return s.eta < 120_000 ? "arrive" : "debut";
+  if (s.remaining <= 3 && s.remaining >= 1) return "r" + s.remaining;
+  return "debut";
+}
+
+function tick(): void {
   const j = S.journey;
   if (!j || document.hidden) return;
   const now = Date.now(), c = j.detail.calls;
-  const refresh = (): void => { const el = document.getElementById("jban"); if (el) el.textContent = bannerText(j); };
-  if (j.native) {
-    void Trip.status().then(st => {
-      if (S.journey !== j) return;
-      j.status = st;
-      if (!st.active) { S.journey = null; render(); return; }
-      refresh();
-    }).catch(() => { /* rien */ });
-    return;
+  const step = stepOf(j, now);
+  if (step && !j.shown.has(step)) {
+    j.shown.add(step);
+    if (step === "debut" && j.shown.size > 1) return;        // « début » seulement au tout début du trajet
+    showBanner(bannerText(j));
+    // le service Android vibre déjà avec ses notifications
+    if (!j.native && (step === "r2" || step === "r1")) vibrate(step === "r1" ? [400, 200, 400, 200, 600] : [300, 150, 300]);
   }
-  const s = state(j, now);
-  if (!s.boarded && !j.reminded && s.eta < 120_000) { j.reminded = true; alertInApp(`Votre ${lineLabel(j.detail.line)} arrive : pensez à valider votre titre de transport en montant`); }
-  if (s.boarded && !j.warned && s.remaining <= 1) { j.warned = true; alertInApp(`Descendez au prochain arrêt : ${c[j.alight].name}`); }
-  if (now > c[j.alight].arr + 60_000) { S.journey = null; render(); toast(`Arrivée à ${c[j.alight].name}`); return; }
-  refresh();
-}, 3000);
-
-function alertInApp(msg: string): void {
-  toast(msg);
-  try { navigator.vibrate?.([300, 150, 300]); } catch { /* rien */ }
+  if (!j.native && now > c[j.alight].arr + 60_000) { S.journey = null; hideBanner(true); render(); toast(`Arrivée à ${c[j.alight].name}`); }
 }
 
-const esc = (t: string): string => t.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]!));
+/** Chaque 3 s, application ouverte : état du service natif, puis bandeau si une étape est franchie */
+setInterval(() => {
+  const j = S.journey;
+  if (!j || document.hidden) return;
+  if (!j.native) return tick();
+  void Trip.status().then(st => {
+    if (S.journey !== j) return;
+    j.status = st;
+    if (!st.active) { S.journey = null; hideBanner(true); render(); return; }
+    tick();
+  }).catch(() => { /* rien */ });
+}, 3000);
+
+function vibrate(pattern: number[]): void {
+  try { navigator.vibrate?.(pattern); } catch { /* rien */ }
+}
