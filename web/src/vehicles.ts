@@ -165,7 +165,8 @@ export function vehicleHeading(v: Vehicle, t = serverNow()): number {
 
 /** Ce qu'affiche le panneau d'un véhicule suivi : état, vitesse moyenne estimée sur le tronçon, prochains arrêts */
 export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed: number | null; next: [string, number][] } {
-  const next = v.next.filter(([, at]) => at > t - 30_000).map(([name, at]) => [name, Math.max(0, Math.round((at - t) / 60000))] as [string, number]);
+  // arrêts déjà passés : retirés dès l'heure de passage
+  const next = v.next.filter(([, at]) => at > t).map(([name, at]) => [name, Math.max(0, Math.round((at - t) / 60000))] as [string, number]);
   if (v.w) return { state: "Au terminus", speed: 0, next };
   if (v.x) return { state: "Immobilisé", speed: 0, next };   // la durée est dans l'encadré au-dessus
   const atStop = v.a[0] === v.b[0] && v.a[1] === v.b[1];

@@ -18,7 +18,7 @@ export interface TripCall { code: string; name: string; lat: number; lon: number
 export interface TripDetail { id: string; line: string; dest: string; mode: string; n: string; calls: TripCall[]; board?: number; alight?: number }
 /** board : indice de l'arrêt de montée ; alight : indice de l'arrêt de descente */
 export interface Journey { detail: TripDetail; board: number; alight: number; native: boolean; status?: NativeStatus;
-  /** étapes déjà annoncées par le bandeau (début, arrivée du véhicule, 5, 2 et 1 arrêts) */
+  /** étapes déjà annoncées par le bandeau (arrivée du véhicule, 5, 2 et 1 arrêts) */
   shown: Set<string>;
   /** version web : position partagée une fois à bord */
   sharing?: boolean }
@@ -130,44 +130,56 @@ function state(j: Journey, now = Date.now()): { boarded: boolean; remaining: num
 }
 
 function bannerText(j: Journey): string {
-  const s = state(j), c = j.detail.calls, line = lineLabel(j.detail.line), to = c[j.alight].name;
-  if (!s.boarded) {
-    const m = Math.round(s.eta / 60_000);
-    return `${line} à ${c[j.board].name} ${m < 1 ? "à l'approche" : `dans ${m} min`} · pensez à valider votre titre · descente à ${to}`;
-  }
+  const s = state(j), to = j.detail.calls[j.alight].name;
+  if (!s.boarded) return "Pensez à valider votre titre de transport";
   return s.remaining <= 1 ? `Descendez au prochain arrêt : ${to}` : `Plus que ${s.remaining} arrêts · descente à ${to}`;
 }
 
 /* ---------- bandeau : apparaît, fait défiler son texte une fois, puis se cache ----------
-   Il apparaît au début du trajet, quand le véhicule arrive (avant de monter), puis à 5, 2 et 1 arrêts de la descente ;
-   à 2 et à 1 arrêt, le téléphone vibre. Il est hors de la page (#app) : les redessins ne relancent pas le défilement. */
-let banner: HTMLElement | null = null, hideTimer = 0;
+   Avant de monter, quand le véhicule arrive : « Pensez à valider votre titre », avec « OK » touchable au bout de 5 s. Puis à
+   5, 2 et 1 arrêts de la descente (sans bouton, il se cache seul) ; à 2 et à 1 arrêt, le téléphone vibre.
+   Il est hors de la page (#app) : les redessins ne relancent pas le défilement. */
+let banner: HTMLElement | null = null, hideTimer = 0, okTimer = 0;
 
-function showBanner(text: string): void {
+/** ok : le bandeau reste affiché jusqu'au toucher de « OK », possible au bout de 5 s (rappel de validation) */
+function showBanner(text: string, ok = false): void {
   if (!banner) {
     banner = document.createElement("div");
     banner.className = "jbanner";
-    banner.innerHTML = `<span class="ride-dot"></span><span class="jb-t"><span class="jb-in"></span></span><button type="button">Arrêter</button>`;
-    banner.querySelector("button")!.addEventListener("click", () => { stopJourney(); toast("Suivi du trajet arrêté"); });
+    banner.innerHTML = `<span class="ride-dot"></span><span class="jb-t"><span class="jb-in"></span></span><button type="button" hidden>OK</button>`;
+    banner.querySelector("button")!.addEventListener("click", () => hideBanner());
     document.body.appendChild(banner);
   }
   window.clearTimeout(hideTimer);
+  window.clearInterval(okTimer);
   const box = banner.querySelector<HTMLElement>(".jb-t")!, inner = banner.querySelector<HTMLElement>(".jb-in")!;
+  const btn = banner.querySelector<HTMLButtonElement>("button")!;
   inner.getAnimations().forEach(a => a.cancel());
   inner.textContent = text;
+  btn.hidden = !ok;
+  banner.classList.toggle("wrap", ok);   // rappel court : sur deux lignes au besoin, sans défilement
+  if (ok) {
+    let left = 5;
+    btn.disabled = true; btn.textContent = `OK (${left})`;
+    okTimer = window.setInterval(() => {
+      if (--left > 0) { btn.textContent = `OK (${left})`; return; }
+      window.clearInterval(okTimer); btn.disabled = false; btn.textContent = "OK";
+    }, 1000);
+  }
   banner.classList.add("show");
   requestAnimationFrame(() => {
-    const over = inner.scrollWidth - box.clientWidth;
+    const over = ok ? 0 : inner.scrollWidth - box.clientWidth;
     if (over > 4) {
       const a = inner.animate([{ transform: "translateX(0)" }, { transform: `translateX(-${over + 12}px)` }],
         { duration: 1200 + over * 28, delay: 1000, easing: "linear", fill: "forwards" });
-      a.onfinish = () => { hideTimer = window.setTimeout(() => hideBanner(), 1800); };
-    } else hideTimer = window.setTimeout(() => hideBanner(), 4500);
+      if (!ok) a.onfinish = () => { hideTimer = window.setTimeout(() => hideBanner(), 1800); };
+    } else if (!ok) hideTimer = window.setTimeout(() => hideBanner(), 4500);
   });
 }
 
 function hideBanner(now = false): void {
   window.clearTimeout(hideTimer);
+  window.clearInterval(okTimer);
   if (!banner) return;
   banner.classList.remove("show");
   if (now) { banner.remove(); banner = null; }
@@ -176,10 +188,10 @@ function hideBanner(now = false): void {
 /** Étape du trajet qui fait apparaître le bandeau (une seule fois chacune) */
 function stepOf(j: Journey, now: number): string | null {
   const s = state(j, now);
-  if (!s.boarded) return s.eta < 120_000 ? "arrive" : "debut";
+  if (!s.boarded) return s.eta < 120_000 ? "arrive" : null;
   if (s.remaining === 5 || s.remaining === 2 || s.remaining === 1) return "r" + s.remaining;
-  if (s.remaining === 4 || s.remaining === 3) return "r5";   // trajet commencé à moins de 5 arrêts
-  return "debut";
+  if (s.remaining === 4 || s.remaining === 3) return "r5";   // étape commencée à moins de 5 arrêts
+  return null;
 }
 
 function tick(): void {
@@ -189,8 +201,7 @@ function tick(): void {
   const step = stepOf(j, now);
   if (step && !j.shown.has(step)) {
     j.shown.add(step);
-    if (step === "debut" && j.shown.size > 1) return;        // « début » seulement au tout début du trajet
-    showBanner(bannerText(j));
+    showBanner(bannerText(j), step === "arrive");
     // le service Android vibre déjà avec ses notifications
     if (!j.native && (step === "r2" || step === "r1")) vibrate(step === "r1" ? [400, 200, 400, 200, 600] : [300, 150, 300]);
   }

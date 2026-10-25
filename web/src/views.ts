@@ -251,7 +251,7 @@ export function overlayVehicle(id: string): string {
   const v = VEHICLES.get(id);
   if (!v) return `<div class="overlay">${bar("Véhicule")}<main><div class="pad"><div class="empty">Ce véhicule n'est plus en circulation.</div></div></main></div>`;
   const now = serverNow();
-  const next = v.next.filter(([, t]) => t > now - 30_000).map(([name, t]) => {
+  const next = v.next.filter(([, t]) => t > now).map(([name, t]) => {
     const m = Math.max(0, Math.round((t - now) / 60000));
     return `<div class="stopline vn"><span class="d"></span><span class="r">${esc(name)}</span><b>${m < 1 ? "à l'approche" : m + " min"}</b></div>`;
   }).join("");

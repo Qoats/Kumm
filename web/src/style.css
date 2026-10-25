@@ -521,6 +521,8 @@ a.box,.more a{text-decoration:none;color:inherit}
 .jbanner.show{transform:none;opacity:1;pointer-events:auto}
 .jbanner .jb-t{flex:1;min-width:0;overflow:hidden;white-space:nowrap}
 .jbanner .jb-in{display:inline-block;white-space:nowrap}
-.jbanner button{background:var(--chip);border-radius:14px;padding:8px 12px;font-weight:800;flex:none}
+.jbanner button{background:var(--accent);color:var(--on-accent);border-radius:14px;padding:8px 14px;font-weight:800;flex:none}
+.jbanner button:disabled{background:var(--chip);color:var(--mute)}
 .toast{width:max-content;max-width:calc(100% - 32px);text-align:center;line-height:1.35}
 body:has(#navlayer) .jbanner{top:calc(env(safe-area-inset-top,0px) + 100px);max-width:496px;margin:0 auto}
+.jbanner.wrap .jb-t,.jbanner.wrap .jb-in{white-space:normal;line-height:1.3}
