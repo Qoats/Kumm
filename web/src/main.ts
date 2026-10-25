@@ -102,7 +102,8 @@ function draw(): void {
   }
   // petite animation à l'ouverture d'un écran ou d'une fiche (pas à chaque mise à jour)
   if (t !== lastTab) { document.querySelector("#app > main")?.classList.add("enter"); lastTab = t; }
-  const okey = o ? JSON.stringify(o) : "";
+  // changer d'onglet dans une fiche (Tous / Tram / Bus / Train) n'est pas l'ouverture d'une nouvelle fiche : pas d'animation
+  const okey = o ? `${o.k}:${"id" in o ? o.id : ""}` : "";
   if (okey !== lastOverlay) { if (o) document.querySelector(".overlay")?.classList.add("enter"); lastOverlay = okey; }
   const slot = document.getElementById("livemap-slot");
   if (slot) mountLiveMap(slot);
