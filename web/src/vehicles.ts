@@ -53,6 +53,7 @@ export function refreshVehicles(onUpdate: () => void): void {
     .then(r => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
     .then((j: { now: number; vehicles?: Vehicle[] }) => {
       skew = j.now - Date.now();
+      keepContinuity(new Map(VEHICLES), j.vehicles ?? [], serverNow());
       VEHICLES.clear();
       for (const v of j.vehicles ?? []) VEHICLES.set(v.id, v);
       onUpdate();
@@ -104,8 +105,8 @@ function profileOf(v: Vehicle): Profile | null {
 /** Secondes de roulage écoulées sur le tronçon selon le profil (bornées à 0..T) */
 const runTime = (v: Vehicle, pr: Profile, t: number): number => Math.max(0, Math.min(pr.T, (t - v.a[2]) / 1000 - pr.wait));
 
-/** Avancée sur le tronçon (0 = arrêt quitté, 1 = arrêt suivant) */
-function progress(v: Vehicle, t: number): number {
+/** Avancée sur le tronçon d'après les horaires reçus (0 = arrêt quitté, 1 = arrêt suivant) */
+function rawProgress(v: Vehicle, t: number): number {
   const t1 = v.a[2], t2 = v.b[2];
   if (t2 <= t1) return 1;
   const pr = profileOf(v);
@@ -115,14 +116,86 @@ function progress(v: Vehicle, t: number): number {
   return Math.max(0, Math.min(1, d / D));
 }
 
-/** Vitesse à l'instant t selon le profil (km/h), null sans profil */
+/* Continuité d'une actualisation à l'autre (toutes les 20 s) : les horaires recalés par la CTS (retard, avance) déplacent
+   l'estimation. Au lieu d'un saut, le véhicule repart d'où il était affiché et rejoint la nouvelle estimation en douceur
+   pendant BLEND_MS ; sur un même tronçon, il ne recule jamais (au pire, il ralentit). */
+const BLEND_MS = 20_000;
+const segOf = (v: Vehicle): string => `${v.a[0]},${v.a[1]}>${v.b[0]},${v.b[1]}`;
+const blends = new Map<string, { seg: string; off: number; at: number }>();
+const shownF = new Map<string, { seg: string; f: number; hist: [number, number][] }>();
+
+/* Passage au tronçon suivant pendant une actualisation, alors que le véhicule affiché n'avait pas fini le précédent : il le
+   termine d'abord (en quelques secondes, à allure plausible), puis repart du quai sur le nouveau tronçon. */
+const carries = new Map<string, { o: Vehicle; f0: number; at: number; ms: number }>();
+function carry(v: Vehicle, t: number): { o: Vehicle; f: number } | null {
+  const c = carries.get(v.id);
+  if (!c) return null;
+  const k = (t - c.at) / c.ms;
+  if (k >= 1) { if (t >= serverNow() - 1000) carries.delete(v.id); return null; }
+  return { o: c.o, f: c.f0 + (1 - c.f0) * Math.max(0, k) };
+}
+const posOn = (v: Vehicle, f: number): [number, number] => {
+  const a = along(v, f);
+  return a ? a.pos : [v.a[0] + (v.b[0] - v.a[0]) * f, v.a[1] + (v.b[1] - v.a[1]) * f];
+};
+
+function smoothProgress(v: Vehicle, t: number): number {
+  let f = rawProgress(v, t);
+  const b = blends.get(v.id);
+  if (b && b.seg === segOf(v)) f += b.off * Math.max(0, Math.min(1, 1 - (t - b.at) / BLEND_MS));
+  return Math.max(0, Math.min(1, f));
+}
+
+/** Avancée affichée sur le tronçon : lissée, et jamais en arrière */
+function progress(v: Vehicle, t: number): number {
+  let f = smoothProgress(v, t);
+  const seg = segOf(v), last = shownF.get(v.id), live = t >= serverNow() - 1000;
+  const same = last && last.seg === seg;
+  if (same && f < last.f) f = last.f;
+  if (live) {
+    // historique des 3 dernières secondes : vitesse affichée = mouvement réellement visible
+    const hist = same ? last.hist.filter(([at]) => t - at < 3000) : [];
+    if (!hist.length || t - hist[hist.length - 1][0] >= 250) hist.push([t, f]);
+    shownF.set(v.id, { seg, f, hist });
+  }
+  return f;
+}
+
+/** Nouvelles positions reçues : chaque véhicule toujours sur le même tronçon garde sa position affichée comme point de départ */
+function keepContinuity(prev: Map<string, Vehicle>, next: Vehicle[], now: number): void {
+  blends.clear();
+  for (const v of next) {
+    const o = prev.get(v.id);
+    if (o && segOf(o) !== segOf(v)) {
+      shownF.delete(v.id);
+      // tronçon suivant : on finit d'abord le précédent, puis le nouveau part de son début
+      const f0 = carry(o, now)?.f ?? progress(o, now);
+      const fromEnd = o.b[0] === v.a[0] && o.b[1] === v.a[1];
+      if (fromEnd && f0 < 0.98) {
+        const left = (1 - f0) * (profileOf(o)?.D ?? 300);
+        const ms = Math.max(1500, Math.min(15_000, (left / 9) * 1000));
+        carries.set(v.id, { o, f0, at: now, ms });
+        const off = -rawProgress(v, now + ms);
+        if (off < -0.02) blends.set(v.id, { seg: segOf(v), off, at: now + ms });
+      } else carries.delete(v.id);
+      continue;
+    }
+    if (!o) continue;
+    const off = progress(o, now) - rawProgress(v, now);
+    if (Math.abs(off) > 0.02 && Math.abs(off) < 0.7) blends.set(v.id, { seg: segOf(v), off, at: now });
+  }
+  for (const id of shownF.keys()) if (!next.some(v => v.id === id)) shownF.delete(id);
+}
+
+/** Vitesse à l'instant t (km/h), d'après le mouvement affiché sur la carte (moyenne sur 2 s) ; null sans profil */
 function speedAt(v: Vehicle, t: number): number | null {
   const pr = profileOf(v);
   if (!pr) return null;
-  const x = runTime(v, pr, t), { acc, vc, ramp, T } = pr;
-  const ms = x < ramp ? acc * x : x > T - ramp ? acc * (T - x) : vc;
+  const f = progress(v, t), first = shownF.get(v.id)?.hist[0];
+  const dt = first ? (t - first[0]) / 1000 : 0;
+  const ms = first && dt >= 0.8 ? (pr.D * Math.max(0, f - first[1])) / dt : 0;
   // horaire très serré (arrondi à la minute) : on n'affiche pas une vitesse impossible
-  return Math.round(Math.min(v.m === "tram" ? 70 : 60, Math.max(0, ms) * 3.6));
+  return Math.round(Math.min(v.m === "tram" ? 70 : 60, ms * 3.6));
 }
 
 /** Point du tracé à la fraction f, et indice du segment où il se trouve */
@@ -138,6 +211,8 @@ function along(v: Vehicle, f: number): { pos: [number, number]; i: number } | nu
 
 /** Position à l'instant t : le long du tracé de la ligne s'il est connu, sinon en ligne droite entre les deux arrêts */
 export function vehiclePos(v: Vehicle, t = serverNow()): [number, number] {
+  const c = carry(v, t);
+  if (c) return posOn(c.o, c.f);
   const f = progress(v, t), a = along(v, f);
   if (a) return a.pos;
   const [la1, lo1] = v.a, [la2, lo2] = v.b;
@@ -148,18 +223,23 @@ export function vehiclePos(v: Vehicle, t = serverNow()): [number, number] {
  * Position décalée de « meters » le long du tracé (négatif : en arrière), sans sortir du tronçon : sert à faire attendre un
  * véhicule juste avant l'icône d'une station en restant sur sa voie, virages compris. null si le tracé est inconnu.
  */
+/** Tracé sur lequel le véhicule est affiché (celui du tronçon précédent tant qu'il le termine) : pour scripts/check-map.mjs */
+export const shownPath = (v: Vehicle, t = serverNow()): [number, number][] | undefined => (carry(v, t)?.o ?? v).p;
+
 export function vehiclePosAlong(v: Vehicle, meters: number, t = serverNow()): [number, number] | null {
-  if (!v.p || v.p.length < 2) return null;
-  const c = cumOf(v, v.p), total = c[c.length - 1] * 111_320;   // longueur du tronçon en mètres
+  const k = carry(v, t), w = k ? k.o : v;   // fin du tronçon précédent : sur son tracé
+  if (!w.p || w.p.length < 2) return null;
+  const c = cumOf(w, w.p), total = c[c.length - 1] * 111_320;   // longueur du tronçon en mètres
   if (total < 1) return null;
-  return along(v, Math.max(0, Math.min(1, progress(v, t) + meters / total)))?.pos ?? null;
+  return along(w, Math.max(0, Math.min(1, (k ? k.f : progress(v, t)) + meters / total)))?.pos ?? null;
 }
 
 /** Direction à l'instant t (degrés) : celle du tracé à cet endroit, pour que la flèche suive les virages */
 export function vehicleHeading(v: Vehicle, t = serverNow()): number {
-  const a = along(v, progress(v, t));
-  if (!a || !v.p) return v.h;
-  const p0 = v.p[a.i - 1], p1 = v.p[a.i];
+  const c = carry(v, t), w = c ? c.o : v;
+  const a = along(w, c ? c.f : progress(v, t));
+  if (!a || !w.p) return w.h;
+  const p0 = w.p[a.i - 1], p1 = w.p[a.i];
   return (Math.atan2((p1[1] - p0[1]) * Math.cos(rad(p0[0])), p1[0] - p0[0]) * 180 / Math.PI + 360) % 360;
 }
 
@@ -173,7 +253,7 @@ export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed:
   if (atStop) return { state: "À quai", speed: 0, next };
   // tram ou bus : vitesse du moment (encore à quai, accélération, croisière, freinage) ; train : moyenne du serveur
   const pr = profileOf(v);
-  if (pr && (t - v.a[2]) / 1000 < pr.wait) return { state: "À quai", speed: 0, next };
+  if (pr && (t - v.a[2]) / 1000 < pr.wait && progress(v, t) < 0.01) return { state: "À quai", speed: 0, next };
   const now = speedAt(v, t);
   if (now !== null) return { state: "En route", speed: now, next };
   if (v.s !== undefined) return { state: "En route", speed: v.s, next };

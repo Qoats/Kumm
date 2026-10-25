@@ -8,7 +8,7 @@ import { makeBaseLayer, wantsDarkMap } from "./tiles";
 import { POIS, S, STOPS, USER, render, toast } from "./store";
 import { COLORS, lineLabel, lineText } from "./data";
 import { esc } from "./util";
-import { VEHICLES, followInfo, refreshVehicles, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
+import { VEHICLES, followInfo, refreshVehicles, shownPath, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
 import { followStops, speedText } from "./views";
 import type { Vehicle } from "./vehicles";
 
@@ -63,6 +63,14 @@ let dots: L.Canvas | null = null;
 const shown = new Map<string, L.Layer>();
 let shownMode = "";
 let zooming = false;
+/* Glissement des véhicules suspendu un instant quand la carte change d'échelle : sinon ils traverseraient l'écran
+   depuis leur ancienne place */
+let glideTimer = 0;
+function freezeGlide(): void {
+  map?.getContainer().classList.add("vfreeze");
+  window.clearTimeout(glideTimer);
+  glideTimer = window.setTimeout(() => map?.getContainer().classList.remove("vfreeze"), 1200);
+}
 
 const icon = (kind: Layer, size: number): L.DivIcon =>
   L.divIcon({ html: markerIcon(kind, size), className: "lm-icon", iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
@@ -80,10 +88,12 @@ function create(): void {
   vehLayer = L.layerGroup().addTo(map);
   dots = L.canvas({ padding: 0.3 });
   // pendant l'animation du zoom, on ne déplace pas les véhicules (sinon saccades)
-  map.on("zoomstart", () => { zooming = true; });
+  // les véhicules glissent d'une position à la suivante (style .vm) ; pas pendant un zoom, où ils sont replacés d'un coup
+  map.on("zoomstart", () => { zooming = true; freezeGlide(); });
+  map.on("viewreset", freezeGlide);
   // l'utilisateur déplace la carte : le suivi se met en pause (bouton « Suivre de nouveau » dans le panneau)
   map.on("dragstart", () => { if (S.follow && !S.follow.paused) { S.follow.paused = true; render(); } });
-  map.on("zoomend", () => { zooming = false; });
+  map.on("zoomend", () => { zooming = false; freezeGlide(); syncVehicles(); });
   me = L.marker([USER.lat, USER.lon], {
     icon: L.divIcon({ html: '<div class="me-dot"></div>', className: "lm-icon", iconSize: [22, 22], iconAnchor: [11, 11] }),
     interactive: false, zIndexOffset: 1000
@@ -92,6 +102,7 @@ function create(): void {
   // pour inspecter la carte dans la console du navigateur (comme __kumm.STOPS)
   (window as unknown as { __kummMap?: L.Map; __kummVeh?: unknown }).__kummMap = map;
   (window as unknown as { __kummVeh?: unknown }).__kummVeh = VEHICLES;
+  (window as unknown as { __kummVehPath?: unknown }).__kummVehPath = shownPath;
 }
 
 /** Positions des arrêts modifiées (repères recentrés) : tous les repères sont recréés au prochain affichage */
@@ -170,7 +181,7 @@ export function mountLiveMap(slot: HTMLElement): void {
 const vehColor = (line: string): string => COLORS[lineLabel(line)] ?? COLORS[line] ?? (/^[A-F]$/.test(lineLabel(line)) ? "#0B4A9E" : "#1296A8");
 const vehIcon = (line: string, h: number): L.DivIcon => L.divIcon({
   html: `<div class="veh" style="--c:${vehColor(line)};--t:${COLORS[lineLabel(line)] ? lineText(lineLabel(line)) : "#fff"}"><i class="va" style="transform:rotate(${h}deg)"></i><span class="vb">${esc(lineLabel(line))}</span></div>`,
-  className: "lm-icon", iconSize: [34, 34], iconAnchor: [17, 17]
+  className: "lm-icon vm", iconSize: [34, 34], iconAnchor: [17, 17]
 });
 
 /** Place les véhicules visibles (catégories et filtre Tram / Bus respectés) ; appelé chaque seconde */

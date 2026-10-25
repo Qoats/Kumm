@@ -25,11 +25,15 @@ for (const [la, lo, z] of places) {
       for (const el of document.querySelectorAll(".leaflet-marker-icon[data-vid]")) {
         const v = V.get(el.dataset.vid); if (!v) continue;
         const r = el.getBoundingClientRect(), c = [r.left + r.width / 2, r.top + r.height / 2];
-        const gap = Math.min(999, ...stops.map(s => Math.hypot(s[0] - c[0], s[1] - c[1])));
+        // repère en train de glisser (passage devant une station, en 1 s) : pas compté comme posé sur la station
+        const gliding = el.getAnimations().some(a => a.playState === "running");
+        const gap = gliding ? 999 : Math.min(999, ...stops.map(s => Math.hypot(s[0] - c[0], s[1] - c[1])));
         // distance (pixels) entre le repère affiché et le tracé du véhicule
         let track = null;
-        if (v.p && v.p.length > 1) {
-          const box = map.getContainer().getBoundingClientRect(), pts = v.p.map(q => map.latLngToContainerPoint(q));
+        // tracé affiché : celui du tronçon précédent tant que le véhicule le termine (web/src/vehicles.ts, carry)
+        const path = window.__kummVehPath ? window.__kummVehPath(v) : v.p;
+        if (path && path.length > 1) {
+          const box = map.getContainer().getBoundingClientRect(), pts = path.map(q => map.latLngToContainerPoint(q));
           const x = c[0] - box.left, y = c[1] - box.top; track = 1e9;
           for (let i = 1; i < pts.length; i++) {
             const a = pts[i - 1], bb = pts[i], dx = bb.x - a.x, dy = bb.y - a.y, L2 = dx * dx + dy * dy;
