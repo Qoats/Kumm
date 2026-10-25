@@ -14,7 +14,7 @@
 <header><a href="/"><img src="/logo.svg" alt="">Kumm</a></header>
 <main>
 <h1>Politique de confidentialité</h1>
-<p class="date">Dernière mise à jour : 24 octobre 2026</p>
+<p class="date">Dernière mise à jour : 25 octobre 2026</p>
 
 <p>Cette page explique quelles données Kumm utilise, pourquoi, et combien de temps elles sont gardées. Kumm n’a pas de compte utilisateur, pas de publicité et pas d’outil de statistiques de visite.</p>
 
@@ -36,8 +36,16 @@
 <ul>
   <li>Quand l’application est ouverte et que la position est autorisée, Kumm compare votre position à celle des trams, bus et trains TER en circulation, <b>sur votre téléphone</b>. Si vous semblez voyager dans un véhicule, l’application vous demande si vous êtes à bord. Rien n’est envoyé à ce stade.</li>
   <li>Si vous acceptez de partager votre trajet, votre position est envoyée au serveur Kumm toutes les 10 secondes, avec seulement le trajet concerné : <b>aucun nom, aucun identifiant de votre téléphone</b>. Elle sert à afficher la vraie position du véhicule et son retard pour tous les utilisateurs.</li>
-  <li>Le serveur garde uniquement la dernière position de chaque véhicule, en mémoire, pendant 2 minutes au plus ; rien n’est écrit sur disque.</li>
-  <li>Le partage s’arrête quand vous touchez « Arrêter », au terminus, si vous quittez le trajet, au bout d’une heure, ou quand l’application passe en arrière-plan. Il ne fonctionne jamais application fermée.</li>
+  <li>Le serveur garde uniquement la dernière position de chaque véhicule, en mémoire, pendant 2 minutes au plus ; les positions ne sont jamais écrites sur disque.</li>
+  <li>Pour améliorer les estimations, le serveur garde seulement la <b>vitesse</b> mesurée entre deux arrêts (par exemple « 38 km/h entre République et Gallia »), au plus 40 mesures par tronçon : sans position, sans heure, sans identifiant. Il est impossible d’en retrouver un voyageur ou un trajet.</li>
+  <li>Le partage s’arrête quand vous touchez « Arrêter », au terminus, si vous quittez le trajet, au bout d’une heure, ou quand l’application passe en arrière-plan.</li>
+</ul>
+
+<h2>Trajet suivi (« Me prévenir pour descendre »)</h2>
+<ul>
+  <li>Vous choisissez votre arrêt de descente. Sur Android, Kumm suit alors le trajet <b>même écran éteint</b>, avec une notification permanente « Trajet en cours » : nombre d’arrêts restants, rappel de valider votre titre quand le véhicule arrive, alerte juste avant votre arrêt.</li>
+  <li>Une fois à bord, votre position est envoyée comme pour un trajet partagé (ci-dessus) : toutes les 10 secondes, sans nom ni identifiant, avec les mêmes règles de conservation. Votre arrêt de descente reste sur votre téléphone.</li>
+  <li>Le suivi s’arrête à votre arrêt, si vous quittez le trajet, au bout de 2 heures, ou avec le bouton « Arrêter » de la notification ou de l’application.</li>
 </ul>
 
 <h2>Recherche d’adresses</h2>

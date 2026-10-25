@@ -23,6 +23,8 @@ import { roadStatus } from "./roads.js";
 import { widgetData } from "./widgets.js";
 import { stallStatus } from "./stalls.js";
 import { lineRoutes, routesStatus } from "./routes.js";
+import { segSpeedStatus } from "./segspeeds.js";
+import { tripAt, tripById } from "./trips.js";
 import { TER_STATIONS_EMS } from "../shared/ter.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
 import type { TrafficMessage } from "./messages.js";
@@ -186,6 +188,14 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
     if (!TER_STATIONS_EMS.some(s => s.uic === uic)) return send(res, 404, "text/plain", "Gare inconnue");
     return cached(res, "info:trains:" + uic, 20, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify({ now: Date.now(), trains: trainDepartures(uic) }) }));
   }
+  // trajet suivi (« Me prévenir pour descendre ») : la course d'un véhicule, ou la prochaine qui passe à un arrêt
+  if (name === "trip") {
+    const id = url.searchParams.get("id"), stop = url.searchParams.get("stop"), line = url.searchParams.get("line") ?? "", dest = url.searchParams.get("dest") ?? "";
+    const ok = (s: string | null): boolean => s !== null && s.length > 0 && s.length <= 120;
+    if (!(ok(id) || (ok(stop) && ok(line) && dest.length <= 120))) return send(res, 400, "text/plain", "Paramètres invalides");
+    const t = id ? tripById(id) : tripAt(stop!, line, dest);
+    return send(res, t ? 200 : 404, "application/json; charset=utf-8", JSON.stringify(t ?? { error: "Trajet introuvable" }), undefined, { cache: "no-store" });
+  }
   // arrêts d'une ligne dans l'ordre, pour chaque sens (appris des courses de la CTS)
   if (name === "line-route") {
     const line = url.searchParams.get("line") ?? "";
@@ -306,6 +316,7 @@ function health(res: ServerResponse): Promise<void> {
     trajets_routiers: roadStatus(),
     vehicules_immobilises: stallStatus(),
     parcours_lignes: routesStatus(),
+    vitesses_apprises: segSpeedStatus(),
     acces_web_prive: WEB_PRIVATE,
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });

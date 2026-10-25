@@ -26,6 +26,8 @@ export interface Vehicle {
   w?: boolean;
   /** vitesse estimée par le serveur (km/h) ; pour un tram ou un bus, l'application calcule la vitesse du moment (profileOf) */
   s?: number;
+  /** tram ou bus : vitesse de croisière réelle sur ce tronçon (km/h), apprise des trajets partagés par les voyageurs */
+  c?: number;
   /** position partagée par un voyageur à bord */
   g?: boolean;
   /** retard sur l'horaire prévu, en secondes (négatif : en avance), d'après la position partagée */
@@ -82,7 +84,7 @@ const profiles = new WeakMap<Vehicle, Profile | null>();
 function profileOf(v: Vehicle): Profile | null {
   if (profiles.has(v)) return profiles.get(v)!;
   let pr: Profile | null = null;
-  const acc0 = ACCEL[v.m ?? ""], vt = CRUISE[v.m ?? ""], span = (v.b[2] - v.a[2]) / 1000;
+  const acc0 = ACCEL[v.m ?? ""], vt = v.c && v.c > 8 ? v.c / 3.6 : CRUISE[v.m ?? ""], span = (v.b[2] - v.a[2]) / 1000;
   const D = v.p && v.p.length > 1 ? cumOf(v, v.p)[v.p.length - 1] * 111_320 : len([v.a[0], v.a[1]], [v.b[0], v.b[1]]) * 111_320;
   if (acc0 && vt && span > 10 && D > 30) {
     // temps qu'il faut à vitesse normale (accélération et freinage compris) ; le reste du créneau : à quai, au plus MAX_WAIT

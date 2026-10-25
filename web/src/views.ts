@@ -241,6 +241,7 @@ function followPanel(f: { id: string; paused: boolean }): string {
       <div><b id="fv-next">${first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—"}</b><small id="fv-nextname">${first ? esc(first[0]) : "terminus"}</small></div>
       <div class="fstate"><b id="fv-state">${esc(info.state)}</b></div>
     </div>
+    ${v.w ? "" : `<button class="go ftrip" data-tpick="${esc(v.id)}">${ic("bell", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"')}${S.journey?.detail.id === v.id ? "Changer mon arrêt de descente" : "Je suis à bord : me prévenir pour descendre"}</button>`}
     ${f.paused ? `<button class="go fre" data-act="refollow">${ic("target", 'stroke="currentColor"')} Suivre de nouveau</button>` : ""}
     <div class="list"><div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div><div id="fv-stops">${followStops(info.next)}</div></div>
       <small class="src" style="display:block;margin-top:10px">Position et vitesse estimées d'après les horaires ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small></div>`;
@@ -260,6 +261,7 @@ export function overlayVehicle(id: string): string {
     ${v.g ? `<div class="fshared" style="margin:0 0 10px"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
     ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : ""}
     ${wait !== null ? `<div class="box vwait"><b>Au terminus</b><span>Départ ${wait < 1 ? "imminent" : `dans ${wait} min`}</span></div>` : ""}
+    ${v.w ? "" : `<button class="go" data-tpick="${esc(v.id)}" style="margin:0 0 12px">${ic("bell", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"')}Je suis à bord : me prévenir pour descendre</button>`}
     ${v.n ? `<div class="vno">Trajet <b>${esc(v.n)}</b><small>${v.m === "ter" ? "TER d’Alsace (Elsàss en alsacien) et numéro du train." : "Terminus de départ, ligne, date et heure de départ prévue."}</small></div>` : ""}
     <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small>
     ${messagesFor(v.line).map(m => `<button class="box" data-act="msgs" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;text-align:left${m.channel === "disruption" ? ";border-color:#E8402F" : ""}"><span class="warn">!</span><span style="flex:1"><b>${esc(m.title)}</b>${m.period ? `<br><small style="color:var(--mute)">${esc(m.period)}</small>` : ""}</span></button>`).join("")}
@@ -544,6 +546,24 @@ export function overlayStop(id: string): string {
    <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button><div id="stopdeps"></div></div></main></div>`;
 }
 
+/** Trajet suivi : choix de l'arrêt de descente (journey.ts) */
+export function overlayTripPick(): string {
+  const p = S.tripPick;
+  if (!p) return "";
+  const d = p.detail, l = lineLabel(d.line), now = Date.now();
+  const rows = d.calls.map((c, i) => ({ c, i })).slice(p.from).map(({ c, i }) => {
+    const m = Math.max(0, Math.round((c.arr - now) / 60000));
+    return `<button class="stopline vn" style="width:100%;text-align:left" data-alight="${i}"><span class="d"></span><span class="r">${esc(c.name)}</span><b>${m < 1 ? "à l'approche" : m + " min"}</b></button>`;
+  }).join("");
+  const from = p.board >= 0 ? `Montée à <b>${esc(d.calls[p.board].name)}</b> (${hm(d.calls[p.board].dep)})` : "Vous êtes à bord";
+  return `<div class="overlay" style="--c:${COLORS[l] ?? "#777"}">${bar("Où descendez-vous ?")}<main><div class="pad">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(d.line)}<b style="font-size:18px">vers ${esc(d.dest)}</b></div>
+    <p class="src" style="margin:6px 0 4px">${from}. Touchez votre arrêt : Kumm compte les arrêts restants et vous prévient juste avant de descendre${p.board >= 0 ? ", et vous rappelle de valider votre titre quand le véhicule arrive" : ""}.</p>
+    <div style="position:relative;margin-top:10px"><div class="rail"></div>${rows}</div>
+    <small class="src" style="display:block;margin-top:14px">Pendant le trajet, votre position (sans nom ni identifiant) est envoyée au serveur : elle donne à tous la vraie position et la vitesse du véhicule, et améliore les estimations des trajets suivants.</small>
+  </div></main></div>`;
+}
+
 export function overlayMsgs(): string {
   const dis = MESSAGES.filter(m => m.channel === "disruption"), works = MESSAGES.filter(m => m.channel === "works");
   const empty = MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Infos trafic indisponibles pour le moment." : "Aucune perturbation signalée.";
@@ -653,7 +673,7 @@ export function pickDir(key: string, dest: string): void {
 }
 
 /** Une tuile par ligne et par arrêt : si la ligne part dans plusieurs directions, un sélecteur permet de choisir la sienne */
-export function depCards(list: StopDeparture[], max = Infinity): string {
+export function depCards(list: StopDeparture[], max = Infinity, take = false): string {
   const now = Date.now();
   const groups = new Map<string, { stop: StopDeparture["stop"]; line: string; dests: Map<string, number[]>; cx: Map<string, number[]> }>();
   for (const { stop, d } of list) {
@@ -681,6 +701,7 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
     return `<div class="dep" role="button" tabindex="0" style="--lc:${c};--lt:${lineText(COLORS[g.line] ? g.line : lineLabel(g.line))}" data-stop="${esc(g.stop.id)}">
       <div class="h">${lineChip(g.line, true, hasAlert(g.line))}<b>${esc(g.stop.name)}</b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
       ${picker}
+      ${take && lineKind(g.line) !== "ter" ? `<button class="take" data-take="${esc(`${g.stop.name}|${g.line}|${dest}`)}">${ic("bell", 'width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" stroke-linejoin="round"')}Prendre ce ${isTram(g.line) ? "tram" : "bus"} vers ${esc(dest)} : me prévenir</button>` : ""}
       ${g.cx.get(dest)?.length ? `<div class="cxl">Supprimé : ${g.cx.get(dest)!.slice(0, 3).map(x => hm(x)).join(", ")}</div>` : ""}
       ${picker && t.length < 2 ? "" : `<div class="f">${picker
         // la direction est déjà dans le sélecteur : seulement les passages suivants

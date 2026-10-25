@@ -19,7 +19,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayTripPick, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -41,6 +41,7 @@ import { configureWidget, initWidgets, stopConfig, syncWidgets } from "./widgets
 import { followFromSearch, showOnMap, mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
 import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
+import { journeyBanner, pickFromStop, pickFromVehicle, startJourney, stopJourney } from "./journey";
 import { answerRide, rideBanner, rideDebug, startRideDetection, stopRideDetection, stopSharing } from "./ride";
 import { acceptTerms, allSteps, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
 import type { Release } from "./update";
@@ -79,7 +80,7 @@ function draw(): void {
   else body = `<main>${screenBuy()}</main>`;
 
   const o = S.overlay;
-  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
+  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : o.k === "tripPick" ? overlayTripPick() : overlayFavs();
 
   // positions de défilement de toutes les zones (listes, fiches, rangées de catégories…), par écran : voir scroll.ts
   const screen = o ? `${t}|${o.k}:${"id" in o ? String(o.id) : ""}` : t;
@@ -93,7 +94,7 @@ function draw(): void {
     `<nav>${NAV.map(n => `<button data-tab="${n[0]}" class="${t === n[0] || (n[0] === "search" && t === "lines") ? "on" : ""}"><span class="ni">${ic(n[2])}</span>${n[1]}</button>`).join("")}</nav>` +
     whenSheet() +
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
-    rideBanner() +
+    (S.journey ? journeyBanner() : rideBanner()) +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
 
   if (act) {
@@ -209,8 +210,8 @@ async function loadDepsNow(): Promise<void> {
           // gare : tableau des départs des trains (retards, suppressions), sous les trams et bus dans l'onglet « Tous »
           const trains = s.sncf ? TRAINS[s.sncf] ?? [] : [], others = all.filter(x => lineKind(x.d.line) !== "ter");
           const h = tabs + (cur === "ter" ? trainBoard(trains)
-            : cur ? depCards(all.filter(x => lineKind(x.d.line) === cur))
-            : (others.length || !s.sncf ? depCards(others) : "") + (s.sncf && (trains.length || !others.length) ? trainBoard(trains, others.length ? 6 : 15) : ""));
+            : cur ? depCards(all.filter(x => lineKind(x.d.line) === cur), Infinity, true)
+            : (others.length || !s.sncf ? depCards(others, Infinity, true) : "") + (s.sncf && (trains.length || !others.length) ? trainBoard(trains, others.length ? 6 : 15) : ""));
           // sans passage : souvent un arrêt non desservi (travaux, déviation) ; l'info trafic l'explique mieux que les détails techniques
           const none = !h.includes('class="dep"') && !h.includes("tb-row");
           return stopNotice(s, none) + (none ? h + debugBox() : h);
@@ -236,7 +237,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-wpick],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-tpick],[data-take],[data-alight],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -244,7 +245,17 @@ app.addEventListener("click", e => {
   if (!b || !app.contains(b)) return;
   const d = b.dataset;
   if (d.onb) { void onboardingAction(d.onb); return; }
-  if (d.ride) { if (d.ride === "stop") stopSharing(); else answerRide(d.ride === "yes"); return; }
+  if (d.ride) {
+    const asked = S.ridePrompt;
+    if (d.ride === "stop") stopSharing(); else answerRide(d.ride === "yes");
+    // « Oui, je suis dans ce bus » : on propose aussi de prévenir avant la descente
+    if (d.ride === "yes" && asked) void pickFromVehicle(asked.id);
+    return;
+  }
+  if (d.tpick) { void pickFromVehicle(d.tpick); return; }
+  if (d.take) { const [st, line, dest] = d.take.split("|"); void pickFromStop(st ?? "", line ?? "", dest ?? ""); return; }
+  if (d.alight !== undefined) { void startJourney(Number(d.alight)); return; }
+  if (d.jstop) { stopJourney(); toast("Suivi du trajet arrêté"); return; }
   if (d.upd) { updateAction(d.upd); return; }
   if (d.dirk !== undefined && d.dirv !== undefined) { pickDir(d.dirk, d.dirv); render(); return; }   // direction d'une ligne, sans ouvrir l'arrêt
   if (d.mb !== undefined) { const m = S.modal; S.modal = null; if (d.mb === "1" && m?.go) m.go(); render(); return; }

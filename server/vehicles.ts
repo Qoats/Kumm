@@ -11,6 +11,7 @@ import { locateOnCourse, sharedPosition } from "./ride.js";
 import { railBetween } from "./rail.js";
 import { roadBetween } from "./roads.js";
 import { stallOf } from "./stalls.js";
+import { cruiseOf } from "./segspeeds.js";
 import { terCourses, trainCode } from "./ter.js";
 
 /** [latitude, longitude, heure en ms] */
@@ -40,6 +41,8 @@ export interface Vehicle {
   /** vitesse estimée en km/h : croisière sur le tronçon pour un tram ou un bus, moyenne pour un train (0 à quai) ;
       absente si elle ne peut pas être calculée. L'application (0.31.1 et plus) calcule elle-même celle d'un tram ou d'un bus */
   s?: number;
+  /** tram ou bus : vitesse de croisière réelle sur ce tronçon (km/h), apprise des trajets partagés (segspeeds.ts) */
+  c?: number;
   /** position partagée par un voyageur à bord (moins de 45 s) : a = b = cette position */
   g?: boolean;
   /** retard sur l'horaire annoncé par la CTS, en secondes (négatif : en avance), d'après la position partagée */
@@ -251,8 +254,9 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       if (!a || !b) continue;
       const p = a !== b && n ? segmentPath(c.mode, c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : null;
       const sp = a !== b ? speedNow(c.line, c.mode, calls, i) : { s: 0 };
+      const learned = a !== b && n && c.mode !== "ter" ? cruiseOf(s.code, n.code) : null;
       out.push({
-        id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp ?? {}),
+        id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp ?? {}), ...(learned ? { c: learned } : {}),
         next: calls.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr]),
         ...(p ? { p } : {}), ...(vno ? { n: vno } : {})
       });

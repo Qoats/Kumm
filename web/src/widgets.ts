@@ -68,6 +68,8 @@ function openFrom(what: string): void {
   else if (kind === "search") { S.tab = "search"; S.overlay = null; }
   else if (kind === "favs") { S.overlay = { k: "favs" }; S.favQ = ""; }
   else if (kind === "msgs") { S.overlay = { k: "msgs" }; }
+  // notification du trajet suivi : la carte, sur le véhicule
+  else if (kind === "trajet") { S.tab = "nearby"; S.overlay = null; if (S.journey) S.follow = { id: S.journey.detail.id, paused: false }; }
   render();
 }
 

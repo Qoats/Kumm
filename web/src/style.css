@@ -509,3 +509,7 @@ a.box,.more a{text-decoration:none;color:inherit}
 .fstall b{display:block;color:#C62828}.fstall small{display:block;color:var(--mute);margin-top:2px}
 :root[data-scheme="dark"] .fstall b{color:#FF8A80}
 .vshared .veh .vb{box-shadow:0 0 0 3px #1E9E57,0 1px 4px rgba(0,0,0,.45)}
+/* trajet suivi (journey.ts) : bouton dans le panneau d'un véhicule, « Prendre ce bus » sur un départ */
+.go.ftrip{margin:12px 0 0}
+.dep .take{display:flex;align-items:center;gap:8px;margin-top:10px;width:100%;padding:9px 12px;border-radius:12px;background:var(--chip);color:var(--accent);font-size:14px;font-weight:700;text-align:left}
+.dep .take svg{flex:none}

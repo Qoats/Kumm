@@ -98,6 +98,22 @@ export function answerRide(yes: boolean): void {
   if (last) share(last, null);
 }
 
+/** Partage de la position à bord d'un véhicule choisi (trajet suivi sans service natif, voir journey.ts) */
+export function shareAboard(p: RideState): void {
+  if (sharing?.id === p.id) return;
+  sharing = { id: p.id, started: Date.now(), lastSent: 0, misses: 0 };
+  S.riding = p;
+  startRideDetection();
+  if (last) share(last, null);
+}
+
+/** Le service natif du trajet suivi prend le relais : la page n'envoie plus rien elle-même */
+export function endSharingQuietly(): void {
+  if (!sharing) return;
+  refused.add(sharing.id);
+  sharing = null; S.riding = null;
+}
+
 export function stopSharing(msg = "Partage du trajet arrêté"): void {
   if (!sharing) return;
   refused.add(sharing.id);

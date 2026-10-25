@@ -2,9 +2,11 @@
  * Positions partagées par des voyageurs à bord (« Je suis dans ce bus ») : quand un voyageur accepte, son téléphone envoie
  * sa position pendant le trajet (POST /api/ride, application ouverte, sans aucun identifiant). Le serveur vérifie qu'elle
  * colle au trajet de la course, garde seulement la dernière position de chaque course pendant 2 minutes, et s'en sert pour
- * afficher la vraie position du véhicule et son écart avec l'horaire (vehicles.ts). Rien n'est écrit sur disque.
+ * afficher la vraie position du véhicule et son écart avec l'horaire (vehicles.ts). Les positions ne sont pas écrites sur
+ * disque ; seule la vitesse mesurée sur chaque tronçon est gardée (segspeeds.ts), sans position ni identifiant.
  */
 import type { Course } from "./realtime.js";
+import { learnSpeed } from "./segspeeds.js";
 
 const KEEP_MS = 2 * 60_000;
 const MAX_OFF_ROUTE_M = 300;
@@ -59,9 +61,11 @@ export function receiveRide(body: unknown, courses: Course[], stopPos: StopPos):
   const c = courses.find(x => x.id === trip);
   const now = Date.now();
   if (!c || now > c.calls[c.calls.length - 1].arr + 5 * 60_000) { counts.refusees++; return { status: 404, msg: "Trajet terminé" }; }
-  const calls = c.calls.map(k => ({ p: stopPos.get(k.code) })).filter(k => k.p) as { p: { lat: number; lon: number } }[];
+  const calls = c.calls.map(k => ({ code: k.code, p: stopPos.get(k.code) })).filter(k => k.p) as { code: string; p: { lat: number; lon: number } }[];
   const where = calls.length >= 2 ? locateOnCourse({ lat, lon }, calls) : null;
   if (!where || where.d > MAX_OFF_ROUTE_M) { counts.refusees++; return { status: 409, msg: "Position éloignée du trajet" }; }
+  // vitesse réelle sur ce tronçon (position bien sur le trajet, en pleine voie) : apprise pour les estimations à venir
+  if (speed !== null && c.mode !== "ter" && where.d < 60 && where.f > 0.1 && where.f < 0.9) learnSpeed(calls[where.k].code, calls[where.k + 1].code, speed);
   const list = (reports.get(trip) ?? []).filter(r => now - r.t < KEEP_MS);
   list.push({ lat, lon, t: now, speed });
   reports.set(trip, list.slice(-5));
