@@ -181,6 +181,21 @@ export async function nextTrains(uic: string): Promise<TrainDeparture[]> {
   return j.trains;
 }
 
+/** Parcours d'une ligne (arrêts dans l'ordre) : le principal de chaque sens, puis les variantes fréquentes */
+export interface LineRoute { dest: string; from: string; codes: string[]; names: string[]; share: number; extra?: LineRoute[] }
+export const LINE_ROUTES: Record<string, { main: LineRoute[]; other: LineRoute[]; at: number; failed?: boolean }> = {};
+const lineRouteLoading = new Set<string>();
+
+/** Charge le parcours d'une ligne s'il n'est pas déjà là (ou s'il date de plus de 10 min) ; appelle done une fois reçu */
+export function ensureLineRoute(line: string, done: () => void): void {
+  const r = LINE_ROUTES[line];
+  if ((r && Date.now() - r.at < (r.failed ? 30_000 : 600_000)) || lineRouteLoading.has(line)) return;
+  lineRouteLoading.add(line);
+  get<{ main: LineRoute[]; other: LineRoute[] }>("/line-route?line=" + encodeURIComponent(line))
+    .then(j => { LINE_ROUTES[line] = { ...j, at: Date.now() }; }, () => { LINE_ROUTES[line] = { main: [], other: [], at: Date.now(), failed: true }; })
+    .finally(() => { lineRouteLoading.delete(line); done(); });
+}
+
 /** Mode de chaque quai (« 319A » → « tram », « bus » ou « bus+tram »), d'après les passages en temps réel */
 /** Lignes de chaque quai (« 527C » → ["B", "C", "F"]), apprises par le serveur au fil des passages */
 export async function loadQuayLines(): Promise<Record<string, string[]>> {

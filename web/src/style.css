@@ -253,6 +253,9 @@ nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .ticket b{font-size:17px;display:block}
 .ticket span{color:var(--mute);font-size:14px}
 .ticket .buy{background:var(--accent);color:var(--on-accent);border-radius:22px;padding:9px 18px;font-weight:700;white-space:nowrap}
+.ldirs{display:flex;gap:3px;margin-top:12px;padding:3px;border-radius:12px;background:var(--chip)}
+.ldirs button{flex:1 1 0;min-width:0;padding:9px 10px;border-radius:10px;font-size:14px;font-weight:600;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ldirs button.on{background:var(--c);color:#fff;font-weight:800}
 .stopline{display:flex;align-items:center;gap:14px;padding:0 6px;position:relative}
 .stopline .d{width:16px;height:16px;border-radius:50%;border:4px solid var(--c);background:var(--card);flex:none;z-index:1}
 .stopline .r{flex:1;padding:15px 0;border-bottom:1px solid var(--line);font-size:16.5px}

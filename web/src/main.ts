@@ -13,7 +13,7 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { TRAINS, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
+import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
@@ -112,6 +112,7 @@ function draw(): void {
   // après restoreSlots : les listes chargées à part ont retrouvé leur contenu, donc leur hauteur
   restoreScroll(app, screen);
   void loadDeps();
+  if (o?.k === "line") ensureLineRoute(o.id, render);
   syncWidgets();   // n'envoie rien si les données des widgets n'ont pas changé
 }
 hooks.render = draw;
@@ -319,7 +320,8 @@ app.addEventListener("click", e => {
     S.layers[k] = !S.layers[k]; render(); return;
   }
   if (d.poi) { S.overlay = { k: "poi", id: d.poi }; render(); return; }
-  if (d.line) { S.overlay = { k: "line", id: d.line }; render(); return; }
+  if (d.line) { S.overlay = { k: "line", id: d.line }; S.lineDir = 0; render(); return; }
+  if (d.ldir !== undefined) { S.lineDir = Number(d.ldir); render(); return; }
   if (d.stop) { S.overlay = { k: "stop", id: d.stop }; render(); return; }
   if (d.f) { S.filter = d.f as Filter; render(); return; }
   if (d.fav) { toggleFav(d.fav); return; }

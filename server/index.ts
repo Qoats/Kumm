@@ -22,6 +22,7 @@ import { startTer, terStatus, trainDepartures } from "./ter.js";
 import { roadStatus } from "./roads.js";
 import { widgetData } from "./widgets.js";
 import { stallStatus } from "./stalls.js";
+import { lineRoutes, routesStatus } from "./routes.js";
 import { TER_STATIONS_EMS } from "../shared/ter.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
 import type { TrafficMessage } from "./messages.js";
@@ -185,6 +186,12 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
     if (!TER_STATIONS_EMS.some(s => s.uic === uic)) return send(res, 404, "text/plain", "Gare inconnue");
     return cached(res, "info:trains:" + uic, 20, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify({ now: Date.now(), trains: trainDepartures(uic) }) }));
   }
+  // arrêts d'une ligne dans l'ordre, pour chaque sens (appris des courses de la CTS)
+  if (name === "line-route") {
+    const line = url.searchParams.get("line") ?? "";
+    if (!/^[A-Za-z0-9]{1,6}$/.test(line)) return send(res, 400, "text/plain", "Ligne invalide");
+    return cached(res, "info:line-route:" + line, 300, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(lineRoutes(line)) }));
+  }
   if (name === "vehicles") return cached(res, "info:vehicles", 5, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(vehiclesAt()) }));
   const conf = ALLOWED[name];
   if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
@@ -298,6 +305,7 @@ function health(res: ServerResponse): Promise<void> {
     trains_ter: terStatus(),
     trajets_routiers: roadStatus(),
     vehicules_immobilises: stallStatus(),
+    parcours_lignes: routesStatus(),
     acces_web_prive: WEB_PRIVATE,
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });

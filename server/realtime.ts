@@ -6,6 +6,7 @@
 import { AUTH, BASE, ET_POLL_S, REQUESTOR, STALE_REALTIME_S } from "./config.js";
 import { describeError, fetchCts } from "./cts.js";
 import { updateStalls } from "./stalls.js";
+import { initRoutes, learnRoutes } from "./routes.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,6 +48,8 @@ export interface Course {
   aimed?: number;
   /** numéro du train (trains TER seulement) */
   num?: string;
+  /** sens de la ligne (DirectionRef de la CTS) */
+  dir?: string;
 }
 
 /** Passages à venir, par code de quai CTS (« 412D ») */
@@ -64,6 +67,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.basename(path.dirname(here)) === "dist" ? path.join(here, "..", "..") : path.join(here, "..");
 const QUAYS_FILE = path.join(process.env.STATE_DIR ?? path.join(ROOT, "state"), "quays.json");
 let quaysDirty = false;
+initRoutes(path.dirname(QUAYS_FILE));
 try {
   const saved = JSON.parse(fs.readFileSync(QUAYS_FILE, "utf8")) as Record<string, { m?: string[]; l?: string[] }>;
   for (const [code, q] of Object.entries(saved)) {
@@ -139,7 +143,8 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
         const course: Course = {
           id: str(isObj(jr["FramedVehicleJourneyRef"]) ? jr["FramedVehicleJourneyRef"]["DatedVehicleJourneySAERef"] : "") || `${str(jr["LineRef"])}-${courses}`,
           line: str(jr["PublishedLineName"]) || str(jr["LineRef"]), dest: "", realTime: false,
-          mode: str(isObj(jr["Extension"]) ? jr["Extension"]["VehicleMode"] : "").toLowerCase(), calls: []
+          mode: str(isObj(jr["Extension"]) ? jr["Extension"]["VehicleMode"] : "").toLowerCase(), calls: [],
+          ...(jr["DirectionRef"] != null && jr["DirectionRef"] !== "" ? { dir: String(jr["DirectionRef"]) } : {})
         };
         const journeyCancelled = isCancelledJourney(jr);
         for (const c of calls) {
@@ -189,6 +194,7 @@ async function refresh(): Promise<void> {
     const recent = courses.filter(c => !ids.has(c.id) && c.calls[c.calls.length - 1].arr > now - 45 * 60_000);
     byCode = p.byCode; courses = [...p.list, ...recent]; validUntil = p.validUntil; loadedAt = now; lastError = "";
     updateStalls(p.list, now);
+    learnRoutes(p.list, now);
     for (const c of p.list) for (const call of c.calls) { if (c.mode) learn(quayModes, call.code, c.mode); if (c.line) learn(quayLines, call.code, c.line); }
     Object.assign(counts, { courses: p.courses, passages: p.passages, quais: p.byCode.size });
     if (counts.chargements++ === 0) console.log(`Passages du réseau chargés : ${p.courses} courses, ${p.byCode.size} quais`);

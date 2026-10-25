@@ -11,7 +11,9 @@ import { marker, markerIcon } from "./markers";
 import { ic, type IconName } from "./icons";
 import { MAPPATHS, mapRoutes } from "./map";
 import { POIS, S, STOPS, USER, mins, stopById } from "./store";
-import { debug, nextDepartures } from "./api";
+import { LINE_ROUTES, debug, nextDepartures } from "./api";
+import type { LineRoute } from "./api";
+import { stopKey } from "./network";
 import { fmtDist, fmtDur, haversine, walkMin } from "./geo";
 import { hm, minutes } from "./transit";
 import type { JLeg, Journey } from "./transit";
@@ -476,12 +478,60 @@ export function screenBuy(): string {
 }
 
 /* ============ ÉCRANS SUPERPOSÉS ============ */
+/** Arrêt de l'application pour un quai d'un parcours : par son code, sinon par son nom */
+function stopForCall(code: string, name: string): Stop | undefined {
+  return STOPS.find(s => s.quays?.some(q => q.code === code)) ?? STOPS.find(s => stopKey(s.name) === stopKey(name));
+}
+
+/** Tronçons d'une ligne coupée, dans l'ordre du trajet : le terminus de l'un est au plus près du départ du suivant */
+function orderParts(parts: LineRoute[]): LineRoute[] {
+  if (parts.length < 2) return parts;
+  const at = (p: LineRoute, i: number): Stop | undefined => stopForCall(p.codes.at(i)!, p.names.at(i)!);
+  const gap = (a: LineRoute, b: LineRoute): number => {
+    const x = at(a, -1), y = at(b, 0);
+    return x && y ? Math.hypot(x.lat - y.lat, (x.lon - y.lon) * 0.66) : 1;
+  };
+  const best = (rest: LineRoute[], seq: LineRoute[]): { seq: LineRoute[]; d: number } => !rest.length ? { seq, d: 0 }
+    : rest.map(p => { const r = best(rest.filter(q => q !== p), [...seq, p]); return { seq: r.seq, d: r.d + (seq.length ? gap(seq.at(-1)!, p) : 0) }; })
+      .reduce((a, b) => (b.d < a.d ? b : a));
+  return parts.length > 5 ? parts : best(parts, []).seq;
+}
+
 export function overlayLine(l: string): string {
-  const stops = STOPS.filter(s => s.lines.includes(l));
+  const r = LINE_ROUTES[l];
+  const route = r?.main[Math.min(S.lineDir, r.main.length - 1)];
+  const row = (id: string | undefined, name: string): string => id
+    ? `<button class="stopline" style="width:100%;text-align:left" data-stop="${esc(id)}"><span class="d"></span><span class="r">${esc(name)}</span></button>`
+    : `<div class="stopline"><span class="d"></span><span class="r">${esc(name)}</span></div>`;
+  let list: string, title = dirText(l);
+  if (route) {
+    const parts = orderParts([route, ...(route.extra ?? [])]);
+    const rail = (p: LineRoute): string => {
+      // un arrêt une seule fois, même si la CTS en donne deux quais à la suite
+      const rows: { id?: string; name: string }[] = [];
+      p.codes.forEach((c, i) => { const s = stopForCall(c, p.names[i]), name = s?.name ?? p.names[i];
+        if (rows.at(-1)?.name !== name) rows.push({ id: s?.id, name }); });
+      return `<div style="position:relative;margin-top:10px"><div class="rail"></div>${rows.map(x => row(x.id, x.name)).join("")}</div>`;
+    };
+    const lastDest = (m: LineRoute): string => orderParts([m, ...(m.extra ?? [])]).at(-1)!.dest;
+    title = `${parts[0].from} ⇄ ${lastDest(route)}`;
+    const others = r.other.filter(o => !r.main.some(m => m.from === o.from && m.dest === o.dest));
+    list = (r.main.length > 1 ? `<div class="ldirs" role="group" aria-label="Sens">${r.main.map((m, i) =>
+      `<button data-ldir="${i}" class="${m === route ? "on" : ""}">vers ${esc(lastDest(m))}</button>`).join("")}</div>` : "") +
+      (parts.length > 1 ? `<p class="src" style="margin-top:12px">La ligne circule en ${parts.length} tronçons séparés (travaux ou perturbation).</p>` : "") +
+      parts.map((p, i) => (i ? `<div class="sub" style="margin-top:16px">Tronçon ${i + 1} : ${esc(p.from)} → ${esc(p.dest)}</div>` : parts.length > 1 ? `<div class="sub" style="margin-top:12px">Tronçon 1 : ${esc(p.from)} → ${esc(p.dest)}</div>` : "") + rail(p)).join("") +
+      (others.length ? `<p class="src" style="margin-top:14px">Certains passages font un autre parcours : ${others.map(o => `${esc(o.from)} → ${esc(o.dest)}`).join(" ; ")}.</p>` : "");
+  } else if (!r) list = `<div class="empty">Chargement du parcours…</div>`;
+  else {
+    // parcours pas encore connu du serveur (ligne qui n'a pas circulé depuis sa mise en route) : liste sans ordre
+    const stops = STOPS.filter(s => s.lines.includes(l));
+    list = `<p class="src" style="margin-top:10px">${r.failed ? "Parcours indisponible pour le moment" : "Ordre des arrêts pas encore connu"} : arrêts desservis, par ordre alphabétique.</p>
+      <div style="position:relative;margin-top:10px"><div class="rail"></div>${stops.map(s => row(s.id, s.name)).join("")}</div>`;
+  }
   return `<div class="overlay" style="--c:${COLORS[l] ?? "#777"}">${bar("Ligne " + l)}
-   <main><div class="pad"><div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(l)}<b style="font-size:18px">${esc(dirText(l))}</b></div>
+   <main><div class="pad"><div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(l)}<b style="font-size:18px">${esc(title)}</b></div>
    ${messagesFor(l).length ? `<div style="margin:10px 0">${messagesFor(l).map(m => msgCard(m, false)).join("")}</div>` : ""}
-   <div style="position:relative;margin-top:10px"><div class="rail"></div>${stops.map(s => `<button class="stopline" style="width:100%;text-align:left" data-stop="${esc(s.id)}"><span class="d"></span><span class="r">${esc(s.name)}</span></button>`).join("")}</div></div></main></div>`;
+   ${list}</div></main></div>`;
 }
 
 export function overlayStop(id: string): string {
