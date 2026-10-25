@@ -6,6 +6,7 @@ import { hm, minutes } from "./transit";
 import type { Journey } from "./transit";
 import { toast } from "./store";
 import { esc } from "./util";
+import { followRoute } from "./journey";
 
 const fail = (): void => toast("Itinéraire à pied indisponible pour le moment");
 
@@ -36,6 +37,8 @@ export async function launchNav(kind: string): Promise<void> {
     if (!leg) return;
     const board = { label: leg.board.name, lat: leg.board.lat, lon: leg.board.lon };
     const route = await fetchWalk(plan.origin, board);
+    // alertes de descente : rappel de validation, 5 arrêts avant, puis juste avant l'arrêt
+    followRoute([{ line, start: Date.now(), from: leg.board, to: leg.alight }]);
     startNav({
       title: `Vers l’arrêt ${leg.board.name}`, route, dest: board,
       endHtml: `Prenez la ligne <b>${esc(line)}</b> et descendez à <b>${esc(leg.alight.name)}</b>. Vérifiez la direction sur l’affichage de l’arrêt.`,
@@ -60,6 +63,8 @@ async function launchJourney(i: number): Promise<void> {
   const lastTransit = [...j.legs].reverse().find(l => l.kind !== "walk") ?? first;
   const board = { label: first.from.name || "l’arrêt de départ", lat: first.from.lat, lon: first.from.lon };
   const alight = { label: lastTransit.to.name || "l’arrêt d’arrivée", lat: lastTransit.to.lat, lon: lastTransit.to.lon };
+  // alertes de descente pour chaque étape en tram ou en bus (correspondances comprises), voir journey.ts
+  followRoute(j.legs.filter(l => l.kind === "tram" || l.kind === "bus").map(l => ({ line: l.line ?? "", headsign: l.headsign, start: l.start, from: l.from, to: l.to })));
   try {
     const route = await fetchWalk(plan.origin, board);
     startNav({

@@ -41,5 +41,5 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_info_shortcuts" />
         </receiver>
-        <!-- trajet suivi (« Me prévenir pour descendre », android-src/TripService.java) : position et notifications, écran éteint -->
+        <!-- alertes de descente pendant une navigation (android-src/TripService.java) : position et notifications, écran éteint -->
         <service android:name=".TripService" android:exported="false" android:foregroundServiceType="location|dataSync" />

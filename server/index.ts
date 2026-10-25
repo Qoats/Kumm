@@ -188,12 +188,17 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
     if (!TER_STATIONS_EMS.some(s => s.uic === uic)) return send(res, 404, "text/plain", "Gare inconnue");
     return cached(res, "info:trains:" + uic, 20, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify({ now: Date.now(), trains: trainDepartures(uic) }) }));
   }
-  // trajet suivi (« Me prévenir pour descendre ») : la course d'un véhicule, ou la prochaine qui passe à un arrêt
+  // trajet suivi pendant une navigation : la course d'un véhicule, ou la prochaine qui passe à un arrêt
   if (name === "trip") {
-    const id = url.searchParams.get("id"), stop = url.searchParams.get("stop"), line = url.searchParams.get("line") ?? "", dest = url.searchParams.get("dest") ?? "";
-    const ok = (s: string | null): boolean => s !== null && s.length > 0 && s.length <= 120;
-    if (!(ok(id) || (ok(stop) && ok(line) && dest.length <= 120))) return send(res, 400, "text/plain", "Paramètres invalides");
-    const t = id ? tripById(id) : tripAt(stop!, line, dest);
+    const q = (k: string): string => url.searchParams.get(k) ?? "";
+    const id = q("id"), stop = q("stop"), line = q("line"), dest = q("dest"), to = q("to"), after = Number(q("after")) || 0;
+    const ok = (s: string): boolean => s.length > 0 && s.length <= 120;
+    if (!(ok(id) || (ok(stop) && ok(line) && dest.length <= 120 && to.length <= 120))) return send(res, 400, "text/plain", "Paramètres invalides");
+    const pt = (la: string, lo: string): { lat: number; lon: number } | undefined => {
+      const lat = Number(q(la)), lon = Number(q(lo));
+      return Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0 ? { lat, lon } : undefined;
+    };
+    const t = id ? tripById(id) : tripAt(stop, line, dest, to, after, pt("lat", "lon"), pt("tolat", "tolon"));
     return send(res, t ? 200 : 404, "application/json; charset=utf-8", JSON.stringify(t ?? { error: "Trajet introuvable" }), undefined, { cache: "no-store" });
   }
   // arrêts d'une ligne dans l'ordre, pour chaque sens (appris des courses de la CTS)

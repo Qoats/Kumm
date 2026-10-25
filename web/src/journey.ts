@@ -1,9 +1,10 @@
 /**
- * Trajet suivi : « Me prévenir pour descendre ». La personne choisit son arrêt de descente, depuis un véhicule suivi sur la
- * carte (elle est à bord) ou depuis un départ à un arrêt (elle va monter). Ensuite :
+ * Alertes de descente pendant une navigation (« Naviguer », puis un itinéraire en transports, flow.ts). Pour chaque étape en
+ * tram ou en bus, Kumm retrouve la course à prendre (ligne, arrêt de montée, arrêt de descente, heure) puis :
  * - avant de monter : rappel « Pensez à valider votre titre » quand le véhicule arrive (2 min avant) ;
- * - à bord : nombre d'arrêts restants, puis alerte « Descendez au prochain arrêt » juste avant l'arrêt choisi ;
- * - sa position, sans identifiant, améliore la position et la vitesse du véhicule pour tout le monde (POST /api/ride).
+ * - à bord : prévenu 5 arrêts avant la descente, puis à 2 arrêts (vibration), puis « Descendez au prochain arrêt » ;
+ * - correspondance : l'étape suivante est suivie à son tour ; véhicule manqué : le suivant de la même ligne ;
+ * - à bord, la position du téléphone, sans identifiant, améliore la position et la vitesse du véhicule pour tout le monde.
  * Sur Android, un service natif (android-src/TripService.java) fait tout cela même écran éteint. Ailleurs (version web),
  * le suivi se fait d'après les horaires, tant que la page est ouverte, et la position est partagée comme avec ride.ts.
  */
@@ -14,12 +15,21 @@ import { S, render, toast } from "./store";
 import { endSharingQuietly, shareAboard } from "./ride";
 
 export interface TripCall { code: string; name: string; lat: number; lon: number; arr: number; dep: number }
-export interface TripDetail { id: string; line: string; dest: string; mode: string; n: string; calls: TripCall[]; board?: number }
-/** board : indice de l'arrêt de montée (-1 : déjà à bord) ; alight : indice de l'arrêt de descente */
+export interface TripDetail { id: string; line: string; dest: string; mode: string; n: string; calls: TripCall[]; board?: number; alight?: number }
+/** board : indice de l'arrêt de montée ; alight : indice de l'arrêt de descente */
 export interface Journey { detail: TripDetail; board: number; alight: number; native: boolean; status?: NativeStatus;
-  /** étapes déjà annoncées par le bandeau (début, arrivée du véhicule, 3, 2 et 1 arrêts) */
-  shown: Set<string> }
+  /** étapes déjà annoncées par le bandeau (début, arrivée du véhicule, 5, 2 et 1 arrêts) */
+  shown: Set<string>;
+  /** version web : position partagée une fois à bord */
+  sharing?: boolean }
 interface NativeStatus { active: boolean; boarded?: boolean; remaining?: number; next?: string; alight?: string; board?: string; eta?: number; speed?: number }
+
+/** Étape en transport d'un itinéraire : ligne, arrêts de montée et de descente, heure de départ prévue */
+export interface RouteLeg {
+  line: string; headsign?: string; start: number;
+  from: { name: string; lat: number; lon: number };
+  to: { name: string; lat: number; lon: number };
+}
 
 interface KummTripPlugin {
   start(o: Record<string, unknown>): Promise<{ notifications: boolean }>;
@@ -39,74 +49,82 @@ async function fetchTrip(q: string): Promise<TripDetail | null> {
 /** Premier arrêt encore devant le véhicule */
 const ahead = (d: TripDetail, now = Date.now()): number => Math.max(0, d.calls.findIndex(c => c.arr > now - 20_000));
 
-/** Choix de l'arrêt de descente : à bord d'un véhicule suivi */
-export async function pickFromVehicle(id: string): Promise<void> {
-  const d = await fetchTrip("id=" + encodeURIComponent(id));
-  if (!d || d.calls.length < 2) { toast("Trajet introuvable : il vient peut-être de se terminer"); return; }
-  S.tripPick = { detail: d, board: -1, from: ahead(d) };
-  S.overlay = { k: "tripPick" };
-  render();
+/* ---------- itinéraire suivi : ses étapes, l'une après l'autre ---------- */
+let legs: RouteLeg[] = [], legIdx = 0, retryTimer = 0, missed = 0;
+
+/** Navigation lancée : les étapes en tram ou en bus de l'itinéraire seront suivies */
+export function followRoute(list: RouteLeg[]): void {
+  stopJourney(true);
+  legs = list.filter(l => l.line); legIdx = 0; missed = 0;
+  if (legs.length) void startLeg(legs[0].start - 120_000, true);
 }
 
-/** Choix de l'arrêt de descente : avant de monter, depuis un départ à un arrêt */
-export async function pickFromStop(stop: string, line: string, dest: string): Promise<void> {
-  const d = await fetchTrip(`stop=${encodeURIComponent(stop)}&line=${encodeURIComponent(line)}&dest=${encodeURIComponent(dest)}`);
-  if (!d || d.board === undefined) { toast("Ce passage n'est pas encore suivi : réessayez dans un instant"); return; }
-  S.tripPick = { detail: d, board: d.board, from: d.board + 1 };
-  S.overlay = { k: "tripPick" };
-  render();
+/** Retrouve la course de l'étape en cours ; pas encore publiée par la CTS (départ lointain) : nouvel essai chaque minute */
+async function startLeg(after: number, first = false): Promise<void> {
+  window.clearTimeout(retryTimer);
+  const leg = legs[legIdx];
+  if (!leg) return;
+  const q = new URLSearchParams({
+    stop: leg.from.name, line: leg.line, dest: leg.headsign ?? "", to: leg.to.name, after: String(Math.round(after)),
+    lat: String(leg.from.lat), lon: String(leg.from.lon), tolat: String(leg.to.lat), tolon: String(leg.to.lon)
+  });
+  const d = await fetchTrip(q.toString());
+  if (legs[legIdx] !== leg) return;                          // autre navigation lancée entre-temps
+  if (!d || d.board === undefined || d.alight === undefined) {
+    if (Date.now() < leg.start + 20 * 60_000) retryTimer = window.setTimeout(() => { void startLeg(after); }, 60_000);
+    if (first) toast(`Le ${lineLabel(leg.line)} sera suivi dès qu'il apparaîtra dans les horaires en direct`);
+    return;
+  }
+  await startJourney(d, d.board, d.alight);
 }
 
-/** Lance le suivi jusqu'à l'arrêt choisi */
-export async function startJourney(alight: number, note?: string): Promise<void> {
-  const p = S.tripPick;
-  if (!p) return;
-  const d = p.detail, j: Journey = { detail: d, board: p.board, alight, native: NATIVE, shown: new Set() };
-  S.tripPick = null; S.overlay = null;
+/** Étape terminée : la suivante (correspondance), s'il y en a une */
+function nextLeg(): void {
+  if (legIdx + 1 >= legs.length) { legs = []; return; }
+  legIdx++; missed = 0;
+  void startLeg(legs[legIdx].start - 120_000);
+}
+
+/** Lance le suivi d'une course, de l'arrêt de montée jusqu'à l'arrêt de descente */
+async function startJourney(d: TripDetail, board: number, alight: number): Promise<void> {
+  const j: Journey = { detail: d, board, alight, native: NATIVE, shown: new Set() };
   if (NATIVE) {
     try {
       const r = await Trip.start({
         base: API_BASE, key: APP_KEY, id: d.id, line: lineLabel(d.line), dest: d.dest, n: d.n, color: COLORS[lineLabel(d.line)] ?? "#136342",
-        board: p.board, alight, calls: d.calls.map(c => ({ name: c.name, lat: c.lat, lon: c.lon, arr: c.arr }))
+        board, alight, calls: d.calls.map(c => ({ name: c.name, lat: c.lat, lon: c.lon, arr: c.arr }))
       });
       if (!r.notifications) toast("Notifications refusées : les alertes s'afficheront seulement dans l'application");
     } catch { j.native = false; }
   }
-  // à bord : la position est partagée par le service natif ; sinon par la page (tant qu'elle est ouverte)
   if (j.native) endSharingQuietly();
-  else if (p.board < 0) shareAboard({ id: d.id, line: d.line, dest: d.dest });
   S.journey = j;
   render();
-  toast(note ?? `Kumm vous préviendra avant ${d.calls[alight].name}`);
+  toast(`Alertes de descente : Kumm vous préviendra 5 arrêts avant ${d.calls[alight].name}`);
   tick();
 }
 
-/** Arrêt qui n'est pas sur le trajet : prévenu à l'arrêt du trajet le plus proche (correspondance) */
-export async function startJourneyNear(stop: { name: string; lat: number; lon: number }): Promise<void> {
-  const p = S.tripPick;
-  if (!p) return;
-  const k = Math.cos((stop.lat * Math.PI) / 180);
-  let best = p.from, dBest = Infinity;
-  p.detail.calls.forEach((c, i) => {
-    if (i < p.from) return;
-    const dd = Math.hypot((c.lon - stop.lon) * k, c.lat - stop.lat);
-    if (dd < dBest) { dBest = dd; best = i; }
-  });
-  await startJourney(best, `${stop.name} n'est pas sur ce trajet : Kumm vous préviendra à ${p.detail.calls[best].name}, l'arrêt le plus proche`);
-}
-
-export function stopJourney(): void {
+/** Arrêt du suivi (bouton « Arrêter », nouvelle navigation) ; quiet : sans redessiner */
+export function stopJourney(quiet = false): void {
+  window.clearTimeout(retryTimer);
+  if (!quiet) legs = [];
   if (S.journey?.native) void Trip.stop().catch(() => { /* rien */ });
   S.journey = null;
   hideBanner(true);
-  render();
+  if (!quiet) render();
+}
+
+/** Fin d'une étape (arrivée, ou course terminée) : étape suivante */
+function legDone(): void {
+  S.journey = null; hideBanner(true); render();
+  nextLeg();
 }
 
 /** Où en est le trajet : état du service natif, sinon d'après les horaires */
 function state(j: Journey, now = Date.now()): { boarded: boolean; remaining: number; next: string; eta: number } {
   const st = j.status, c = j.detail.calls;
   if (j.native && st?.active) return { boarded: !!st.boarded, remaining: st.remaining ?? 0, next: st.next ?? "", eta: st.eta ?? 0 };
-  const boarded = j.board < 0 || now > c[j.board].arr + 20_000;
+  const boarded = now > c[j.board].arr + 20_000;
   const at = ahead(j.detail, now);
   return { boarded, remaining: Math.max(0, j.alight - at + 1), next: c[Math.min(at, c.length - 1)].name, eta: j.board >= 0 ? c[j.board].arr - now : 0 };
 }
@@ -121,7 +139,7 @@ function bannerText(j: Journey): string {
 }
 
 /* ---------- bandeau : apparaît, fait défiler son texte une fois, puis se cache ----------
-   Il apparaît au début du trajet, quand le véhicule arrive (avant de monter), puis à 3, 2 et 1 arrêts de la descente ;
+   Il apparaît au début du trajet, quand le véhicule arrive (avant de monter), puis à 5, 2 et 1 arrêts de la descente ;
    à 2 et à 1 arrêt, le téléphone vibre. Il est hors de la page (#app) : les redessins ne relancent pas le défilement. */
 let banner: HTMLElement | null = null, hideTimer = 0;
 
@@ -159,7 +177,8 @@ function hideBanner(now = false): void {
 function stepOf(j: Journey, now: number): string | null {
   const s = state(j, now);
   if (!s.boarded) return s.eta < 120_000 ? "arrive" : "debut";
-  if (s.remaining <= 3 && s.remaining >= 1) return "r" + s.remaining;
+  if (s.remaining === 5 || s.remaining === 2 || s.remaining === 1) return "r" + s.remaining;
+  if (s.remaining === 4 || s.remaining === 3) return "r5";   // trajet commencé à moins de 5 arrêts
   return "debut";
 }
 
@@ -175,7 +194,15 @@ function tick(): void {
     // le service Android vibre déjà avec ses notifications
     if (!j.native && (step === "r2" || step === "r1")) vibrate(step === "r1" ? [400, 200, 400, 200, 600] : [300, 150, 300]);
   }
-  if (!j.native && now > c[j.alight].arr + 60_000) { S.journey = null; hideBanner(true); render(); toast(`Arrivée à ${c[j.alight].name}`); }
+  const s = state(j, now);
+  // véhicule parti sans la personne (2 min après son passage, pas monté) : le suivant de la même ligne, deux fois au plus
+  if (!s.boarded && j.board >= 0 && now > c[j.board].dep + 120_000 && missed < 2) {
+    missed++; toast(`${lineLabel(j.detail.line)} manqué ? Kumm suit le suivant`);
+    stopJourney(true); void startLeg(now - 30_000);
+    return;
+  }
+  if (!j.native && s.boarded && !j.sharing) { j.sharing = true; shareAboard({ id: j.detail.id, line: j.detail.line, dest: j.detail.dest }); }
+  if (!j.native && now > c[j.alight].arr + 60_000) { toast(`Arrivée à ${c[j.alight].name}`); legDone(); }
 }
 
 /** Chaque 3 s, application ouverte : état du service natif, puis bandeau si une étape est franchie */
@@ -186,7 +213,7 @@ setInterval(() => {
   void Trip.status().then(st => {
     if (S.journey !== j) return;
     j.status = st;
-    if (!st.active) { S.journey = null; hideBanner(true); render(); return; }
+    if (!st.active) { legDone(); return; }
     tick();
   }).catch(() => { /* rien */ });
 }, 3000);

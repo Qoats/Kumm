@@ -6,14 +6,14 @@ import { loadPrefs } from "./themes";
 import { loadAlerts } from "./alerts";
 import type { AlertPrefs } from "./alerts";
 import type { Prefs } from "./themes";
-import type { Journey, TripDetail } from "./journey";
+import type { Journey } from "./journey";
 import type { Layer } from "./kinds";
 import { CONFIG } from "./config";
 import { CENTER, KX, KY, MOCK_POIS, MOCK_STOPS } from "./data";
 
 export type Tab = "home" | "search" | "lines" | "nearby" | "trips" | "buy";
 export type Filter = "all" | "bus" | "tram";
-export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string; /** onglet des départs : tous, ou un seul mode (arrêts desservis par trams et bus) */ mode?: "tram" | "bus" | "ter" } | { k: "poi"; id: string } | { k: "veh"; id: string } | { k: "settings" } | { k: "msgs" } | { k: "favs" } | { k: "account" } | { k: "help" } | { k: "widget" } | { k: "tripPick" } | null;
+export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string; /** onglet des départs : tous, ou un seul mode (arrêts desservis par trams et bus) */ mode?: "tram" | "bus" | "ter" } | { k: "poi"; id: string } | { k: "veh"; id: string } | { k: "settings" } | { k: "msgs" } | { k: "favs" } | { k: "account" } | { k: "help" } | { k: "widget" } | null;
 export interface Modal { t: string; p: string; b: string[]; go?: () => void }
 
 export interface State {
@@ -64,8 +64,7 @@ export interface State {
   /** « Êtes-vous dans le C6 ? » (ride.ts) : question posée, puis trajet partagé en cours */
   ridePrompt: { id: string; line: string; dest: string } | null;
   riding: { id: string; line: string; dest: string } | null;
-  /** trajet suivi : choix de l'arrêt de descente, puis trajet en cours (journey.ts) */
-  tripPick: { detail: TripDetail; board: number; from: number } | null;
+  /** alertes de descente pendant une navigation : course suivie (journey.ts) */
   journey: Journey | null;
   /** véhicule suivi sur la carte « À proximité » (paused : l'utilisateur a déplacé la carte) */
   follow: { id: string; paused: boolean } | null;
@@ -99,7 +98,7 @@ export const mins = (t: number): number => Math.max(0, Math.round((t - Date.now(
 
 export const S: State = {
   tab: "home", filter: "all", prefs: loadPrefs(), alerts: loadAlerts(), layers: Object.fromEntries(LAYERS.map(k => [k, true])) as Record<Layer, boolean>, sheet: 1, overlay: null, q: "", fav: [], modal: null, searchAddr: null, favQ: "", lineDir: 0, wsetup: null, tripBack: null,
-  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", ridePrompt: null, riding: null, tripPick: null, journey: null, follow: null, onb: null, upd: null
+  trip: { fromText: "Ma position", toText: "", mode: "transit", fromIsMe: true, from: null, dest: null, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null }, locOn: false, askedLoc: false, swiped: false, toast: "", ridePrompt: null, riding: null, journey: null, follow: null, onb: null, upd: null
 };
 try { S.fav = JSON.parse(localStorage.getItem("fav") ?? "[]") as string[]; } catch { /* stockage indisponible */ }
 

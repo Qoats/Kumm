@@ -34,11 +34,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Trajet suivi (« Me prévenir pour descendre ») : service au premier plan qui continue écran éteint ou application fermée.
+ * Alertes de descente pendant une navigation (web/src/journey.ts) : service au premier plan qui continue écran éteint ou application fermée.
  * - Avant de monter : l'heure d'arrivée du véhicule à l'arrêt de départ est relue toutes les 30 s ; 2 min avant, rappel
  *   « Pensez à valider votre titre de transport ».
  * - À bord : la position du téléphone (GPS) situe le voyageur sur le trajet ; la notification (rangée) indique le nombre
- *   d'arrêts restants, le prochain arrêt et la vitesse. À 3 arrêts, notification qui s'affiche puis se range ; à 2 arrêts,
+ *   d'arrêts restants, le prochain arrêt et la vitesse. À 5 arrêts, notification qui s'affiche puis se range ; à 2 arrêts,
  *   vibration ; juste avant l'arrêt de descente, alerte « Descendez au prochain arrêt » avec une vibration plus forte.
  * - Sa position (sans identifiant) est envoyée toutes les 10 s au serveur (POST /api/ride) : elle donne à tous la vraie
  *   position et la vitesse du véhicule, et apprend au serveur les vitesses réelles de chaque tronçon.
@@ -205,13 +205,13 @@ public class TripService extends Service implements LocationListener {
                 finish(4000L);
                 return;
             }
-            // 3 arrêts avant : notification qui s'affiche puis se range ; à 2 arrêts, vibration ; au dernier, alerte forte
+            // 5 arrêts avant : notification qui s'affiche puis se range ; à 2 arrêts, vibration ; au dernier, alerte forte
             int r = remaining();
             boolean far = toEnd > ALERT_M && arr[alight] - now > 100_000;
             if (r == 1 && far) r = 0;   // long dernier tronçon : l'alerte attend d'être proche de l'arrêt
-            if (r >= 1 && r <= 3 && r < announced) {
+            if (r >= 1 && r <= 5 && r < announced && (r == 5 || r <= 2 || announced > 5)) {
                 announced = r;
-                if (r == 3) step("Plus que 3 arrêts", "Descente à " + names[alight] + ".");
+                if (r >= 3) step("Plus que " + r + " arrêts", "Descente à " + names[alight] + ".");
                 else if (r == 2) alert("Plus que 2 arrêts", "Descente à " + names[alight] + " : préparez-vous.", false);
                 else alert("Descendez au prochain arrêt", names[alight] + " : préparez-vous à descendre.", true);
             }
@@ -313,7 +313,7 @@ public class TripService extends Service implements LocationListener {
         a.setDescription("Arrêts restants pendant un trajet suivi");
         a.setShowBadge(false);
         NotificationChannel st = new NotificationChannel(CH_STEP, "Étapes du trajet", NotificationManager.IMPORTANCE_HIGH);
-        st.setDescription("« Plus que 3 arrêts » : s'affiche quelques secondes, sans vibrer");
+        st.setDescription("« Plus que 5 arrêts » : s'affiche quelques secondes, sans vibrer");
         st.enableVibration(false);
         st.setSound(null, null);
         NotificationChannel b = new NotificationChannel(CH_ALERT, "Descente et validation", NotificationManager.IMPORTANCE_HIGH);
