@@ -24,10 +24,8 @@ export interface Vehicle {
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course */
   w?: boolean;
-  /** vitesse estimée par le serveur (km/h) : croisière d'un tram ou d'un bus, moyenne d'un train */
+  /** vitesse estimée par le serveur (km/h) ; pour un tram ou un bus, l'application calcule la vitesse du moment (profileOf) */
   s?: number;
-  /** tram ou bus : vitesse de roulage moyenne (km/h, hors arrêt à quai), base du profil accélération / croisière / freinage */
-  r?: number;
   /** position partagée par un voyageur à bord */
   g?: boolean;
   /** retard sur l'horaire prévu, en secondes (négatif : en avance), d'après la position partagée */
@@ -73,18 +71,24 @@ function cumOf(v: Vehicle, p: [number, number][]): number[] {
 
 /* Profil de vitesse d'un tram ou d'un bus sur le tronçon : quelques secondes encore à quai, accélération, croisière, freinage,
    arrivée à l'heure annoncée. Sert à la vitesse affichée et à l'avancée du repère (qui démarre doucement et freine). */
+/* Les horaires CTS laissent ~95 s pour ~500 m entre deux stations (20 km/h de moyenne), dont 20 à 30 s à quai et l'attente
+   aux feux. Le véhicule reste donc à quai une partie du créneau, puis roule à une vitesse de croisière normale (CRUISE) ;
+   si l'horaire laisse plus de temps que ça, il roule un peu moins vite, s'il en laisse moins, plus vite. */
 const ACCEL: Record<string, number> = { tram: 1.0, bus: 0.9 };
+const CRUISE: Record<string, number> = { tram: 40 / 3.6, bus: 35 / 3.6 };   // m/s
+const MAX_WAIT = 45;   // s, temps à quai au plus (montées et descentes, feu au départ, horaire arrondi à la minute)
 interface Profile { wait: number; T: number; D: number; acc: number; vc: number; ramp: number }
 const profiles = new WeakMap<Vehicle, Profile | null>();
 function profileOf(v: Vehicle): Profile | null {
   if (profiles.has(v)) return profiles.get(v)!;
   let pr: Profile | null = null;
-  const acc0 = ACCEL[v.m ?? ""], span = (v.b[2] - v.a[2]) / 1000;
+  const acc0 = ACCEL[v.m ?? ""], vt = CRUISE[v.m ?? ""], span = (v.b[2] - v.a[2]) / 1000;
   const D = v.p && v.p.length > 1 ? cumOf(v, v.p)[v.p.length - 1] * 111_320 : len([v.a[0], v.a[1]], [v.b[0], v.b[1]]) * 111_320;
-  if (acc0 && v.r && v.r > 3 && span > 10 && D > 30) {
-    // temps de roulage à la vitesse moyenne de la ligne ; le reste du créneau (au plus 10 s) : encore à quai au départ
-    const wait = Math.min(10, Math.max(0, span - D / (v.r / 3.6))), T = span - wait;
-    // croisière vc : D = vc·T − vc²/acc ; trop court pour cette accélération : on accélère plus (profil en triangle)
+  if (acc0 && vt && span > 10 && D > 30) {
+    // temps qu'il faut à vitesse normale (accélération et freinage compris) ; le reste du créneau : à quai, au plus MAX_WAIT
+    const need = D < (vt * vt) / acc0 ? 2 * Math.sqrt(D / acc0) : D / vt + vt / acc0;
+    const wait = Math.min(MAX_WAIT, Math.max(0, span - need), span * 0.6), T = span - wait;
+    // croisière vc pour parcourir D en T : D = vc·T − vc²/acc ; trop court pour cette accélération : profil en triangle
     let acc = acc0;
     const disc = acc * acc * T * T - 4 * acc * D;
     let vc: number;
@@ -164,7 +168,9 @@ export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed:
   if (v.x) return { state: "Immobilisé", speed: 0, next };   // la durée est dans l'encadré au-dessus
   const atStop = v.a[0] === v.b[0] && v.a[1] === v.b[1];
   if (atStop) return { state: "À quai", speed: 0, next };
-  // tram ou bus : vitesse du moment (accélération, croisière, freinage) ; train : moyenne calculée par le serveur
+  // tram ou bus : vitesse du moment (encore à quai, accélération, croisière, freinage) ; train : moyenne du serveur
+  const pr = profileOf(v);
+  if (pr && (t - v.a[2]) / 1000 < pr.wait) return { state: "À quai", speed: 0, next };
   const now = speedAt(v, t);
   if (now !== null) return { state: "En route", speed: now, next };
   if (v.s !== undefined) return { state: "En route", speed: v.s, next };

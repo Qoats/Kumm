@@ -38,10 +38,8 @@ export interface Vehicle {
   /** à quai au terminus, en attente du départ de sa prochaine course (a = b = quai et heure de départ) */
   w?: boolean;
   /** vitesse estimée en km/h : croisière sur le tronçon pour un tram ou un bus, moyenne pour un train (0 à quai) ;
-      absente si elle ne peut pas être calculée */
+      absente si elle ne peut pas être calculée. L'application (0.31.1 et plus) calcule elle-même celle d'un tram ou d'un bus */
   s?: number;
-  /** tram ou bus : vitesse de roulage moyenne (km/h, hors arrêt à quai), d'où l'application tire accélération et freinage */
-  r?: number;
   /** position partagée par un voyageur à bord (moins de 45 s) : a = b = cette position */
   g?: boolean;
   /** retard sur l'horaire annoncé par la CTS, en secondes (négatif : en avance), d'après la position partagée */
@@ -99,11 +97,11 @@ function speedAhead(line: string, mode: string, calls: { code: string; dep: numb
 /* Vitesse d'un tram ou d'un bus. La moyenne entre arrêts (speedAhead) compte l'arrêt à quai, le démarrage et le freinage :
    autour de 20 km/h pour un tram CTS, alors qu'il roule à 40 ou 50 entre deux stations. Ici : vitesse de roulage moyenne
    (sans les ~20 s à quai que la CTS compte souvent dans l'horaire), d'où la vitesse de croisière sur le tronçon en cours,
-   avec accélération et freinage (profil en trapèze). L'application refait ce profil à chaque instant (champ r) pour la
-   vitesse affichée et l'avancée du repère. La CTS ne publie pas la vitesse réelle : c'est une estimation. */
+   avec accélération et freinage (profil en trapèze). Les versions récentes de l'application calculent elles-mêmes la vitesse
+   du moment (web/src/vehicles.ts). La CTS ne publie pas la vitesse réelle : c'est une estimation. */
 const ACCEL = { tram: 1.0, bus: 0.9 } as Record<string, number>;
 const DWELL_S = 20;
-function speedNow(line: string, mode: string, calls: { code: string; dep: number; arr: number; p: { lat: number; lon: number } }[], i: number): { s: number; r?: number } | null {
+function speedNow(line: string, mode: string, calls: { code: string; dep: number; arr: number; p: { lat: number; lon: number } }[], i: number): { s: number } | null {
   const acc = ACCEL[mode];
   if (!acc) { const s = speedAhead(line, mode, calls, i); return s === null ? null : { s }; }
   // vitesse de roulage moyenne sur les 3 prochains tronçons (les horaires arrondis à la minute faussent un tronçon seul)
@@ -123,8 +121,7 @@ function speedNow(line: string, mode: string, calls: { code: string; dep: number
   // vitesse de croisière vc : distance = vc·T − vc²/acc (accélération et freinage à acc) ; tronçon trop court : profil en triangle
   const disc = acc * acc * T * T - 4 * acc * cur;
   const vc = disc > 0 ? (acc * T - Math.sqrt(disc)) / 2 : (acc * T) / 2;
-  // s : vitesse de croisière (pour les versions de l'application qui affichent s telle quelle) ; r : roulage moyen, en km/h
-  return { s: Math.round(Math.min(mode === "tram" ? 70 : 60, vc * 3.6)), r: Math.round(vAvg * 36) / 10 };
+  return { s: Math.round(Math.min(mode === "tram" ? 70 : 60, vc * 3.6)) };
 }
 
 /* ---------- code de chaque trajet et attente au terminus ----------

@@ -39,6 +39,8 @@ let bad = 0;
 for (const [name, st] of views) {
   await p.evaluate(st => { Object.assign(window.__kumm.S, st); window.__kumm.render(); }, st);
   await p.waitForTimeout(st.trip ? 9000 : 2500);
+  // fiche d'une ligne : son parcours arrive à part ; mesurer avant fausserait la comparaison
+  await p.waitForFunction(() => !document.querySelector(".overlay")?.textContent?.includes("Chargement du parcours"), null, { timeout: 15000 }).catch(() => {});
   const set = await p.evaluate(() => {
     const out = [];
     const walk = el => { for (const c of el.children) { if (c.classList.contains("leaflet-container")) continue;
