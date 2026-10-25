@@ -122,7 +122,10 @@ function rawProgress(v: Vehicle, t: number): number {
 const BLEND_MS = 20_000;
 const segOf = (v: Vehicle): string => `${v.a[0]},${v.a[1]}>${v.b[0]},${v.b[1]}`;
 const blends = new Map<string, { seg: string; off: number; at: number }>();
-const shownF = new Map<string, { seg: string; f: number; hist: [number, number][] }>();
+const shownF = new Map<string, { seg: string; f: number; t: number; hist: [number, number][] }>();
+/** Estimation repoussée derrière la position affichée (retard annoncé) : le véhicule continue au pas (m/s), sans dépasser
+    l'approche de l'arrêt (fraction du tronçon), au lieu de s'arrêter net en pleine voie */
+const CREEP_MS = 2.5, CREEP_MAX = 0.92;
 
 /* Passage au tronçon suivant pendant une actualisation, alors que le véhicule affiché n'avait pas fini le précédent : il le
    termine d'abord (en quelques secondes, à allure plausible), puis repart du quai sur le nouveau tronçon. */
@@ -146,17 +149,20 @@ function smoothProgress(v: Vehicle, t: number): number {
   return Math.max(0, Math.min(1, f));
 }
 
-/** Avancée affichée sur le tronçon : lissée, et jamais en arrière */
+/** Avancée affichée sur le tronçon : lissée, jamais en arrière, et jamais figée en pleine voie */
 function progress(v: Vehicle, t: number): number {
   let f = smoothProgress(v, t);
   const seg = segOf(v), last = shownF.get(v.id), live = t >= serverNow() - 1000;
   const same = last && last.seg === seg;
-  if (same && f < last.f) f = last.f;
+  if (same && f < last.f) {
+    const dt = Math.max(0, (t - last.t) / 1000), D = profileOf(v)?.D ?? 300;
+    f = last.f < CREEP_MAX ? Math.min(CREEP_MAX, last.f + (CREEP_MS * dt) / D) : last.f;
+  }
   if (live) {
     // historique des 3 dernières secondes : vitesse affichée = mouvement réellement visible
     const hist = same ? last.hist.filter(([at]) => t - at < 3000) : [];
     if (!hist.length || t - hist[hist.length - 1][0] >= 250) hist.push([t, f]);
-    shownF.set(v.id, { seg, f, hist });
+    shownF.set(v.id, { seg, f, t, hist });
   }
   return f;
 }
@@ -223,6 +229,9 @@ export function vehiclePos(v: Vehicle, t = serverNow()): [number, number] {
  * Position décalée de « meters » le long du tracé (négatif : en arrière), sans sortir du tronçon : sert à faire attendre un
  * véhicule juste avant l'icône d'une station en restant sur sa voie, virages compris. null si le tracé est inconnu.
  */
+/** Avancée affichée sur le tronçon (0 à 1), pour les mesures de scripts/check-map.mjs */
+export const shownProgress = (id: string): number | null => shownF.get(id)?.f ?? null;
+
 /** Tracé sur lequel le véhicule est affiché (celui du tronçon précédent tant qu'il le termine) : pour scripts/check-map.mjs */
 export const shownPath = (v: Vehicle, t = serverNow()): [number, number][] | undefined => (carry(v, t)?.o ?? v).p;
 

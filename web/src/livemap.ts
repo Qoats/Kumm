@@ -8,7 +8,7 @@ import { makeBaseLayer, wantsDarkMap } from "./tiles";
 import { POIS, S, STOPS, USER, render, toast } from "./store";
 import { COLORS, lineLabel, lineText } from "./data";
 import { esc } from "./util";
-import { VEHICLES, followInfo, refreshVehicles, shownPath, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
+import { VEHICLES, followInfo, refreshVehicles, shownPath, shownProgress, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
 import { followStops, speedText } from "./views";
 import type { Vehicle } from "./vehicles";
 
@@ -102,7 +102,8 @@ function create(): void {
   // pour inspecter la carte dans la console du navigateur (comme __kumm.STOPS)
   (window as unknown as { __kummMap?: L.Map; __kummVeh?: unknown }).__kummMap = map;
   (window as unknown as { __kummVeh?: unknown }).__kummVeh = VEHICLES;
-  (window as unknown as { __kummVehPath?: unknown }).__kummVehPath = shownPath;
+  (window as unknown as { __kummVehPath?: unknown; __kummVehF?: unknown }).__kummVehPath = shownPath;
+  (window as unknown as { __kummVehF?: unknown }).__kummVehF = shownProgress;
 }
 
 /** Positions des arrêts modifiées (repères recentrés) : tous les repères sont recréés au prochain affichage */
