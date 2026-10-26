@@ -34,6 +34,15 @@ export const lineChip = (l: string, sm = false, alert = false): string => {
 const chipAlert = (l: string): string =>
   `<button class="ln" data-line="${esc(l)}" style="background:${COLORS[l] ?? "#777"};color:${lineText(l)}">${esc(l)}${hasAlert(l) ? '<span class="al" style="color:#fff">!</span>' : ""}</button>`;
 const live = '<span class="live"></span>';
+/** Ordre des lignes : trams (A à F), lignes G et H, lignes à lettre et numéro (C1, L1…), puis bus par numéro */
+const lineOrder = (l: string): string =>
+  /^[A-F]$/.test(l) ? "0" + l : /^[GH]$/.test(l) ? "1" + l : /^[A-Z]+\d+$/.test(l) ? "2" + l.replace(/\d+/, d => d.padStart(4, "0")) : /^\d+$/.test(l) ? "3" + l.padStart(4, "0") : "4" + l;
+/** Toutes les lignes du réseau : celles qui desservent les arrêts connus (la liste fixe ALL_LINES tant qu'ils ne sont pas chargés) */
+export function networkLines(): string[] {
+  const set = new Set<string>(ALL_LINES);
+  for (const st of STOPS) for (const l of st.lines) { const n = lineLabel(l); if (lineKind(l) !== "ter" && n.length <= 5) set.add(n); }
+  return [...set].sort((a, b) => lineOrder(a).localeCompare(lineOrder(b)));
+}
 const dirs = (l: string): [string, string] => DIRS[l] ?? ["", ""];
 const dirText = (l: string): string => { const d = dirs(l); return d[0] + (d[0] !== d[1] ? " ⇄ " + d[1] : ""); };
 /** Date et heure à Strasbourg ; 04h00 et 02h00 sont le début et la fin de journée de service de la CTS : on n'affiche alors que la date */
@@ -122,7 +131,7 @@ export function screenHome(): string {
     <h2>Infos trafic <button class="pill" data-act="msgs">Toutes les perturbations</button></h2>
     ${trafficSummary()}
     <div class="sub">Toutes les lignes</div>
-    <div class="chips">${ALL_LINES.map(chipAlert).join("")}</div>
+    <div class="chips">${networkLines().map(chipAlert).join("")}</div>
 
     <h2>Horaires <span><button class="pill" data-tab="search">Par arrêts</button><button class="pill" data-tab="lines">Par ligne</button></span></h2>
     <button class="box" data-tab="search"><span>Trouvez les horaires d’une ligne à un arrêt</span><span class="rb">${ic("clock")}</span></button>
@@ -137,7 +146,7 @@ export function screenHome(): string {
 export function screenSearch(): string {
   const q = fold(S.q);
   const stops = STOPS.filter(s => !q || fold(s.name).includes(q)).slice(0, 40);
-  const lines = ALL_LINES.filter(l => !q || l.toLowerCase() === q || dirs(l).some(d => fold(d).includes(q)));
+  const lines = networkLines().filter(l => !q || l.toLowerCase() === q || dirs(l).some(d => fold(d).includes(q)));
   // lieux de la carte (P+R, Vélhop, Véloparks…) et adresses : chaque résultat mène à l'écran des itinéraires (« Naviguer »)
   const pois = q.length > 1 ? POIS.filter(p => fold(p.name).includes(q)).slice(0, 8) : [];
   const addr = q.length > 2 && S.searchAddr && fold(S.searchAddr.q) === q ? S.searchAddr.items : [];
@@ -162,7 +171,7 @@ export function screenSearch(): string {
 }
 
 export function screenLines(): string {
-  return bar("Toutes les lignes", "tabHome") + `<div class="pad">${ALL_LINES.map(l => `<button class="item" data-line="${esc(l)}">${lineChip(l)}<span>${esc(dirText(l))}<br><small style="color:var(--mute)">${isTram(l) ? "Tram" : "Bus"}</small></span>${hasAlert(l) ? '<span class="ml"><span class="warn" aria-label="Perturbation">!</span></span>' : ""}</button>`).join("")}</div>`;
+  return bar("Toutes les lignes", "tabHome") + `<div class="pad">${networkLines().map(l => `<button class="item" data-line="${esc(l)}">${lineChip(l)}<span>${esc(dirText(l))}<br><small style="color:var(--mute)">${isTram(l) ? "Tram" : "Bus"}</small></span>${hasAlert(l) ? '<span class="ml"><span class="warn" aria-label="Perturbation">!</span></span>' : ""}</button>`).join("")}</div>`;
 }
 
 export const layerCounts = (): Record<Layer, number> => {
@@ -745,8 +754,7 @@ function alertLineChoices(): string[] {
   S.fav.map(stopById).forEach(s => s?.lines.forEach(l => set.add(lineLabel(l))));
   S.alerts.lines.forEach(l => { if (l !== "*") set.add(l); });
   MESSAGES.forEach(m => m.lines.forEach(l => set.add(l)));
-  const order = (l: string): string => (/^[A-H]$/.test(l) ? "0" + l : /^\d+$/.test(l) ? "2" + l.padStart(4, "0") : "1" + l);
-  return [...set].sort((a, b) => order(a).localeCompare(order(b))).slice(0, 60);
+  return [...set].sort((a, b) => lineOrder(a).localeCompare(lineOrder(b))).slice(0, 60);
 }
 
 function alertSettings(): string {
