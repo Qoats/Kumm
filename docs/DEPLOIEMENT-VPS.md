@@ -104,7 +104,7 @@ Retour en arrière : redéployez l'archive précédente.
 Dans le dépôt GitHub, fichier `web/.env.android` : `VITE_API_BASE=https://app.kumm.fr`. Relancez la compilation de l'APK (Actions). Avec une adresse en https, l'APK de production n'accepte que le HTTPS.
 
 ## 11. Héberger d'autres sites sur kumm.fr
-Oui, c'est possible, et le VPS (6 vCPU, 12 Go) a largement la place. Le principe : **un nom par site**, tous traités par le même Caddy.
+Oui, c'est possible pour des sites légers : le VPS actuel (1 vCore, 2 Go de mémoire, dont Kumm utilise environ 300 Mo) a encore de la place pour des fichiers fixes. Le principe : **un nom par site**, tous traités par le même Caddy.
 1. **DNS** : un enregistrement A par nom (`blog`, `docs`…), vers l'adresse du VPS.
 2. **Un bloc dans `deploy/Caddyfile`** :
    - site de fichiers fixes (HTML, CSS, images) : `blog.kumm.fr { root * /srv/blog` puis `file_server }` et un volume `./blog:/srv/blog:ro` dans `docker-compose.yml` ;
@@ -114,7 +114,7 @@ Oui, c'est possible, et le VPS (6 vCPU, 12 Go) a largement la place. Le principe
 Le site vitrine fourni (`vitrine/index.html`) est une page unique, sans service externe ; ajoutez-y vos pages (mentions légales, politique de confidentialité, contact) en copiant des fichiers dans `vitrine/` : ils sont servis immédiatement, sans redémarrage.
 
 ## 12. Ensuite : se passer des services partagés
-Votre VPS (6 vCPU, 12 Go) peut héberger les services gratuits dont dépend Kumm, pour ne plus dépendre d'infrastructures communautaires : **calcul de marche à pied** (OSRM ou Valhalla avec les données OpenStreetMap d'Alsace), **calcul des trajets** (MOTIS avec les horaires GTFS de la CTS, si votre accord le permet) et **tuiles de carte**. Le serveur est déjà prêt à les utiliser (variables `GEO_WALK_BASE`, `TRANSIT_BASE`, `TILE_BASE`) ; voir `MISE-EN-LIGNE.md`.
+Un VPS plus puissant que l'actuel (1 vCore, 2 Go : trop juste pour ces calculs) pourrait héberger les services gratuits dont dépend Kumm, pour ne plus dépendre d'infrastructures communautaires : **calcul de marche à pied** (OSRM ou Valhalla avec les données OpenStreetMap d'Alsace), **calcul des trajets** (MOTIS avec les horaires GTFS de la CTS, si votre accord le permet) et **tuiles de carte**. Le serveur est déjà prêt à les utiliser (variables `GEO_WALK_BASE`, `TRANSIT_BASE`, `TILE_BASE`) ; voir `MISE-EN-LIGNE.md`.
 
 ## 13. Alertes trafic (notifications push, Firebase)
 1. **Projet Firebase** (gratuit) : https://console.firebase.google.com → « Créer un projet » (Google Analytics inutile).
@@ -133,11 +133,40 @@ Le script `deploy/kumm-update.sh` du dépôt, lancé toutes les 5 minutes par le
 - met le serveur à jour depuis `main` (retour à l'ancienne version si la nouvelle ne répond pas) ;
 - copie dans `~/kumm/apk/` le dernier APK signé publié par GitHub (branche `apk`) : l'application le propose au lancement et l'installe elle-même.
 
-Une seule fois, pour que le minuteur utilise le script du dépôt (il suivra ensuite tout seul ses évolutions) :
+Une seule fois, sur un nouveau serveur (en tant que `kumm`) : le script de lancement, qui utilise celui du dépôt (il suivra ensuite tout seul ses évolutions),
 ```
-printf '#!/usr/bin/env bash\nexec bash /home/kumm/kumm/deploy/kumm-update.sh\n' > ~/kumm-update.sh
-sudo systemctl start kumm-update.service && journalctl -u kumm-update -n 20     # « APK : version … disponible »
+printf '#!/usr/bin/env bash\nexec bash /home/kumm/kumm/deploy/kumm-update.sh\n' > ~/kumm-update.sh && chmod +x ~/kumm-update.sh
 ```
+puis le service `sudo nano /etc/systemd/system/kumm-update.service` :
+```
+[Unit]
+Description=Mise a jour de Kumm depuis GitHub
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=kumm
+WorkingDirectory=/home/kumm/kumm
+ExecStart=/home/kumm/kumm-update.sh
+```
+et le minuteur `sudo nano /etc/systemd/system/kumm-update.timer` :
+```
+[Unit]
+Description=Mise a jour de Kumm toutes les 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+```
+Activation et premier passage :
+```
+sudo systemctl daemon-reload && sudo systemctl enable --now kumm-update.timer && sudo systemctl start kumm-update.service
+journalctl -u kumm-update -n 20 --no-pager     # « APK : version … disponible »
+```
+Le dépôt est privé : le serveur s'y connecte avec une clé de déploiement en lecture seule (`ssh-keygen -t ed25519 -f ~/.ssh/kumm_deploy -N ""`, clé publique ajoutée dans GitHub → Settings → Deploy keys, et `~/.ssh/config` : `Host github.com` / `IdentityFile ~/.ssh/kumm_deploy` / `IdentitiesOnly yes`), puis `git clone git@github.com:evergreen-stack/Kumm-server.git ~/kumm`.
 Publier une version pour les téléphones : Actions → « APK Android » → Run workflow (case « Proposer cette version aux téléphones » cochée).
 Vérification : `https://app.kumm.fr/app/latest.json`, ou la partie `apk` de `/health`.
 
