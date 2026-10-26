@@ -3,10 +3,11 @@
  * sa position pendant le trajet (POST /api/ride, application ouverte, sans aucun identifiant). Le serveur vérifie qu'elle
  * colle au trajet de la course, garde seulement la dernière position de chaque course pendant 2 minutes, et s'en sert pour
  * afficher la vraie position du véhicule et son écart avec l'horaire (vehicles.ts). Les positions ne sont pas écrites sur
- * disque ; seule la vitesse mesurée sur chaque tronçon est gardée (segspeeds.ts), sans position ni identifiant.
+ * disque ; seules les observations sur le véhicule (vitesse, temps à quai, arrêts, retard) sont gardées (observations.ts).
  */
 import type { Course } from "./realtime.js";
-import { learnSpeed } from "./segspeeds.js";
+import { observe } from "./observations.js";
+import { tripCode } from "./vehicles.js";
 
 const KEEP_MS = 2 * 60_000;
 const MAX_OFF_ROUTE_M = 300;
@@ -61,11 +62,13 @@ export function receiveRide(body: unknown, courses: Course[], stopPos: StopPos):
   const c = courses.find(x => x.id === trip);
   const now = Date.now();
   if (!c || now > c.calls[c.calls.length - 1].arr + 5 * 60_000) { counts.refusees++; return { status: 404, msg: "Trajet terminé" }; }
-  const calls = c.calls.map(k => ({ code: k.code, p: stopPos.get(k.code) })).filter(k => k.p) as { code: string; p: { lat: number; lon: number } }[];
+  const calls = c.calls.map((k, i) => ({ i, p: stopPos.get(k.code) })).filter(k => k.p) as { i: number; p: { lat: number; lon: number } }[];
   const where = calls.length >= 2 ? locateOnCourse({ lat, lon }, calls) : null;
   if (!where || where.d > MAX_OFF_ROUTE_M) { counts.refusees++; return { status: 409, msg: "Position éloignée du trajet" }; }
-  // vitesse réelle sur ce tronçon (position bien sur le trajet, en pleine voie) : apprise pour les estimations à venir
-  if (speed !== null && c.mode !== "ter" && where.d < 60 && where.f > 0.1 && where.f < 0.9) learnSpeed(calls[where.k].code, calls[where.k + 1].code, speed);
+  // ce que cette position apprend du véhicule (vitesse, arrêts, retard), avec le jour, le mois et le créneau : observations.ts
+  const s0 = calls[where.k], s1 = calls[where.k + 1], here = { lat, lon };
+  const d0 = toSegment(here, s0.p, s0.p).d, d1 = toSegment(here, s1.p, s1.p).d;
+  if (s1.i === s0.i + 1) observe(c, tripCode(c), s0.i, where.f, where.d, d0 <= d1 ? { k: s0.i, m: d0 } : { k: s1.i, m: d1 }, speed, now);
   const list = (reports.get(trip) ?? []).filter(r => now - r.t < KEEP_MS);
   list.push({ lat, lon, t: now, speed });
   reports.set(trip, list.slice(-5));

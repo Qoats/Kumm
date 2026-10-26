@@ -23,7 +23,7 @@ import { roadStatus } from "./roads.js";
 import { widgetData } from "./widgets.js";
 import { stallStatus } from "./stalls.js";
 import { lineRoutes, routesStatus } from "./routes.js";
-import { segSpeedStatus } from "./segspeeds.js";
+import { observationStatus } from "./observations.js";
 import { tripAt, tripById } from "./trips.js";
 import { TER_STATIONS_EMS } from "../shared/ter.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
@@ -321,7 +321,7 @@ function health(res: ServerResponse): Promise<void> {
     trajets_routiers: roadStatus(),
     vehicules_immobilises: stallStatus(),
     parcours_lignes: routesStatus(),
-    vitesses_apprises: segSpeedStatus(),
+    observations_trajets: observationStatus(),
     acces_web_prive: WEB_PRIVATE,
     requetes: { total: stats.requests, refusees_429: stats.limited, erreurs_5xx: stats.errors5xx, lentes: stats.slow, erreurs_services: stats.upstreamErrors }
   });

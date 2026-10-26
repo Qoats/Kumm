@@ -28,6 +28,8 @@ export interface Vehicle {
   s?: number;
   /** tram ou bus : vitesse de croisière réelle sur ce tronçon (km/h), apprise des trajets partagés par les voyageurs */
   c?: number;
+  /** tram ou bus : temps à quai observé à l'arrêt de départ (s), appris des trajets partagés */
+  q?: number;
   /** position partagée par un voyageur à bord */
   g?: boolean;
   /** retard sur l'horaire prévu, en secondes (négatif : en avance), d'après la position partagée */
@@ -90,7 +92,8 @@ function profileOf(v: Vehicle): Profile | null {
   if (acc0 && vt && span > 10 && D > 30) {
     // temps qu'il faut à vitesse normale (accélération et freinage compris) ; le reste du créneau : à quai, au plus MAX_WAIT
     const need = D < (vt * vt) / acc0 ? 2 * Math.sqrt(D / acc0) : D / vt + vt / acc0;
-    const wait = Math.min(MAX_WAIT, Math.max(0, span - need), span * 0.6), T = span - wait;
+    // temps à quai : celui observé à cet arrêt par les voyageurs (champ q), sinon ce que l'horaire laisse, au plus MAX_WAIT
+    const wait = Math.min(v.q ?? MAX_WAIT, Math.max(0, span - need), span * 0.6), T = span - wait;
     // croisière vc pour parcourir D en T : D = vc·T − vc²/acc ; trop court pour cette accélération : profil en triangle
     let acc = acc0;
     const disc = acc * acc * T * T - 4 * acc * D;

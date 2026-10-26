@@ -7,7 +7,7 @@ import { AUTH, BASE, ET_POLL_S, REQUESTOR, STALE_REALTIME_S } from "./config.js"
 import { describeError, fetchCts } from "./cts.js";
 import { updateStalls } from "./stalls.js";
 import { initRoutes, learnRoutes } from "./routes.js";
-import { initSegSpeeds } from "./segspeeds.js";
+import { initObservations } from "./observations.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,7 +69,7 @@ const ROOT = path.basename(path.dirname(here)) === "dist" ? path.join(here, ".."
 const QUAYS_FILE = path.join(process.env.STATE_DIR ?? path.join(ROOT, "state"), "quays.json");
 let quaysDirty = false;
 initRoutes(path.dirname(QUAYS_FILE));
-initSegSpeeds(path.dirname(QUAYS_FILE));
+initObservations(path.dirname(QUAYS_FILE));
 try {
   const saved = JSON.parse(fs.readFileSync(QUAYS_FILE, "utf8")) as Record<string, { m?: string[]; l?: string[] }>;
   for (const [code, q] of Object.entries(saved)) {
