@@ -123,6 +123,7 @@ Un VPS plus puissant que l'actuel (1 vCore, 2 Go : trop juste pour ces calculs) 
 ```
 mkdir -p ~/kumm/secrets && nano ~/kumm/secrets/firebase.json      # coller tout le contenu du fichier, Ctrl+O, Entrée, Ctrl+X
 chmod 600 ~/kumm/secrets/firebase.json
+sudo chown 1000:1000 ~/kumm/secrets/firebase.json    # lisible par Kumm dans son conteneur (utilisateur 1000)
 cd ~/kumm && docker compose up -d --force-recreate kumm
 docker compose logs kumm | grep "Alertes push"                   # « actives (projet …) »
 ```
