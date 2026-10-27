@@ -76,12 +76,13 @@ jobs:
             require("fs").writeFileSync("android/app/google-services.json", JSON.stringify(j, null, 2));
             console.log("google-services.json valide (projet " + j.project_info.project_id + ")");
           '; fi
-          # icône et écran de démarrage Kumm (au lieu de ceux de Capacitor) ; fond vert de l'écran de démarrage (Android 12+)
+          # icône et écran de démarrage Kumm (au lieu de ceux de Capacitor) ; fond vert de l'écran de démarrage (Android 12+), puis thème de l'application
+          # (MainActivity garde l'écran de démarrage jusqu'à ce que la page soit dessinée)
           cp -r android-res/. android/app/src/main/res/
           # modules natifs (mise à jour de l'APK, widgets de l'écran d'accueil), enregistrés dans MainActivity
           cp android-src/*.java android/app/src/main/java/fr/kumm/app/
           STYLES=android/app/src/main/res/values/styles.xml
-          grep -q windowSplashScreenBackground "$STYLES" || sed -i 's|<item name="android:background">@drawable/splash</item>|<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">#136342</item>|' "$STYLES"
+          grep -q windowSplashScreenBackground "$STYLES" || sed -i 's|<item name="android:background">@drawable/splash</item>|<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">#136342</item>\n        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>|' "$STYLES"
           # position (« À proximité », « Ma position », guidage) et icône blanche des notifications dans la barre d'état
           MANIFEST=android/app/src/main/AndroidManifest.xml
           grep -q "ACCESS_FINE_LOCATION" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />|' "$MANIFEST"
