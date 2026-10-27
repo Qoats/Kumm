@@ -217,16 +217,18 @@ export function screenNearby(): string {
     : `<div id="livemap-slot"></div><span class="osm" style="bottom:calc(${h} + 4px)">© OpenStreetMap</span>`;
   return `<div class="map">
     ${background}
+    <button class="msearch" data-tab="search">${ic("search")}<span>Où allez-vous ?</span></button>
     <div class="layers">${chips}</div>
     <div class="mapbtns"><div class="tools"><button data-act="prefs" aria-label="Réglages">${ic("gear", 'stroke="currentColor"')}</button><button data-act="locate" aria-label="Me localiser">${ic("target", 'stroke="var(--accent)"')}</button></div>
     ${CONFIG.USE_MOCK ? "" : `<div class="tools zoom"><button data-act="zoomIn" aria-label="Zoomer">${ic("plus", 'stroke="currentColor"')}</button><button data-act="zoomOut" aria-label="Dézoomer">${ic("minus", 'stroke="currentColor"')}</button></div>`}</div>
+    ${S.follow || S.sheet === 2 ? "" : `<button class="mfab" data-tab="search" style="bottom:calc(${h} + 14px)">${ic("navigate")}Itinéraire</button>`}
     <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
       <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
-      ${S.follow ? followPanel(S.follow) : `<h3${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>
-      <div class="seg">
-        <button data-f="bus" class="${S.filter === "bus" ? "on" : ""}">${ic("bus")}Bus</button>
+      ${S.follow ? followPanel(S.follow) : `<h3 class="shead"${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>
+      <div class="seg pills">
+        <button data-f="all" class="${S.filter === "all" ? "on" : ""}">Tout</button>
         <button data-f="tram" class="${S.filter === "tram" ? "on" : ""}">${ic("tram")}Tram</button>
-        <button data-f="all" class="${S.filter === "all" ? "on" : ""}">${ic("bus")}Tous</button>
+        <button data-f="bus" class="${S.filter === "bus" ? "on" : ""}">${ic("bus")}Bus</button>
       </div>
       <div class="list" id="nearlist"></div>`}
     </div>
@@ -544,7 +546,7 @@ export function overlayStop(id: string): string {
   if (!s) return "";
   const fav = S.fav.includes(id);
   return `<div class="overlay">${bar(s.name)}
-   <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
+   <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700;flex:1">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap${s.lines.length > 5 ? ";order:3;flex-basis:100%" : ""}">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
    <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div>
    <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button><div id="stopdeps"></div></div></main></div>`;
 }
@@ -693,6 +695,25 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
         : `<span>${ic(lineKind(g.line) === "ter" ? "train" : isTram(g.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(dest)}</b></span></span>`}<span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div>`}</div>`;
   });
   return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
+}
+
+/** Départs d'un arrêt façon écran en station : une ligne par ligne et direction, prochain passage en grand, le suivant à côté */
+export function departureBoard(name: string, list: StopDeparture[], max = 16): string {
+  const now = Date.now();
+  const rows = new Map<string, { line: string; dest: string; t: number[]; cx: number[] }>();
+  for (const { d } of list) {
+    const k = d.line + "|" + d.dest;
+    const r = rows.get(k) ?? rows.set(k, { line: d.line, dest: d.dest, t: [], cx: [] }).get(k)!;
+    r.t.push(...d.times.filter(x => x > now - 30000));
+    r.cx.push(...(d.cancelled ?? []).filter(x => x > now - 60_000 && x < now + 3600_000));
+  }
+  const list2 = [...rows.values()].filter(r => r.t.length).map(r => ({ ...r, t: r.t.sort((a, b) => a - b) })).sort((a, b) => a.t[0] - b.t[0]).slice(0, max);
+  if (!list2.length) return '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
+  const body = list2.map(r => {
+    const m = mins(r.t[0]), n = r.t[1] !== undefined ? mins(r.t[1]) : null;
+    return `<button class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b>${esc(r.dest)}</b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À QUAI</span>' : `<span class="lb-m">${m}<small>min</small></span>`}</button>`;
+  }).join("");
+  return `<div class="lboard"><div class="lb-h"><span><small>Prochains départs</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
 }
 
 /** Tableau des départs d'une gare, comme sur les écrans en gare : heure prévue, retard ou suppression, destination, numéro du train */

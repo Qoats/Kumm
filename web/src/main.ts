@@ -19,7 +19,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenHome, favRows,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenHome, favRows, departureBoard,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -209,10 +209,10 @@ async function loadDepsNow(): Promise<void> {
           // gare : tableau des départs des trains (retards, suppressions), sous les trams et bus dans l'onglet « Tous »
           const trains = s.sncf ? TRAINS[s.sncf] ?? [] : [], others = all.filter(x => lineKind(x.d.line) !== "ter");
           const h = tabs + (cur === "ter" ? trainBoard(trains)
-            : cur ? depCards(all.filter(x => lineKind(x.d.line) === cur))
-            : (others.length || !s.sncf ? depCards(others) : "") + (s.sncf && (trains.length || !others.length) ? trainBoard(trains, others.length ? 6 : 15) : ""));
+            : cur ? departureBoard(s.name, all.filter(x => lineKind(x.d.line) === cur))
+            : (others.length || !s.sncf ? departureBoard(s.name, others) : "") + (s.sncf && (trains.length || !others.length) ? trainBoard(trains, others.length ? 6 : 15) : ""));
           // sans passage : souvent un arrêt non desservi (travaux, déviation) ; l'info trafic l'explique mieux que les détails techniques
-          const none = !h.includes('class="dep"') && !h.includes("tb-row");
+          const none = !h.includes('class="lb-r"') && !h.includes("tb-row");
           return stopNotice(s, none) + (none ? h + debugBox() : h);
         });
       }
@@ -226,7 +226,7 @@ async function loadDepsNow(): Promise<void> {
     // serveur momentanément injoignable (mise à jour, réseau) : les derniers horaires restent affichés, avec un avertissement ;
     // la liste se remet à jour toute seule à la réponse suivante (toutes les 30 s)
     for (const el of document.querySelectorAll<HTMLElement>("#stopdeps, #nearlist, [id^=fav-]")) {
-      if (el.querySelector(".dep, .trow")) {
+      if (el.querySelector(".dep, .trow, .lb-r")) {
         if (!el.querySelector(".stalenote")) el.insertAdjacentHTML("afterbegin", '<div class="stalenote">Connexion perdue : derniers horaires connus</div>');
       } else if (el.id !== "nearlist" || !el.innerHTML.trim() || el.querySelector(".empty")) {
         el.innerHTML = '<div class="empty" style="padding:24px">Horaires indisponibles pour le moment : nouvel essai dans quelques secondes.</div>';
