@@ -78,36 +78,19 @@ const msgCard = (m: TrafficMsg, withLines = true): string =>
   </div>`;
 
 /** Résumé de l'accueil : les deux premières infos trafic (incidents d'abord) */
-function trafficSummary(): string {
-  if (!MESSAGES.length) {
-    const t = MSG_STATE.status === "loading" ? "Chargement des infos trafic…" : MSG_STATE.status === "error" ? "Infos trafic indisponibles pour le moment" : "Aucune perturbation signalée par la CTS";
-    return `<div class="box"><span>${t}</span><span class="rb">${ic("bus")}</span></div>`;
-  }
-  const rest = MESSAGES.length - 2;
-  return `<button class="box" data-act="msgs" style="text-align:left"><span>${MESSAGES.slice(0, 2).map(m =>
-    `<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">${m.lines.slice(0, 4).map(l => lineChip(l, true)).join("")}<b>${esc(m.title)}</b></span>`).join("")}${rest > 0 ? `<small style="color:var(--mute)">et ${rest} autre${rest > 1 ? "s" : ""} info${rest > 1 ? "s" : ""} trafic</small>` : ""}</span><span class="rb">${ic("bus")}</span></button>`;
-}
-
 const pinIcon = (): string => ic("pin", 'width="22" height="22" fill="none" stroke="var(--accent)" stroke-width="2"');
 
-const greeting = (): string => {
+/** En-tête de l'accueil : date, salutation, raccourcis, puis la recherche */
+export function header(): string {
   const h = new Date().getHours();
   const hello = h < 5 ? "Bonne nuit" : h < 12 ? "Bonjour" : h < 18 ? "Bon après-midi" : "Bonsoir";
   const date = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-  return `${hello} · ${date}`;
-};
-
-export function header(): string {
-  const lines = ["A", "B", "C", "D", "E", "F"], step = 100 / lines.length;
-  const stripe = lines.map((l, i) => `${COLORS[l]} ${(i * step).toFixed(2)}% ${((i + 1) * step).toFixed(2)}%`).join(",");
-  return `<div class="hwrap" style="background:linear-gradient(90deg,${stripe})"><header>
+  return `<header class="thead">
     <div class="top">
-      <button data-act="account" aria-label="Compte">${ic("user")}</button>
-      <span class="ic"><button data-act="msgs" aria-label="Messages">${ic("mail")}</button><button data-act="prefs" aria-label="Réglages">${ic("sliders")}</button><button data-act="favs" aria-label="Favoris">${ic("heart")}</button></span>
+      <div><small>${esc(date.charAt(0).toUpperCase() + date.slice(1))}</small><h1>${hello}</h1></div>
+      <span class="ic"><button data-act="msgs" aria-label="Messages">${ic("mail")}</button><button data-act="prefs" aria-label="Réglages">${ic("sliders")}</button><button data-act="account" aria-label="Compte">${ic("user")}</button></span>
     </div>
-    <p class="hello">${greeting()}</p>
-    <div class="search"><input id="hq" placeholder="Où voulez-vous aller ?" readonly><span class="go">${ic("search")}</span></div>
-  </header></div>`;
+  </header>`;
 }
 
 export function bar(title: string, back?: string): string {
@@ -115,32 +98,63 @@ export function bar(title: string, back?: string): string {
 }
 
 /* ============ ÉCRANS ============ */
+/** Tuile Vélhop : la station la plus proche et ses vélos disponibles */
+function bikeTile(): string {
+  const st = POIS.filter(p => p.kind === "velhop").map(p => ({ p, d: haversine(USER, p) })).sort((a, b) => a.d - b.d)[0];
+  const n = st?.p.info?.match(/(\d+)\s*vélo/i)?.[1];
+  return `<button class="tile tile-bike" data-act="mapBikes"><h4>${ic("bike")}Vélhop</h4>${n !== undefined
+    ? `<div class="big">${n}<small> vélo${n === "1" ? "" : "s"}</small></div><p>${esc(st!.p.name.replace(/^Vélhop\s*/i, ""))} · ${fmtDist(st!.d)}</p>`
+    : `<div class="big sm">Stations</div><p>Vélos en libre-service</p>`}</button>`;
+}
+
+/** Tuile infos trafic : nombre de perturbations et la première */
+function trafficTile(): string {
+  if (!MESSAGES.length) {
+    const t = MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Indisponibles pour le moment" : "Aucune perturbation signalée";
+    return `<button class="tile tile-ok" data-act="msgs"><h4>${ic("bell")}Info trafic</h4><p class="msg">${t}</p></button>`;
+  }
+  const m = MESSAGES[0], n = MESSAGES.length;
+  return `<button class="tile tile-alert" data-act="msgs"><h4>${ic("bell")}Info trafic · ${n}</h4>
+    <div class="ls">${m.lines.slice(0, 3).map(l => lineChip(l, true)).join("")}</div><p class="msg">${esc(m.title)}</p></button>`;
+}
+
+/** Accueil en tuiles : itinéraire, arrêts favoris (prochains passages), info trafic, Vélhop, lignes et services */
 export function screenHome(): string {
   const favStops = S.fav.map(stopById).filter((s): s is Stop => !!s);
-  // [libellé, couleur, icône, lien officiel ou action de l'application]
-  const more: [string, string, IconName, string][] = [
-    ["Objets perdus", "#00BFA5", "lost", CTS_OBJETS_TROUVES], ["Parkings", "#1B6EC2", "parking", "act:mapParkings"],
-    ["Vélo", "#86B80B", "bike", "act:mapBikes"], ["FAQ/ Contact", "#AAB4BC", "help", "act:help"]
+  // un seul favori, ou le dernier d'un nombre impair : tuile pleine largeur
+  const favs = favStops.map((s, i) => `<div class="tile tile-stop${favStops.length % 2 && i === favStops.length - 1 ? " w" : ""}" role="button" tabindex="0" data-stop="${esc(s.id)}">
+      <h4>${ic("star")}${esc(s.name)}</h4><div id="fav-${esc(s.id)}"></div></div>`).join("");
+  const svc: [string, IconName, string][] = [
+    ["Horaires par ligne", "clock", "tab:lines"], ["Parkings relais", "parking", "act:mapParkings"],
+    ["Objets perdus", "lost", CTS_OBJETS_TROUVES], ["Aide et contact", "help", "act:help"]
   ];
-  return `<div class="pad">
-    <div class="qa"><button data-tab="search"><span class="qi">${ic("navigate")}</span>Naviguer</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>Carte</button></div>
-    <h2>Prochains passages <button class="pill" data-act="favs">Personnaliser</button></h2>
-    ${favStops.length ? favStops.map(s => `<div id="fav-${esc(s.id)}"></div>`).join("") :
-      `<div class="box"><span>Affichez les prochains passages à vos arrêts favoris</span><span class="rb">${ic("heart")}</span></div>`}
-
-    <h2>Infos trafic <button class="pill" data-act="msgs">Toutes les perturbations</button></h2>
-    ${trafficSummary()}
-    <div class="sub">Toutes les lignes</div>
-    <div class="chips">${networkLines().map(chipAlert).join("")}</div>
-
-    <h2>Horaires <span><button class="pill" data-tab="search">Par arrêts</button><button class="pill" data-tab="lines">Par ligne</button></span></h2>
-    <button class="box" data-tab="search"><span>Trouvez les horaires d’une ligne à un arrêt</span><span class="rb">${ic("clock")}</span></button>
-
-    <h2>En plus</h2>
-    <div class="more">${more.map(m => { const inner = `<div class="c" style="background:${m[1]}">${ic(m[2])}</div>${m[0].replace(" ", "<br>")}`; return m[3].startsWith("act:") ? `<button data-act="${m[3].slice(4)}">${inner}</button>` : `<a href="${m[3]}" target="_blank" rel="noopener noreferrer">${inner}</a>`; }).join("")}</div>
-
-    <p class="ver">Kumm v${VERSION}${CONFIG.USE_MOCK ? " · démonstration : données fictives" : ""}</p>
+  return `<div class="pad tiles">
+    <button class="tile w tile-go" data-tab="search"><h4>${ic("navigate")}Naviguer</h4><div class="big sm">Où allez-vous ?</div><p>Tram, bus, train, vélo ou à pied, guidé jusqu’à destination</p></button>
+    ${favs || `<button class="tile w tile-empty" data-act="favs"><h4>${ic("star")}Vos arrêts</h4><p>Ajoutez vos arrêts favoris : leurs prochains passages s’afficheront ici</p></button>`}
+    ${trafficTile()}
+    ${bikeTile()}
+    <div class="tile w tile-lines"><h4>${ic("tram")}Toutes les lignes</h4><div class="chips">${networkLines().map(chipAlert).join("")}</div></div>
+    ${svc.map(([label, icon, to]) => {
+      const inner = `<span class="si">${ic(icon)}</span><b>${label}</b>`;
+      return to.startsWith("act:") ? `<button class="tile tile-svc" data-act="${to.slice(4)}">${inner}</button>`
+        : to.startsWith("tab:") ? `<button class="tile tile-svc" data-tab="${to.slice(4)}">${inner}</button>`
+        : `<a class="tile tile-svc" href="${to}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
+    }).join("")}
+    <button class="tile-add w" data-act="favs">${ic("plus")}${favStops.length ? "Gérer mes arrêts favoris" : "Ajouter un arrêt favori"}</button>
+    <p class="ver w">Kumm v${VERSION}${CONFIG.USE_MOCK ? " · démonstration : données fictives" : ""}</p>
   </div>`;
+}
+
+/** Contenu d'une tuile d'arrêt favori : les 3 prochains départs, toutes lignes confondues */
+export function favRows(list: StopDeparture[]): string {
+  const now = Date.now();
+  const rows = list.flatMap(({ d }) => d.times.filter(t => t > now - 30000).slice(0, 1).map(t => ({ d, t })))
+    .sort((a, b) => a.t - b.t).slice(0, 3);
+  if (!rows.length) return '<p class="none">Aucun passage prévu</p>';
+  return rows.map(({ d, t }) => {
+    const m = mins(t);
+    return `<div class="trow">${lineChip(d.line, true)}<b class="dn">${esc(d.dest)}</b><i class="${m < 2 ? "soon" : ""}${m < 1 ? " q" : ""}">${m < 1 ? "À quai" : m + "′"}</i></div>`;
+  }).join("");
 }
 
 export function screenSearch(): string {

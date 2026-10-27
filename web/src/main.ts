@@ -19,7 +19,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenHome,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenHome, favRows,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -194,7 +194,7 @@ async function loadDepsNow(): Promise<void> {
       for (const id of S.fav) {
         const s = stopById(id);
         if (!s || !document.getElementById("fav-" + id)) continue;
-        await fillSlot("fav-" + id, async () => depCards((await nextDepartures(s)).map(d => ({ stop: s, d })).sort(sortByTime), 2));
+        await fillSlot("fav-" + id, async () => favRows((await nextDepartures(s)).map(d => ({ stop: s, d }))));
       }
     }
     if (S.overlay?.k === "stop") {
@@ -226,7 +226,7 @@ async function loadDepsNow(): Promise<void> {
     // serveur momentanément injoignable (mise à jour, réseau) : les derniers horaires restent affichés, avec un avertissement ;
     // la liste se remet à jour toute seule à la réponse suivante (toutes les 30 s)
     for (const el of document.querySelectorAll<HTMLElement>("#stopdeps, #nearlist, [id^=fav-]")) {
-      if (el.querySelector(".dep")) {
+      if (el.querySelector(".dep, .trow")) {
         if (!el.querySelector(".stalenote")) el.insertAdjacentHTML("afterbegin", '<div class="stalenote">Connexion perdue : derniers horaires connus</div>');
       } else if (el.id !== "nearlist" || !el.innerHTML.trim() || el.querySelector(".empty")) {
         el.innerHTML = '<div class="empty" style="padding:24px">Horaires indisponibles pour le moment : nouvel essai dans quelques secondes.</div>';
