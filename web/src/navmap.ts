@@ -47,13 +47,16 @@ async function loadStyle(dark: boolean): Promise<unknown> {
 
 const line = (coords: [number, number][]): GeoJSON.Feature<GeoJSON.LineString> => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords.length >= 2 ? coords : [...coords, ...coords] } });
 
-async function create3D(el: HTMLElement, coords: [number, number][], dest: LL): Promise<NavView> {
+/** Étape en tram ou en bus : tracé à la couleur de la ligne, vue plus haute et moins inclinée (on suit le trajet, pas les rues) */
+export interface NavLook { color?: string; overview?: boolean }
+
+async function create3D(el: HTMLElement, coords: [number, number][], dest: LL, look: NavLook = {}): Promise<NavView> {
   const [ml, worker] = await Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url")]);
   await import("maplibre-gl/dist/maplibre-gl.css");
   ml.setWorkerUrl(worker.default);
   const style = await loadStyle(wantsDarkMap());
   const map = new ml.Map({
-    container: el, style: style as never, center: coords[0], zoom: 17.5, pitch: 60, bearing: 0,
+    container: el, style: style as never, center: coords[0], zoom: look.overview ? 15 : 17.5, pitch: look.overview ? 35 : 60, bearing: 0,
     maxPitch: 70, attributionControl: { compact: true }, fadeDuration: 0
   });
   try {
@@ -66,8 +69,8 @@ async function create3D(el: HTMLElement, coords: [number, number][], dest: LL): 
   // crédits repliés derrière le bouton ⓘ (ils restent accessibles), pour ne pas masquer la carte
   el.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
   map.addSource("route", { type: "geojson", data: line(coords) });
-  map.addLayer({ id: "route-casing", type: "line", source: "route", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": CASING, "line-width": 13 } });
-  map.addLayer({ id: "route-line", type: "line", source: "route", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": ROUTE, "line-width": 9 } });
+  map.addLayer({ id: "route-casing", type: "line", source: "route", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": look.color ? "rgba(0,0,0,.3)" : CASING, "line-width": 13 } });
+  map.addLayer({ id: "route-line", type: "line", source: "route", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": look.color ?? ROUTE, "line-width": 9 } });
 
   const pinEl = document.createElement("div"); pinEl.innerHTML = PIN;
   new ml.Marker({ element: pinEl, anchor: "bottom" }).setLngLat([dest.lon, dest.lat]).addTo(map);
@@ -82,7 +85,8 @@ async function create3D(el: HTMLElement, coords: [number, number][], dest: LL): 
       if (bearing !== null) lastBearing = bearing;
       me.setLngLat([p.lon, p.lat]).setRotation(lastBearing);
       // position dans le bas de l'écran, carte tournée dans le sens de la marche
-      if (follow) map.easeTo({ center: [p.lon, p.lat], bearing: lastBearing, pitch: 60, zoom: Math.max(map.getZoom(), 17), padding: { top: el.clientHeight * 0.4, bottom: 0, left: 0, right: 0 }, duration: 900 });
+      if (follow && look.overview) map.easeTo({ center: [p.lon, p.lat], pitch: 35, zoom: Math.max(map.getZoom(), 15), duration: 900 });
+      else if (follow) map.easeTo({ center: [p.lon, p.lat], bearing: lastBearing, pitch: 60, zoom: Math.max(map.getZoom(), 17), padding: { top: el.clientHeight * 0.4, bottom: 0, left: 0, right: 0 }, duration: 900 });
     },
     setRemaining(c) { (map.getSource("route") as unknown as { setData(d: unknown): void }).setData(line(c)); },
     setFollow(on) { follow = on; },
@@ -91,12 +95,12 @@ async function create3D(el: HTMLElement, coords: [number, number][], dest: LL): 
   };
 }
 
-function create2D(el: HTMLElement, coords: [number, number][], dest: LL): NavView {
+function create2D(el: HTMLElement, coords: [number, number][], dest: LL, look: NavLook = {}): NavView {
   const map = L.map(el, { zoomControl: false }).setView([coords[0][1], coords[0][0]], 17);
   makeBaseLayer().addTo(map);
   const ll = (c: [number, number][]): L.LatLngTuple[] => c.map(([lo, la]) => [la, lo]);
-  const casing = L.polyline(ll(coords), { color: CASING, weight: 10 }).addTo(map);
-  const route = L.polyline(ll(coords), { color: ROUTE, weight: 7 }).addTo(map);
+  const casing = L.polyline(ll(coords), { color: look.color ? "#000" : CASING, opacity: look.color ? 0.3 : 1, weight: 10 }).addTo(map);
+  const route = L.polyline(ll(coords), { color: look.color ?? ROUTE, weight: 7 }).addTo(map);
   L.marker([dest.lat, dest.lon], { icon: L.divIcon({ html: PIN, className: "lm-icon", iconSize: [38, 38], iconAnchor: [19, 36] }), interactive: false }).addTo(map);
   const me = L.circleMarker([coords[0][1], coords[0][0]], { radius: 9, color: "#fff", weight: 3, fillColor: "#4A90E2", fillOpacity: 1 }).addTo(map);
   map.fitBounds(route.getBounds(), { padding: [50, 50] });
@@ -114,10 +118,10 @@ function create2D(el: HTMLElement, coords: [number, number][], dest: LL): NavVie
 }
 
 /** Vue 3D si possible, sinon 2D ; « mode » indique laquelle a été retenue */
-export async function createNavView(el: HTMLElement, coords: [number, number][], dest: LL): Promise<{ view: NavView; mode: "3d" | "2d" }> {
+export async function createNavView(el: HTMLElement, coords: [number, number][], dest: LL, look: NavLook = {}): Promise<{ view: NavView; mode: "3d" | "2d" }> {
   if (hasWebGL()) {
-    try { return { view: await create3D(el, coords, dest), mode: "3d" }; }
+    try { return { view: await create3D(el, coords, dest, look), mode: "3d" }; }
     catch (e) { console.warn("Guidage en 3D indisponible, carte 2D :", e); el.innerHTML = ""; }
   }
-  return { view: create2D(el, coords, dest), mode: "2d" };
+  return { view: create2D(el, coords, dest, look), mode: "2d" };
 }

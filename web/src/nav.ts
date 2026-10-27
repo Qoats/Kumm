@@ -30,6 +30,8 @@ export interface TransitOptions {
   path: [number, number][];
   dest: LL & { label: string };
   line: string;
+  /** « Tram vers Hoenheim Gare » */
+  caption: string;
   /** couleur de la ligne et de son texte */
   color: string;
   ink: string;
@@ -39,7 +41,20 @@ export interface TransitOptions {
   next?: () => void;
   onQuit?: () => void;
 }
-export interface TransitStatus { done: boolean; text: string; dist: string; eta: string; rem: string; say?: string }
+export interface TransitStop { name: string; time?: number; state: "past" | "now" | "next" | "end" }
+export interface TransitStatus {
+  done: boolean;
+  boarded: boolean;
+  /** « Prenez le B » / « Descendez à Wacken » */
+  title: string;
+  /** « à Broglie » / « dans 4 arrêts » */
+  sub: string;
+  /** compte à rebours (« 6 min », « à quai ») et ce qu'il compte (« avant le départ · 16:15 ») */
+  big: string;
+  bigLabel: string;
+  stops: TransitStop[];
+  say?: string;
+}
 
 const WALK_SPEED = 1.35;   // m/s, marche normale
 const BIKE_SPEED = 4.2;    // m/s, vélo en ville (~15 km/h)
@@ -78,23 +93,36 @@ function speak(text: string): void {
   window.speechSynthesis.speak(u);
 }
 
+const TICKET = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 6v12" stroke-dasharray="2 2.5"/></svg>';
+const hhmm = (ms: number): string => new Date(ms).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
+
 /** Étape en tram ou en bus : attente à l'arrêt, puis arrêts restants jusqu'à la descente ; la carte suit la position */
 export function startTransitNav(o: TransitOptions): void {
   stopNav();
-  const { layer, $ } = navLayer();
-  layer.classList.add("nv-transit");
-  const arrow = $("nv-arrow");
-  arrow.textContent = o.line;
-  arrow.classList.add("nv-line");
-  arrow.style.background = o.color;
-  arrow.style.color = o.ink;
-  const skip = document.createElement("button");
-  skip.textContent = "Étape suivante";
-  skip.onclick = () => { o.skip(); done(); };
-  $("nv-quit").before(skip);
+  const layer = document.createElement("div");
+  layer.id = "navlayer";
+  layer.className = "nv-transit";
+  layer.style.setProperty("--lc", o.color);
+  layer.innerHTML = `
+    <div class="nt-top">
+      <span class="nt-line" style="background:${o.color};color:${o.ink}">${esc(o.line)}</span>
+      <div class="nt-head"><small>${esc(o.caption)}</small><b id="nt-title"></b><span id="nt-sub"></span></div>
+    </div>
+    <div id="nv-map"></div>
+    <button id="nv-recenter" hidden>➤ Recentrer</button>
+    <div id="nv-end" hidden></div>
+    <div class="nt-sheet">
+      <div class="nt-count"><b id="nt-big"></b><span id="nt-label"></span></div>
+      <div class="nt-valid" id="nt-valid">${TICKET}<span>Pensez à valider votre titre de transport</span></div>
+      <ol class="nt-stops" id="nt-stops"></ol>
+      <div class="nt-acts"><button id="nt-skip">Étape suivante</button><button id="nv-quit">Quitter</button></div>
+    </div>`;
+  document.body.appendChild(layer);
+  const $ = <T extends HTMLElement>(id: string): T => layer.querySelector<T>("#" + id) as T;
+  $("nt-skip").onclick = () => { o.skip(); done(); };
 
-  let view: NavView | null = null, stopped = false, lastPos: LL | null = null, finished = false, said = "";
-  void createNavView($("nv-map"), o.path, o.dest).then(({ view: v, mode }) => {
+  let view: NavView | null = null, stopped = false, lastPos: LL | null = null, finished = false, said = "", shown = "";
+  void createNavView($("nv-map"), o.path, o.dest, { color: o.color, overview: true }).then(({ view: v, mode }) => {
     if (stopped) { v.destroy(); return; }
     view = v;
     layer.dataset.mode = mode;
@@ -106,22 +134,34 @@ export function startTransitNav(o: TransitOptions): void {
     if (finished) return;
     finished = true;
     if (o.next) { o.next(); return; }
-    $("nv-text").textContent = `Vous êtes arrivé : ${o.dest.label}`;
-    $("nv-dist").textContent = "";
+    $("nt-title").textContent = `Vous êtes arrivé : ${o.dest.label}`;
+    $("nt-sub").textContent = "";
     const end = $("nv-end");
     end.hidden = false;
     end.innerHTML = `<b>${esc(o.title)}</b><p>Vous êtes arrivé à destination.</p><div class="nv-acts"><button class="nv-done">Terminer</button></div>`;
     (end.querySelector(".nv-done") as HTMLElement).onclick = stopNav;
   }
 
+  /** Arrêts : au plus 5 lignes ; au-delà, ceux du milieu sont résumés (« 3 autres arrêts ») */
+  function stopsHtml(stops: TransitStop[]): string {
+    let list: (TransitStop | number)[] = stops;
+    if (stops.length > 5) list = [stops[0], stops[1], stops.length - 4, stops[stops.length - 2], stops[stops.length - 1]];
+    return list.map(s => typeof s === "number"
+      ? `<li class="more"><span class="dot"></span>${s} autres arrêts</li>`
+      : `<li class="${s.state}"><span class="dot"></span><span class="nm">${esc(s.name)}</span>${s.time ? `<span class="tm">${hhmm(s.time)}</span>` : ""}</li>`).join("");
+  }
+
   function update(): void {
     if (finished) return;
     const s = o.status();
     if (s.done) { done(); return; }
-    $("nv-text").textContent = s.text;
-    $("nv-dist").textContent = s.dist;
-    $("nv-eta").textContent = s.eta;
-    $("nv-rem").textContent = s.rem;
+    $("nt-title").textContent = s.title;
+    $("nt-sub").textContent = s.sub;
+    $("nt-big").textContent = s.big;
+    $("nt-label").textContent = s.bigLabel;
+    $("nt-valid").hidden = s.boarded;
+    const html = stopsHtml(s.stops);
+    if (html !== shown) { shown = html; $("nt-stops").innerHTML = html; }
     if (s.say && s.say !== said) { said = s.say; speak(s.say); }
   }
   update();

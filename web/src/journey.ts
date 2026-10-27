@@ -130,6 +130,15 @@ export function legState(k: number): { done: boolean; boarded: boolean; remainin
   return { done: false, ...state(j) };
 }
 
+/** Arrêts de l'étape k, de la montée à la descente, avec leur heure de passage ; at : premier arrêt encore devant le véhicule */
+export function legStops(k: number): { calls: { name: string; arr: number }[]; at: number } | null {
+  const j = S.journey;
+  if (k !== legIdx || !j || !legs.length) return null;
+  const calls = j.detail.calls.slice(j.board, j.alight + 1).map(c => ({ name: c.name, arr: c.arr }));
+  const st = state(j);
+  return { calls, at: st.boarded ? Math.max(0, Math.min(calls.length - 1, calls.length - st.remaining)) : 0 };
+}
+
 /** La personne passe d'elle-même à l'étape suivante (« Étape suivante » du guidage) */
 export function skipLeg(k: number): void {
   if (k !== legIdx || k < legsDone || !legs.length) return;
