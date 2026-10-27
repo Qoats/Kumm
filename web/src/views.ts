@@ -217,7 +217,8 @@ export const layerCounts = (): Record<Layer, number> => {
 };
 
 export function screenNearby(): string {
-  const h = ["64px", "42%", "84%"][S.sheet];
+  // ouvert en grand : le panneau s'arrête sous la recherche et les filtres, sa poignée reste toujours touchable
+  const h = S.sheet === 2 ? "calc(100% - 132px - var(--safe-top))" : `calc(${S.sheet === 0 ? "64px" : "42%"} + var(--navh, 0px))`;
   const inView = (p: { x: number; y: number }): boolean => p.x > -10 && p.x < 370 && p.y > -10 && p.y < 450;
   const stopPins = STOPS
     .filter(s => {
@@ -235,14 +236,14 @@ export function screenNearby(): string {
       ${stopPins}${poiPins}
       <circle cx="170" cy="222" r="14" fill="#4A90E2" opacity=".25"><animate attributeName="r" values="8;20;8" dur="2.4s" repeatCount="indefinite"/></circle><circle cx="170" cy="222" r="7" fill="#4A90E2" stroke="#fff" stroke-width="2.500"/>
     </svg>`
-    : `<div id="livemap-slot"></div><span class="osm" style="bottom:calc(${h} + var(--navh, 0px) + 4px)">© OpenStreetMap</span>`;
+    : `<div id="livemap-slot"></div><span class="osm" style="bottom:calc(${h} + 4px)">© OpenStreetMap</span>`;
   return `<div class="map">
     ${background}
     <button class="msearch" data-tab="search">${ic("search")}<span>Où allez-vous ?</span></button>
     <div class="layers">${chips}</div>
     <div class="mapbtns"><div class="tools"><button data-act="prefs" aria-label="Réglages">${ic("gear", 'stroke="currentColor"')}</button><button data-act="locate" aria-label="Me localiser">${ic("target", 'stroke="var(--accent)"')}</button></div>
     ${CONFIG.USE_MOCK ? "" : `<div class="tools zoom"><button data-act="zoomIn" aria-label="Zoomer">${ic("plus", 'stroke="currentColor"')}</button><button data-act="zoomOut" aria-label="Dézoomer">${ic("minus", 'stroke="currentColor"')}</button></div>`}</div>
-    <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:calc(${h} + var(--navh, 0px))">
+    <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
       <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
       ${S.follow ? followPanel(S.follow) : `<h3 class="shead"${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>
       <div class="seg pills">

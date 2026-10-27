@@ -591,8 +591,8 @@ app.addEventListener("focusin", e => {
 
 /* appui long (data-hold) : action secondaire d'une tuile, par exemple choisir la station Vélhop de l'accueil ;
    le clic qui suit l'appui long est ignoré, et le menu du navigateur (copier, partager…) n'apparaît jamais */
-let holdTimer = 0, held = false, holdAt: [number, number] | null = null;
-const cancelHold = (): void => { window.clearTimeout(holdTimer); holdAt = null; };
+let holdTimer = 0, held = false, holdAt: [number, number] | null = null, holdCopy: string | null = null;
+const cancelHold = (): void => { window.clearTimeout(holdTimer); holdAt = null; holdCopy = null; };
 app.addEventListener("pointerdown", e => {
   held = false;   // l'appui long précédent n'a pas toujours été suivi d'un clic (l'écran a changé sous le doigt)
   const h = (e.target as HTMLElement).closest<HTMLElement>("[data-hold]");
@@ -602,27 +602,27 @@ app.addEventListener("pointerdown", e => {
     held = true; holdAt = null;
     try { navigator.vibrate?.(25); } catch { /* rien */ }
     if (h.dataset.hold === "bikepick") { S.overlay = { k: "bikepick" }; render(); }
-    else if (h.dataset.hold?.startsWith("copy:")) void copyText(h.dataset.hold.slice(5));
+    // copie : faite au moment où le doigt se lève (Android n'autorise le presse-papiers que pendant un geste)
+    else if (h.dataset.hold?.startsWith("copy:")) holdCopy = h.dataset.hold.slice(5);
   }, 550);
 });
 app.addEventListener("pointermove", e => { if (holdAt && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 10) cancelHold(); });
-app.addEventListener("pointerup", cancelHold);
+app.addEventListener("pointerup", () => { const t = holdCopy; cancelHold(); if (t) void copyText(t); });
 app.addEventListener("pointercancel", cancelHold);
 app.addEventListener("click", e => { if (held) { held = false; e.stopPropagation(); e.preventDefault(); } }, true);
 document.addEventListener("contextmenu", e => { if (!(e.target as HTMLElement).closest("input,textarea")) e.preventDefault(); });
 
 /** Copie dans le presse-papiers (appui long sur un code de trajet) */
 async function copyText(t: string): Promise<void> {
-  try { await navigator.clipboard.writeText(t); }
-  catch {
-    // presse-papiers refusé (ancien WebView) : copie par une zone de texte temporaire
-    const ta = document.createElement("textarea");
-    ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
-    document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); } catch { /* rien */ }
-    ta.remove();
-  }
-  toast(`Code du trajet copié : ${t}`);
+  // d'abord la copie classique, immédiate (pendant le geste), puis l'API du presse-papiers ; message seulement si l'une a réussi
+  const ta = document.createElement("textarea");
+  ta.value = t; ta.readOnly = true; ta.style.position = "fixed"; ta.style.opacity = "0"; ta.style.top = "0";
+  document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, t.length);
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { /* rien */ }
+  ta.remove();
+  if (!ok) { try { await navigator.clipboard.writeText(t); ok = true; } catch { /* refusé */ } }
+  toast(ok ? `Code du trajet copié : ${t}` : "Copie impossible sur ce téléphone");
 }
 
 /* glisser le panneau « À proximité » vers le haut ou le bas */
