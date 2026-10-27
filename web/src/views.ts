@@ -711,7 +711,7 @@ export function departureBoard(name: string, list: StopDeparture[], max = 16): s
   if (!list2.length) return '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
   const body = list2.map(r => {
     const m = mins(r.t[0]), n = r.t[1] !== undefined ? mins(r.t[1]) : null;
-    return `<button class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b>${esc(r.dest)}</b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À QUAI</span>' : `<span class="lb-m">${m}<small>min</small></span>`}</button>`;
+    return `<button class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b>${esc(r.dest)}</b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}</button>`;
   }).join("");
   return `<div class="lboard"><div class="lb-h"><span><small>Prochains départs</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
 }
