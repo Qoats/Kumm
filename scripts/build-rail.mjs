@@ -6,9 +6,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const OUT = path.join(process.cwd(), "data", "rail.json");
-// voies ferrées de Molsheim à Kehl, d'Erstein à Brumath : voies principales, voies de gare et aiguillages (sans « usage » dans OSM),
+// voies ferrées de Molsheim à Kehl, d'Erstein à Brumath, et jusqu'à Lauterbourg : voies principales, voies de gare et aiguillages (sans « usage » dans OSM),
 // mais pas les voies de garage, de triage ni les embranchements industriels, militaires ou touristiques
-const QUERY = '[out:json][timeout:180];way["railway"="rail"]["service"!~"^(yard|siding|spur)$"]["usage"!~"^(industrial|military|tourism|test)$"](48.38,7.45,48.78,7.95);out geom;';
+const QUERY = '[out:json][timeout:180];(way["railway"="rail"]["service"!~"^(yard|siding|spur)$"]["usage"!~"^(industrial|military|tourism|test)$"](48.38,7.45,48.78,7.95);way["railway"="rail"]["service"!~"^(yard|siding|spur)$"]["usage"!~"^(industrial|military|tourism|test)$"](48.66,7.80,48.99,8.21););out geom;';
 // Serveurs publics d'OpenStreetMap, essayés à tour de rôle. Ils tombent parfois en panne (502, 504) :
 // on refait plusieurs tours espacés, et si aucun ne répond, on garde les tracés de la veille sans faire échouer le travail.
 const SERVERS = [

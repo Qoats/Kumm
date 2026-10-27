@@ -13,7 +13,9 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
+import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, placeOnTramQuays } from "./api";
+import { fmtDist, haversine } from "./geo";
+import { STRASBOURG_VILLE } from "../../shared/ter";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, setBikeStation, stopById, toast, toggleFav } from "./store";
@@ -149,8 +151,8 @@ function restoreSlots(): void {
 }
 
 const sortByTime = (a: StopDeparture, b: StopDeparture): number => a.d.times[0] - b.d.times[0];
-const matchesFilter = (s: { name: string }): boolean =>
-  S.filter === "all" || isHub(s) || (S.filter === "tram" ? kindOfStop(s) === "tram" : kindOfStop(s) === "bus");
+const matchesFilter = (s: { name: string; sncf?: string }): boolean =>
+  S.filter === "all" || (S.filter === "ter" ? !!s.sncf : isHub(s) || kindOfStop(s) === S.filter);
 
 /** Un seul chargement des passages à la fois ; un redessin pendant le chargement en relance un seul à la fin */
 let depsRunning = false, depsAgain = false;
@@ -165,7 +167,15 @@ async function loadDeps(): Promise<void> {
 
 async function loadDepsNow(): Promise<void> {
   try {
-    if (S.tab === "nearby" && !S.overlay) {
+    if (S.tab === "nearby" && !S.overlay && S.filter === "ter") {
+      // gares les plus proches (Strasbourg-Ville compris, rattachée à Gare Centrale) et leurs prochains trains
+      const gares = STOPS.filter(s => s.sncf).map(s => ({ s, d: haversine(USER, s) })).sort((a, b) => a.d - b.d).slice(0, 3);
+      await fillSlot("nearlist", async () => {
+        const res = await Promise.all(gares.map(({ s }) => nextTrains(s.sncf!).catch(() => null)));
+        if (res.every(r => r === null)) throw new Error("Serveur Kumm injoignable");
+        return gares.map(({ s, d }, i) => trainBoard(res[i] ?? [], 4, s.sncf === STRASBOURG_VILLE ? "Strasbourg-Ville" : s.name, `Gare · ${fmtDist(d)}`, s.id)).join("");
+      });
+    } else if (S.tab === "nearby" && !S.overlay) {
       // les 12 arrêts les plus proches sont interrogés, et les 4 plus proches qui ont encore des passages sont affichés :
       // le soir, l'arrêt de bus le plus proche n'a souvent plus rien, alors qu'un tram passe un peu plus loin
       const near = STOPS.filter(s => matchesFilter(s))

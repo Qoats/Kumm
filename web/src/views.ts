@@ -223,7 +223,7 @@ export function screenNearby(): string {
   const stopPins = STOPS
     .filter(s => {
       const k = kindOfStop(s);
-      return S.layers[k] && (S.filter === "all" || (S.filter === "tram" ? k === "tram" : k === "bus"));
+      return S.layers[k] && (S.filter === "all" || S.filter === k);
     })
     .filter(inView).slice(0, 90)
     .map(s => marker(kindOfStop(s), s.x, s.y, `data-stop="${esc(s.id)}"`)).join("");
@@ -250,6 +250,7 @@ export function screenNearby(): string {
         <button data-f="all" class="${S.filter === "all" ? "on" : ""}">Tout</button>
         <button data-f="tram" class="${S.filter === "tram" ? "on" : ""}">${ic("tram")}Tram</button>
         <button data-f="bus" class="${S.filter === "bus" ? "on" : ""}">${ic("bus")}Bus</button>
+        <button data-f="ter" class="${S.filter === "ter" ? "on" : ""}">${ic("train")}TER</button>
       </div>
       <div class="list" id="nearlist"></div>`}
     </div>
@@ -735,7 +736,7 @@ export function departureBoard(name: string, list: StopDeparture[], max = 16): s
 }
 
 /** Tableau des départs d'une gare, comme sur les écrans en gare : heure prévue, retard ou suppression, destination, numéro du train */
-export function trainBoard(list: TrainDeparture[], max = 15): string {
+export function trainBoard(list: TrainDeparture[], max = 15, title = "Trains au départ", sub = "Horaires SNCF", stopId?: string): string {
   const now = Date.now();
   const rows = list.filter(t => t.t > now - 60_000).slice(0, max).map(t => {
     const late = !t.cancelled && (t.delay ?? 0) >= 60, m = mins(t.t);
@@ -748,8 +749,10 @@ export function trainBoard(list: TrainDeparture[], max = 15): string {
       <span class="lb-d"><b>${esc(t.dest)}</b><small>${time} · n° ${esc(t.num)}${state ? " · " + state : ""}</small></span>
       ${t.cancelled ? "" : m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}</div>`;
   });
-  if (!rows.length) return '<div class="empty" style="padding:24px">Aucun train au départ dans les 4 prochaines heures</div>';
-  return `<div class="lboard"><div class="lb-h"><span><small>Horaires SNCF</small><b>Trains au départ</b></span><span class="lb-clock">${hm(now)}</span></div>${rows.join("")}</div>`;
+  if (!rows.length && title === "Trains au départ") return '<div class="empty" style="padding:24px">Aucun train au départ dans les 4 prochaines heures</div>';
+  if (!rows.length) rows.push('<div class="lb-r ter"><span class="lb-d"><small>Aucun train dans les 4 prochaines heures</small></span></div>');
+  // dans « À proximité » : toucher le nom de la gare ouvre sa fiche
+  return `<div class="lboard"><div class="lb-h"${stopId ? ` data-stop="${esc(stopId)}" role="button"` : ""}><span><small>${esc(sub)}</small><b>${esc(title)}</b></span><span class="lb-clock">${hm(now)}</span></div>${rows.join("")}</div>`;
 }
 
 /** Onglets des départs d'un arrêt desservi par plusieurs modes */

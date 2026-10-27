@@ -1,5 +1,5 @@
 /**
- * Gares TER de l'Eurométropole de Strasbourg (code UIC SNCF, nom affiché, position de la gare).
+ * Gares TER de l'Eurométropole de Strasbourg et de la ligne Strasbourg – Lauterbourg (code UIC SNCF, nom affiché, position).
  * Positions et codes : horaires ouverts de la SNCF (GTFS « Export_OpenData_SNCF_GTFS »).
  * Strasbourg-Ville est rattachée au pôle d'échanges « Gare Centrale » de la CTS (une seule fiche : trams, bus et trains).
  */
@@ -18,7 +18,20 @@ export const TER_STATIONS_EMS: TerStation[] = [
   { uic: "87338517", name: "Hœnheim-Tram", lat: 48.628622, lon: 7.758123 },
   { uic: "87212100", name: "Mundolsheim", lat: 48.644773, lon: 7.721389 },
   { uic: "87212118", name: "Vendenheim", lat: 48.665922, lon: 7.717777 },
-  { uic: "87212316", name: "La Wantzenau", lat: 48.665204, lon: 7.824822 }
+  { uic: "87212316", name: "La Wantzenau", lat: 48.665204, lon: 7.824822 },
+  // ligne Strasbourg – Lauterbourg, au-delà de La Wantzenau
+  { uic: "87212324", name: "Kilstett", lat: 48.679287, lon: 7.854769 },
+  { uic: "87212332", name: "Gambsheim", lat: 48.694909, lon: 7.879179 },
+  { uic: "87212340", name: "Herrlisheim", lat: 48.72792, lon: 7.910146 },
+  { uic: "87212357", name: "Drusenheim", lat: 48.765844, lon: 7.947796 },
+  { uic: "87212365", name: "Sessenheim", lat: 48.796467, lon: 7.989311 },
+  { uic: "87212373", name: "Rountzenheim", lat: 48.820457, lon: 8.011774 },
+  { uic: "87212407", name: "Roeschwoog", lat: 48.833437, lon: 8.029823 },
+  { uic: "87212415", name: "Roppenheim", lat: 48.851162, lon: 8.06231 },
+  { uic: "87212431", name: "Seltz", lat: 48.896564, lon: 8.098672 },
+  { uic: "87212449", name: "Munchhausen", lat: 48.923851, lon: 8.141035 },
+  { uic: "87212456", name: "Mothern", lat: 48.93475, lon: 8.161664 },
+  { uic: "87212464", name: "Lauterbourg", lat: 48.967697, lon: 8.182682 }
 ];
 
 /** Gare de Strasbourg, rattachée à « Gare Centrale » */

@@ -142,7 +142,7 @@ function sync(): void {
       // pôle d'échanges : visible dès que les trams, les bus ou les gares sont affichés, même de loin
       if (!S.layers.tram && !S.layers.bus && !S.layers.ter) continue;
     } else {
-      if (!S.layers[k] || (S.filter === "tram" && k !== "tram") || (S.filter === "bus" && k !== "bus")) continue;
+      if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
       if (mode === "far" && k !== "tram" && k !== "ter") continue;   // de loin : stations de tram et gares seulement
     }
     place("s:" + s.id, s.lat, s.lon, k, `${isHub(s) ? "Gare" : KINDS[k].label} · ${s.name}`, () => { S.overlay = { k: "stop", id: s.id }; render(); });
