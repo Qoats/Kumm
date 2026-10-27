@@ -27,7 +27,7 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { stopNav } from "./nav";
 import { DEFAULT_PREFS, applyTheme, savePrefs } from "./themes";
-import type { Accent, Theme } from "./themes";
+import type { Accent, Theme, Ui } from "./themes";
 import type { Place, Poi, StopDeparture } from "../../shared/types";
 import { buildVeloparks } from "./places";
 import { geocode } from "./walk";
@@ -237,7 +237,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -310,8 +310,9 @@ app.addEventListener("click", e => {
     else if (a) openTrip(a);
     return;
   }
-  if (d.themePick || d.accentPick || d.darkmap || d.reset) {
+  if (d.themePick || d.accentPick || d.uiPick || d.darkmap || d.reset) {
     if (d.themePick) S.prefs.theme = d.themePick as Theme;
+    if (d.uiPick) S.prefs.ui = d.uiPick as Ui;
     if (d.accentPick) S.prefs.accent = d.accentPick as Accent;
     if (d.darkmap) S.prefs.darkMap = !S.prefs.darkMap;
     if (d.reset) S.prefs = { ...DEFAULT_PREFS };

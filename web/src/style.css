@@ -566,3 +566,106 @@ body:has(#navlayer) .jbanner{top:calc(env(safe-area-inset-top,0px) + 100px);max-
 /* véhicules sur la carte : glissent d'une position à l'autre (placées chaque seconde), sauf pendant un zoom */
 .leaflet-marker-icon.vm{transition:transform 1s linear}
 .leaflet-container.vfreeze .leaflet-marker-icon.vm{transition:none}
+
+/* ============================================================
+   Palettes supplémentaires (data-palette) : Sable (clair), Océan et Nuit (sombres) ; posées sur data-scheme light ou dark
+   ============================================================ */
+:root[data-palette="sand"]{
+  --bg:#F5EFE4; --card:#FFFCF6; --ink:#2B2218; --mute:#7A6A58; --line:#E8DDCC; --chip:#EEE5D5; --nav:#FFFCF6;
+  --search-bg:#FFFCF6; --map:#EEE8DD; --water:#C6DDE6; --park:#E0E6C8; --street:#FFFDF8;
+  --sh:0 1px 2px rgba(60,40,10,.06),0 8px 20px rgba(60,40,10,.08);
+}
+:root[data-palette="ocean"]{
+  --bg:#0A1222; --card:#111C31; --ink:#E6EEFA; --mute:#8C9BB5; --line:#1D2A42; --chip:#18253D; --nav:#0C1528;
+  --search-bg:#18253D; --search-ink:#E6EEFA; --map:#14203A; --water:#1B3B63; --park:#1C3333; --street:#26344F;
+}
+:root[data-palette="ocean"][data-accent]{--head-a:#0F2244;--head-b:#173563}
+:root[data-palette="night"]{
+  --bg:#000; --card:#0F0F11; --ink:#F2F2F2; --mute:#9A9AA0; --line:#1C1C20; --chip:#1A1A1D; --nav:#000;
+  --search-bg:#1A1A1D; --search-ink:#F2F2F2; --map:#0B0B0D; --water:#0D2234; --park:#0F1F14; --street:#222226;
+  --sh:0 0 0 1px #1C1C20;
+}
+:root[data-palette="night"][data-accent]{--head-a:#0F0F11;--head-b:#16161A}
+
+/* ============================================================
+   Formes d'interface (data-ui) : kumm (l'original), epure, bulles, compact
+   ============================================================ */
+/* Épuré : en-têtes sans couleur, filets fins au lieu des ombres, la couleur seulement sur les actions */
+:root[data-ui="epure"]{--r:14px;--sh:0 0 0 1px var(--line)}
+:root[data-ui="epure"] .hwrap{box-shadow:none;padding-bottom:3px;border-radius:0}
+:root[data-ui="epure"] header,:root[data-ui="epure"] .bar,:root[data-ui="epure"] .nv-top,:root[data-ui="epure"] .nt-top{background:var(--card);color:var(--ink);border-radius:0;box-shadow:none;border-bottom:1px solid var(--line)}
+:root[data-ui="epure"] header svg,:root[data-ui="epure"] .bar svg{stroke:var(--ink)}
+:root[data-ui="epure"] header .top button,:root[data-ui="epure"] .bar button{background:var(--chip)}
+:root[data-ui="epure"] .brand .mark{background:var(--accent)}
+:root[data-ui="epure"] header .brand .mark svg{stroke:var(--on-accent)}
+:root[data-ui="epure"] .search{background:var(--chip);box-shadow:none}
+:root[data-ui="epure"] .search input{color:var(--ink)}
+:root[data-ui="epure"] nav{box-shadow:none}
+:root[data-ui="epure"] .qa .qi{background:transparent}
+:root[data-ui="epure"] .sheet{box-shadow:0 -1px 0 var(--line)}
+:root[data-ui="epure"] .nt-sheet,:root[data-ui="epure"] .nv-bottom{box-shadow:0 -1px 0 var(--line);border-radius:0;margin-top:0}
+
+/* Bulles : grands arrondis, pastilles rondes, barre du bas flottante */
+:root[data-ui="bulles"]{--r:28px}
+:root[data-ui="bulles"] .hwrap{border-radius:0 0 46px 46px}
+:root[data-ui="bulles"] header{border-radius:0 0 42px 42px;padding-bottom:22px}
+:root[data-ui="bulles"] .bar{border-radius:0 0 32px 32px}
+:root[data-ui="bulles"] header .top button,:root[data-ui="bulles"] .bar button{border-radius:50%}
+:root[data-ui="bulles"] .brand .mark{border-radius:50%}
+:root[data-ui="bulles"] .ln{border-radius:18px}
+:root[data-ui="bulles"] .ln.sm{border-radius:14px}
+:root[data-ui="bulles"] .qa button{border-radius:28px}
+:root[data-ui="bulles"] .qa .qi{border-radius:50%}
+:root[data-ui="bulles"] .field,:root[data-ui="bulles"] .jrow,:root[data-ui="bulles"] .theme-card{border-radius:26px}
+:root[data-ui="bulles"] .box .rb{border-radius:50%}
+:root[data-ui="bulles"] nav{margin:0 12px calc(8px + var(--safe-bottom));padding:8px 6px;border:0;border-radius:30px;background:var(--card);box-shadow:0 10px 30px -8px rgba(0,0,0,.35)}
+:root[data-ui="bulles"] nav button.on .ni{border-radius:20px}
+:root[data-ui="bulles"] .sheet{border-radius:36px 36px 0 0}
+:root[data-ui="bulles"] .nt-line{border-radius:50%}
+:root[data-ui="bulles"] .nt-acts button{border-radius:30px}
+
+/* Compact : marges et textes resserrés, plus de passages visibles d'un coup */
+:root[data-ui="compact"]{--r:12px}
+:root[data-ui="compact"] .pad{padding:10px 12px 20px}
+:root[data-ui="compact"] header{padding:calc(8px + var(--safe-top)) 12px 10px;border-radius:0 0 18px 18px}
+:root[data-ui="compact"] .hwrap{border-radius:0 0 22px 22px}
+:root[data-ui="compact"] .hello{display:none}
+:root[data-ui="compact"] .bar{padding:calc(10px + var(--safe-top)) 12px 10px;font-size:16px;border-radius:0 0 16px 16px}
+:root[data-ui="compact"] h2{font-size:17px;margin:16px 0 6px}
+:root[data-ui="compact"] .box{padding:10px 12px;font-size:14px}
+:root[data-ui="compact"] .dep{padding:8px 12px 8px 16px;margin-bottom:6px}
+:root[data-ui="compact"] .dep .t{font-size:21px}
+:root[data-ui="compact"] .dep .h b{font-size:15.5px}
+:root[data-ui="compact"] .dep .f{margin-top:4px}
+:root[data-ui="compact"] .dep .f span.to{font-size:14.5px}
+:root[data-ui="compact"] .dep .f .n{font-size:16px}
+:root[data-ui="compact"] .qa{gap:6px}
+:root[data-ui="compact"] .qa button{flex-direction:row;justify-content:center;padding:8px 4px;gap:6px;font-size:12.5px;border-radius:12px}
+:root[data-ui="compact"] .qa .qi{width:30px;height:30px;border-radius:9px}
+:root[data-ui="compact"] .qa svg{width:19px;height:19px}
+:root[data-ui="compact"] .ln{min-width:40px;height:31px;font-size:17px;border-radius:9px}
+:root[data-ui="compact"] .trip{padding:10px 12px;margin-bottom:8px}
+:root[data-ui="compact"] .jrow{padding:9px 12px;margin-bottom:6px;border-radius:12px}
+:root[data-ui="compact"] .item{padding:10px 4px}
+:root[data-ui="compact"] nav{padding:5px 4px calc(4px + var(--safe-bottom))}
+:root[data-ui="compact"] nav button{font-size:11px;gap:1px}
+:root[data-ui="compact"] nav svg{width:22px;height:22px}
+
+/* aperçus des formes dans les réglages */
+.theme-card .ui-prev{background:var(--bg)!important}
+.theme-card .ui-prev b,.theme-card .ui-prev i,.theme-card .ui-prev u{position:absolute;display:block}
+.theme-card .ui-prev b{left:0;right:0;top:0;height:18px;background:linear-gradient(135deg,var(--head-a),var(--head-b))!important;border-radius:0 0 8px 8px}
+.theme-card .ui-prev i{left:8px;right:8px;height:11px;background:var(--card)!important;border-radius:5px;box-shadow:0 2px 5px rgba(0,0,0,.12);bottom:auto!important}
+.theme-card .ui-prev i:nth-of-type(1){top:24px}
+.theme-card .ui-prev i:nth-of-type(2){top:39px}
+.theme-card .ui-prev u{left:0;right:0;bottom:0;height:8px;background:var(--card)}
+.theme-card .ui-epure b{background:var(--card)!important;border-radius:0;border-bottom:1px solid var(--line)}
+.theme-card .ui-epure i{box-shadow:0 0 0 1px var(--line)}
+.theme-card .ui-bulles b{border-radius:0 0 16px 16px;height:20px}
+.theme-card .ui-bulles i{border-radius:9px;left:12px;right:12px}
+.theme-card .ui-bulles u{left:14px;right:14px;bottom:3px;height:8px;border-radius:6px;box-shadow:0 2px 5px rgba(0,0,0,.2)}
+.theme-card .ui-compact b{height:12px;border-radius:0 0 5px 5px}
+.theme-card .ui-compact i{height:7px;border-radius:3px}
+.theme-card .ui-compact i:nth-of-type(1){top:17px}
+.theme-card .ui-compact i:nth-of-type(2){top:27px}
+.theme-card .ui-compact::after{content:"";position:absolute;left:8px;right:8px;top:37px;height:7px;border-radius:3px;background:var(--card);box-shadow:0 2px 5px rgba(0,0,0,.12)}

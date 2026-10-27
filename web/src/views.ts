@@ -4,7 +4,7 @@ import { CONFIG, VERSION } from "./config";
 import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
-import { ACCENTS, THEMES } from "./themes";
+import { ACCENTS, THEMES, UIS } from "./themes";
 import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_OBJETS_TROUVES, CTS_POINTS_DE_VENTE, CTS_SITE, KUMM_CONTACT, isIOS } from "./links";
 import type { Layer } from "./kinds";
 import { marker, markerIcon } from "./markers";
@@ -779,9 +779,15 @@ export function overlaySettings(): string {
       <strong>${t.label}</strong><small>${t.hint}</small><span class="ok">${check()}</span></button>`).join("");
   const accents = ACCENTS.map(a => `<button class="acc ${p.accent === a.id ? "on" : ""}" data-accent-pick="${a.id}" aria-pressed="${p.accent === a.id}" aria-label="${a.label}">
       <span class="dot" style="background:${a.color}">${check()}</span>${a.label}</button>`).join("");
+  // aperçu de chaque forme : en-tête, deux cartes et barre du bas, dessinés à sa façon (style.css, .ui-prev)
+  const uis = UIS.map(u => `<button class="theme-card ${p.ui === u.id ? "on" : ""}" data-ui-pick="${u.id}" aria-pressed="${p.ui === u.id}">
+      <div class="prev ui-prev ui-${u.id}"><b></b><i></i><i></i><u></u></div>
+      <strong>${u.label}</strong><small>${u.hint}</small><span class="ok">${check()}</span></button>`).join("");
   return `<div class="overlay">${bar("Réglages")}<main><div class="pad">
     <div class="sub" style="margin-top:4px">Thème</div>
     <div class="theme-grid">${themes}</div>
+    <div class="sub">Forme de l’interface</div>
+    <div class="theme-grid">${uis}</div>
     <div class="sub">Couleur principale</div>
     <div class="accent-row">${accents}</div>
     <div class="sub">Carte</div>
