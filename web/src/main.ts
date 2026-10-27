@@ -212,7 +212,7 @@ async function loadDepsNow(): Promise<void> {
             : cur ? departureBoard(s.name, all.filter(x => lineKind(x.d.line) === cur))
             : (others.length || !s.sncf ? departureBoard(s.name, others) : "") + (s.sncf && (trains.length || !others.length) ? trainBoard(trains, others.length ? 6 : 15) : ""));
           // sans passage : souvent un arrêt non desservi (travaux, déviation) ; l'info trafic l'explique mieux que les détails techniques
-          const none = !h.includes('class="lb-r"') && !h.includes("tb-row");
+          const none = !h.includes('class="lb-r');
           return stopNotice(s, none) + (none ? h + debugBox() : h);
         });
       }

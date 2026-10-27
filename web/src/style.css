@@ -435,21 +435,6 @@ a.box{text-decoration:none;color:inherit}
 .vno{margin:0 0 10px;font-size:15.5px}
 .vno small{display:block;color:var(--mute);font-size:13px;margin-top:2px}
 .upd-alt{display:block;text-align:center;color:var(--accent-ink);font-weight:700;font-size:15px;padding:8px}
-.tboard{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:6px 14px 4px;margin-bottom:10px;border-left:6px solid #7B1FA2}
-.tb-h{display:flex;align-items:center;gap:8px;padding:8px 0;font-weight:800}
-.tb-h svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
-.tb-h small{margin-left:auto;color:var(--mute);font-weight:600;font-size:12.5px}
-.tb-row{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
-.tb-t{font-weight:800;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;line-height:1.2}
-.tb-t s{color:var(--mute);font-weight:600;font-size:12.5px}
-.tb-d{min-width:0;display:flex;flex-direction:column}
-.tb-d b,.tb-d small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tb-d small{color:var(--mute);font-size:12.5px}
-.tb-s{display:flex;flex-direction:column;align-items:flex-end;font-size:13.5px;white-space:nowrap}
-.tb-s small{color:var(--mute);font-size:12.5px}
-.tb-late{color:#E65100}.tb-x{color:#C62828}.tb-ok{color:var(--accent-ink);font-weight:700}
-:root[data-scheme="dark"] .tb-late{color:#FFB74D}:root[data-scheme="dark"] .tb-x{color:#FF8A80}
-.tb-row.off .tb-t,.tb-row.off .tb-d b{text-decoration:line-through;color:var(--mute)}
 .srow{display:flex;align-items:stretch;gap:8px}.srow .item{flex:1;min-width:0}
 .sgo{flex:none;align-self:center;width:48px;height:44px;border:0;border-radius:14px;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer}
 .sgo svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2}
@@ -724,6 +709,10 @@ header.thead svg{stroke:var(--ink)}
 :root[data-scheme="contrast"] .lboard{border:2px solid #fff;box-shadow:none}
 :root[data-ui="compact"] .lb-r{padding:8px 12px}
 :root[data-ui="compact"] .lb-m{font-size:19px}
+.lb-r.ter em{font-style:normal;font-weight:800}
+.lb-r.ter em.ok{color:#5BD08A}.lb-r.ter em.late{color:#FFA94D}.lb-r.ter em.x{color:#FF8A8A}
+.lb-r.ter s{opacity:.7}
+.lb-r.ter.off .lb-d b{text-decoration:line-through;color:#8B939C}
 
 /* ============================================================
    Pas de sélection de texte ni de menu « Copier » dans l'application (sauf dans les champs de saisie)

@@ -739,16 +739,17 @@ export function trainBoard(list: TrainDeparture[], max = 15): string {
   const now = Date.now();
   const rows = list.filter(t => t.t > now - 60_000).slice(0, max).map(t => {
     const late = !t.cancelled && (t.delay ?? 0) >= 60, m = mins(t.t);
-    const state = t.cancelled ? `<b class="tb-x">Supprimé</b>`
-      : late ? `<b class="tb-late">+${Math.round(t.delay! / 60)} min</b>`
-      : t.delay !== undefined ? `<span class="tb-ok">À l’heure</span>` : "";
-    return `<div class="tb-row${t.cancelled ? " off" : ""}">
-      <span class="tb-t">${late ? `<s>${hm(t.aim)}</s>${hm(t.t)}` : hm(t.aim)}</span>
-      <span class="tb-d"><b>${esc(t.dest)}</b><small>TER ${esc(t.num)} · ${esc(t.route)}</small></span>
-      <span class="tb-s">${state}${t.cancelled ? "" : `<small>${m < 1 ? "À quai" : m + " min"}</small>`}</span></div>`;
+    // heure prévue (barrée si retard, avec l'heure réelle), numéro du train, puis l'état
+    const time = late ? `<s>${hm(t.aim)}</s> ${hm(t.t)}` : hm(t.aim);
+    const state = t.cancelled ? '<em class="x">Supprimé</em>'
+      : late ? `<em class="late">+${Math.round(t.delay! / 60)} min</em>`
+      : t.delay !== undefined ? '<em class="ok">À l’heure</em>' : "";
+    return `<div class="lb-r ter${t.cancelled ? " off" : ""}"><span class="ln sm" style="background:#7B1FA2;color:#fff">TER</span>
+      <span class="lb-d"><b>${esc(t.dest)}</b><small>${time} · n° ${esc(t.num)}${state ? " · " + state : ""}</small></span>
+      ${t.cancelled ? "" : m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}</div>`;
   });
   if (!rows.length) return '<div class="empty" style="padding:24px">Aucun train au départ dans les 4 prochaines heures</div>';
-  return `<div class="tboard"><div class="tb-h">${ic("train")}<span>Trains au départ</span><small>Horaires SNCF</small></div>${rows.join("")}</div>`;
+  return `<div class="lboard"><div class="lb-h"><span><small>Horaires SNCF</small><b>Trains au départ</b></span><span class="lb-clock">${hm(now)}</span></div>${rows.join("")}</div>`;
 }
 
 /** Onglets des départs d'un arrêt desservi par plusieurs modes */
