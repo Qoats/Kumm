@@ -33,13 +33,24 @@ export interface LineInfo {
   /** couleurs officielles : fond et texte, « #RRGGBB » */
   colors: Record<string, string>;
   text: Record<string, string>;
+  /** terminus de chaque ligne, d'après son nom long (« Lingolsheim Alouettes - Entzheim Ouest ») */
+  ends: Record<string, [string, string]>;
 }
 
 const hex = (v: unknown): string | undefined => (typeof v === "string" && /^[0-9A-Fa-f]{6}$/.test(v) ? "#" + v.toUpperCase() : undefined);
 
 /** Lit la réponse lines-discovery : identifiant, nom public et mode de chaque ligne */
+/** Terminus d'après le nom long d'une ligne : « A - B », « A -B/C », « A-B/C/D » (un seul tiret), « A - B - C » (boucle) */
+function ends(name: string | undefined): [string, string] | null {
+  if (!name) return null;
+  let parts = name.split(/\s+[-–—]\s*|\s*[-–—]\s+/);
+  if (parts.length < 2 && (name.match(/-/g) ?? []).length === 1) parts = name.split("-");
+  parts = parts.map(x => x.replace(/\s*\/\s*/g, " / ").trim()).filter(Boolean);
+  return parts.length >= 2 ? [parts[0], parts.slice(1).join(" – ")] : null;
+}
+
 export function parseLineInfo(json: unknown): LineInfo {
-  const out: LineInfo = { modes: {}, names: {}, colors: {}, text: {} };
+  const out: LineInfo = { modes: {}, names: {}, colors: {}, text: {}, ends: {} };
   const walk = (v: unknown, depth: number): void => {
     if (depth > 8) return;
     if (Array.isArray(v)) { v.forEach(x => walk(x, depth + 1)); return; }
@@ -54,6 +65,8 @@ export function parseLineInfo(json: unknown): LineInfo {
       const m = modeOf(v);
       if (m) ids.forEach(id => { out.modes[id] = m; });
       if (ref && pub && ref !== pub) out.names[ref] = pub;
+      const e = ends(str("LineName"));
+      if (e) [ref, pub].forEach(id => { if (id) out.ends[id] = e; });
       const ext = isObj(v["Extension"]) ? v["Extension"] : {};
       const bg = hex(ext["RouteColor"] ?? v["RouteColor"]), fg = hex(ext["RouteTextColor"] ?? v["RouteTextColor"]);
       [ref, pub].forEach(id => {

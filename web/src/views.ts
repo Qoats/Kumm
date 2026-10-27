@@ -44,7 +44,12 @@ export function networkLines(): string[] {
   for (const st of STOPS) for (const l of st.lines) { const n = lineLabel(l); if (lineKind(l) !== "ter" && n.length <= 5) set.add(n); }
   return [...set].sort((a, b) => lineOrder(a).localeCompare(lineOrder(b)));
 }
-const dirs = (l: string): [string, string] => DIRS[l] ?? ["", ""];
+/** Terminus d'une ligne : ceux publiés par la CTS, sinon les destinations des véhicules en circulation */
+const dirs = (l: string): [string, string] => {
+  if (DIRS[l]) return DIRS[l];
+  const d = [...new Set([...VEHICLES.values()].filter(v => v.line === l).map(v => v.dest))].sort((a, b) => a.localeCompare(b, "fr"));
+  return d.length ? [d[0], d[1] ?? d[0]] : ["", ""];
+};
 const dirText = (l: string): string => { const d = dirs(l); return d[0] + (d[0] !== d[1] ? " ⇄ " + d[1] : ""); };
 /** Date et heure à Strasbourg ; 04h00 et 02h00 sont le début et la fin de journée de service de la CTS : on n'affiche alors que la date */
 function moment(iso?: string): { day: string; hm: string; today: boolean; dayOnly: boolean } | null {

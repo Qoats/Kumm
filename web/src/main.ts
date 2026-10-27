@@ -11,7 +11,7 @@ import "@fontsource/plus-jakarta-sans/latin-800.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-800.css";
 import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
-import { COLORS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
+import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
 import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
 import { KINDS } from "./kinds";
@@ -672,7 +672,7 @@ async function initReal(): Promise<void> {
   void refreshMessages();
   setInterval(() => { if (!document.hidden) void refreshMessages(); }, 5 * 60_000);
   // modes des lignes (tram / bus / TER) : améliore le classement des arrêts dès qu'ils arrivent
-  void loadLineInfo().then(info => { Object.assign(LINE_MODES, info.modes); Object.assign(LINE_NAMES, info.names); Object.assign(COLORS, info.colors); Object.assign(TEXT_COLORS, info.text); render(); }).catch(e => console.warn("lines-discovery indisponible :", e));
+  void loadLineInfo().then(info => { Object.assign(LINE_MODES, info.modes); Object.assign(LINE_NAMES, info.names); Object.assign(COLORS, info.colors); Object.assign(TEXT_COLORS, info.text); Object.assign(DIRS, info.ends); render(); }).catch(e => console.warn("lines-discovery indisponible :", e));
   // 1) démarrage instantané avec la liste d'arrêts gardée sur le téléphone (7 jours)
   try {
     const c = JSON.parse(localStorage.getItem("stopsCache2") ?? "null") as { t: number; list: typeof STOPS } | null;
