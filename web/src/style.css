@@ -572,7 +572,11 @@ body:has(#navlayer) .jbanner{top:calc(env(safe-area-inset-top,0px) + 100px);max-
 :root[data-ui="bulles"] .ln.sm{border-radius:14px}
 :root[data-ui="bulles"] .field,:root[data-ui="bulles"] .jrow{border-radius:26px}
 :root[data-ui="bulles"] .box .rb{border-radius:50%}
-:root[data-ui="bulles"] nav{margin:0 12px calc(8px + var(--safe-bottom));padding:8px 6px;border:0;border-radius:30px;background:var(--card);box-shadow:0 10px 30px -8px rgba(0,0,0,.35)}
+:root[data-ui="bulles"]{--navh:calc(84px + var(--safe-bottom))}
+/* barre flottante posée sur le contenu : l'écran continue dessous (le contenu garde une marge pour rester visible au-dessus) */
+:root[data-ui="bulles"] #app>nav{position:absolute;left:12px;right:12px;bottom:calc(8px + var(--safe-bottom));z-index:1500;margin:0;padding:8px 6px;border:1px solid var(--line);border-radius:30px;background:color-mix(in srgb,var(--card) 82%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 10px 30px -8px rgba(0,0,0,.45)}
+:root[data-ui="bulles"] #app>main{padding-bottom:var(--navh)}
+:root[data-ui="bulles"] .map .sheet .list{padding-bottom:calc(var(--navh) + 16px)}
 :root[data-ui="bulles"] nav button.on .ni{border-radius:20px}
 :root[data-ui="bulles"] .sheet{border-radius:36px 36px 0 0}
 :root[data-ui="bulles"] .nt-line{border-radius:50%}
