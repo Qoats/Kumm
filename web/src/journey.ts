@@ -139,14 +139,6 @@ export function legStops(k: number): { calls: { name: string; arr: number }[]; a
   return { calls, at: st.boarded ? Math.max(0, Math.min(calls.length - 1, calls.length - st.remaining)) : 0 };
 }
 
-/** La personne passe d'elle-même à l'étape suivante (« Étape suivante » du guidage) */
-export function skipLeg(k: number): void {
-  if (k !== legIdx || k < legsDone || !legs.length) return;
-  window.clearTimeout(retryTimer);
-  if (S.journey?.native) void Trip.stop().catch(() => { /* rien */ });
-  legDone();
-}
-
 /** Où en est le trajet : état du service natif, sinon d'après les horaires */
 function state(j: Journey, now = Date.now()): { boarded: boolean; remaining: number; next: string; eta: number } {
   const st = j.status, c = j.detail.calls;

@@ -337,7 +337,6 @@ nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .nt-stops li.more .dot{width:6px;height:6px;left:8px;border:0;background:var(--lc);opacity:.7}
 .nt-acts{display:flex;gap:10px}
 .nt-acts button{flex:1;border-radius:16px;padding:13px 10px;font-weight:800;font-size:16px;white-space:nowrap}
-#nt-skip{background:var(--chip);color:var(--ink)}
 .nv-transit #nv-quit{background:transparent!important;color:#D93025;box-shadow:inset 0 0 0 2px #D93025;padding:13px 10px!important}
 
 /* ---------- contraste élevé ---------- */

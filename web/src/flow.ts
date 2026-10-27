@@ -4,7 +4,7 @@ import type { TransitStatus, TransitStop } from "./nav";
 import { fetchWalk } from "./walk";
 import { JOURNEYS, PLAN, TRIP } from "./trip";
 import { hm } from "./transit";
-import { followRoute, legState, legStops, skipLeg, stopJourney } from "./journey";
+import { followRoute, legState, legStops, stopJourney } from "./journey";
 import { COLORS, lineKind, lineLabel, lineText } from "./data";
 import { fmtMin, haversine } from "./geo";
 import { toast } from "./store";
@@ -91,7 +91,6 @@ function runPhases(phases: Phase[], dest: Place, k = 0): void {
     path: p.path.map(([lat, lon]) => [lon, lat] as [number, number]),
     dest: p.to, line: label, caption: `${p.mode === "bus" ? "Bus" : p.mode === "tram" ? "Tram" : "Train"}${p.headsign ? ` vers ${p.headsign}` : ""}`, color: COLORS[label] ?? p.color ?? "#136342", ink: COLORS[label] ? lineText(label) : "#fff",
     status: () => rideStatus(p),
-    skip: () => { if (p.follow >= 0) skipLeg(p.follow); },
     next, onQuit
   });
 }

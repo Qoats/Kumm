@@ -36,8 +36,6 @@ export interface TransitOptions {
   color: string;
   ink: string;
   status(): TransitStatus;
-  /** « Étape suivante » touché : l'étape est considérée comme faite */
-  skip(): void;
   next?: () => void;
   onQuit?: () => void;
 }
@@ -115,11 +113,10 @@ export function startTransitNav(o: TransitOptions): void {
       <div class="nt-count"><b id="nt-big"></b><span id="nt-label"></span></div>
       <div class="nt-valid" id="nt-valid">${TICKET}<span>Pensez à valider votre titre de transport</span></div>
       <ol class="nt-stops" id="nt-stops"></ol>
-      <div class="nt-acts"><button id="nt-skip">Étape suivante</button><button id="nv-quit">Quitter</button></div>
+      <div class="nt-acts"><button id="nv-quit">Quitter</button></div>
     </div>`;
   document.body.appendChild(layer);
   const $ = <T extends HTMLElement>(id: string): T => layer.querySelector<T>("#" + id) as T;
-  $("nt-skip").onclick = () => { o.skip(); done(); };
 
   let view: NavView | null = null, stopped = false, lastPos: LL | null = null, finished = false, said = "", shown = "";
   void createNavView($("nv-map"), o.path, o.dest, { color: o.color, overview: true }).then(({ view: v, mode }) => {
@@ -274,7 +271,8 @@ export function startNav(o: NavOptions): void {
     while (idx < steps.length - 1 && haversine(p, steps[idx]) < 25) idx++;
     const next = steps[idx];
     const d = haversine(p, next);
-    if (idx === steps.length - 1 && d < 20) { finish(); return; }
+    // arrivée : à 20 m de la destination ; d'un arrêt (étape suivante de la navigation), à 35 m, le GPS étant moins précis en ville
+    if (idx === steps.length - 1 && d < (o.next ? 35 : 20)) { finish(); return; }
 
     $("nv-arrow").textContent = arrowFor(next);
     const isEnd = next.type === "arrive";
@@ -309,13 +307,7 @@ export function startNav(o: NavOptions): void {
   onPos({ lat: first[1], lon: first[0] });
 
   $("nv-quit").onclick = () => { stopNav(); o.onQuit?.(); };
-  if (o.next) {
-    // arrivé à l'arrêt mais la position ne le montre pas (GPS imprécis) : on passe à l'étape suivante soi-même
-    const skip = document.createElement("button");
-    skip.textContent = "Étape suivante";
-    skip.onclick = () => { if (!finished) { finished = true; o.next?.(); } };
-    $("nv-quit").before(skip);
-  }
+
   $("nv-recenter").onclick = () => {
     $("nv-recenter").hidden = true;
     view?.setFollow(true);
