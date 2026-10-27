@@ -35,8 +35,15 @@ class DarkTiles extends L.GridLayer {
       ctx.putImageData(px, 0, 0);
       done(undefined, tile);
     };
-    img.onerror = () => done(new Error("tuile indisponible"), tile);
-    img.src = TILE_URL.replace("{z}", String(coords.z)).replace("{x}", String(coords.x)).replace("{y}", String(coords.y));
+    // adresse à part (« ?c=1 ») : la même tuile déjà chargée par la carte claire est gardée en cache sans l'autorisation
+    // d'être lue par le canevas ; la réutiliser ferait échouer la tuile sombre. Un échec (réseau) est retenté une fois.
+    const src = TILE_URL.replace("{z}", String(coords.z)).replace("{x}", String(coords.x)).replace("{y}", String(coords.y)) + "?c=1";
+    let retried = false;
+    img.onerror = () => {
+      if (!retried) { retried = true; window.setTimeout(() => { img.src = src + "&r=" + Date.now(); }, 800); return; }
+      done(new Error("tuile indisponible"), tile);
+    };
+    img.src = src;
     return tile;
   }
 }

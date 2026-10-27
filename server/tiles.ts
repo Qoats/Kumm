@@ -47,7 +47,9 @@ export async function serveTile(res: ServerResponse, path: string): Promise<void
     }
   }
   if (!buf) { res.writeHead(502, { "Content-Type": "text/plain" }); return void res.end("Tuile indisponible"); }
-  res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" });
+  // Vary : la réponse diffère selon l'origine (autorisation CORS) ; sans lui, une tuile chargée sans Origin resterait en cache
+  // et ne pourrait plus être assombrie par la carte sombre
+  res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400", "Vary": "Origin" });
   res.end(buf);
 }
 
