@@ -127,12 +127,20 @@ export function setStopIndex(body: string): void {
   } catch { /* forme inattendue : on garde l'ancienne correspondance */ }
 }
 
+/* Arrêts déjà passés : la CTS remplace parfois leur heure par une date bidon (« 0001-01-01T00:00:00 »). Prise telle quelle,
+   le véhicule semblait parti en l'an 1 : vitesse absurde, arrêts sautés, puis saut brutal, et un code de trajet faux. */
+const MIN_TIME = Date.UTC(2020, 0, 1);
+const real = (t: number): boolean => Number.isFinite(t) && t > MIN_TIME;
+/** heure de départ prévue au terminus de chaque course, retenue tant qu'elle est connue (le code du trajet en dépend) */
+const startOf = new Map<string, number>();
+
 /** Lit la réponse estimated-timetable : un passage par arrêt desservi, sauf l'arrivée au terminus (on ne peut pas y monter) */
 export function parseEstimatedTimetable(body: string): { byCode: Map<string, Visit[]>; validUntil: string; courses: number; passages: number; list: Course[] } {
   const j = JSON.parse(body) as { ServiceDelivery?: { EstimatedTimetableDelivery?: unknown[] } };
   const map = new Map<string, Visit[]>();
   const list: Course[] = [];
   let courses = 0, passages = 0, until = "";
+  const seen = new Set<string>();
   for (const del of j.ServiceDelivery?.EstimatedTimetableDelivery ?? []) {
     if (!isObj(del)) continue;
     until ||= str(del["ValidUntil"]);
@@ -149,18 +157,35 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
           ...(jr["DirectionRef"] != null && jr["DirectionRef"] !== "" ? { dir: String(jr["DirectionRef"]) } : {})
         };
         const journeyCancelled = isCancelledJourney(jr);
+        let passed = 0;   // arrêts déjà passés en tête de course, sans heure valable
         for (const c of calls) {
           if (!isObj(c) || isCancelledCall(c)) continue;      // arrêt non desservi : ni passage, ni position sur la carte
-          const dep = Date.parse(str(c["ExpectedDepartureTime"]) || str(c["AimedDepartureTime"]));
-          const arr = Date.parse(str(c["ExpectedArrivalTime"]) || str(c["AimedArrivalTime"]));
+          const p = (k: string): number => { const t = Date.parse(str(c[k])); return real(t) ? t : NaN; };
+          const dep = Number.isNaN(p("ExpectedDepartureTime")) ? p("AimedDepartureTime") : p("ExpectedDepartureTime");
+          const arr = Number.isNaN(p("ExpectedArrivalTime")) ? p("AimedArrivalTime") : p("ExpectedArrivalTime");
           const a = Number.isNaN(arr) ? dep : arr, d = Number.isNaN(dep) ? arr : dep;
-          if (Number.isNaN(a) || !str(c["StopPointRef"])) continue;
-          if (!course.calls.length) { const t = Date.parse(str(c["AimedDepartureTime"]) || str(c["AimedArrivalTime"])); if (!Number.isNaN(t)) course.aimed = t; }
-          const aim = Date.parse(str(c["AimedArrivalTime"]) || str(c["AimedDepartureTime"]));
+          if (!str(c["StopPointRef"])) continue;
+          if (Number.isNaN(a)) {
+            // sans heure : arrêt déjà passé s'il précède tous les arrêts horodatés (heure estimée plus bas), sinon ignoré
+            if (course.calls.length === passed) { course.calls.push({ code: str(c["StopPointRef"]), name: str(c["StopPointName"]), arr: NaN, dep: NaN }); passed++; }
+            continue;
+          }
+          const aim = Number.isNaN(p("AimedArrivalTime")) ? p("AimedDepartureTime") : p("AimedArrivalTime");
+          if (course.aimed === undefined) { const t = Number.isNaN(p("AimedDepartureTime")) ? p("AimedArrivalTime") : p("AimedDepartureTime"); if (!Number.isNaN(t) && course.calls.length === 0) course.aimed = t; }
           course.calls.push({ code: str(c["StopPointRef"]), name: str(c["StopPointName"]), arr: a, dep: d, ...(Number.isNaN(aim) ? {} : { aim }) });
           course.dest ||= str(c["DestinationName"]);
           if (isObj(c["Extension"]) && c["Extension"]["IsRealTime"] === true) course.realTime = true;
         }
+        // arrêts passés sans heure : une minute d'écart chacun avant le premier arrêt horodaté (le véhicule les a déjà quittés)
+        if (passed) {
+          if (course.calls.length === passed) course.calls = [];
+          else { const t0 = course.calls[passed].arr; for (let i = 0; i < passed; i++) course.calls[i].arr = course.calls[i].dep = t0 - (passed - i) * 60_000; }
+        }
+        // départ prévu au terminus : retenu d'une mise à jour à l'autre (il disparaît quand le premier arrêt est passé)
+        seen.add(course.id);
+        const known = startOf.get(course.id);
+        if (known !== undefined) course.aimed = known;
+        else if (!passed && course.calls.length) startOf.set(course.id, course.aimed ??= course.calls[0].dep);
         if (course.calls.length >= 2 && !journeyCancelled) list.push(course);   // course supprimée : pas de véhicule
         calls.forEach((c, i) => {
           if (!isObj(c)) return;
@@ -182,6 +207,7 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
     }
   }
   for (const l of map.values()) l.sort((a, b) => a.time - b.time);
+  for (const id of startOf.keys()) if (!seen.has(id)) startOf.delete(id);   // course terminée
   return { byCode: map, validUntil: until, courses, passages, list };
 }
 
