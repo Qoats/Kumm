@@ -319,7 +319,7 @@ export async function directLineCards(origin: Place, dest: Place): Promise<{ lin
         html: `<div class="trip"><div class="top"><span style="display:flex;gap:10px;align-items:center">${lineChip(l)}<b style="font-size:18px">${esc(board.name)}</b></span><span style="color:var(--mute)">🚶 ~${walkMin(dBoard)} min</span></div>`
           + (deps.length ? deps.slice(0, 2).map(x => `<div style="display:flex;justify-content:space-between;margin-top:6px;gap:8px"><span>vers <b>${esc(x.dest)}</b></span><span style="white-space:nowrap">${x.times.slice(0, 2).map(t => mins(t) + " min").join(" · ")}</span></div>`).join("") : '<small style="color:var(--mute)">Aucun passage prévu</small>')
           + `<div class="legs" style="margin-top:8px"><small>Descendre à ${esc(alt.s.name)}, puis 🚶 ~${walkMin(alt.d)} min jusqu’à la destination</small></div>`
-          + `<div class="acts"><button class="go" data-nav="board:${esc(l)}">Guider jusqu’à l’arrêt</button></div></div>`
+          + `<div class="acts"><button class="go" data-nav="board:${esc(l)}">Démarrer la navigation</button></div></div>`
       });
     }
   }
@@ -336,7 +336,7 @@ function journeySteps(j: Journey, i: number): string {
     if (l.kind === "walk") return `<div class="jl"><span class="jw">${ic("walk")}</span><span>${minutes(l.duration)} min à pied${l.distance ? ` · ${fmtDist(l.distance)}` : ""}</span></div>`;
     return `<div class="jl"><span>${lineChip(l.line ?? "?", true)}</span><span><b>${esc(l.from.name)}</b> ${hm(l.start)} → <b>${esc(l.to.name)}</b> ${hm(l.end)}<br><small style="color:var(--mute)">${l.headsign ? `vers ${esc(l.headsign)} · ` : ""}${minutes(l.duration)} min${l.stops ? ` · ${l.stops + 1} arrêts` : ""}${l.realTime ? " · temps réel" : ""}</small></span></div>`;
   }).join("");
-  return `<div class="jdet">${steps}<div class="acts"><button class="go" data-nav="j:${i}">Guider à pied jusqu’à l’arrêt</button></div></div>`;
+  return `<div class="jdet">${steps}<div class="acts"><button class="go" data-nav="j:${i}">Démarrer la navigation</button></div></div>`;
 }
 
 /** Une ligne de la liste des trajets : horaires, durée, enchaînement des lignes ; touchée, elle s'affiche sur la carte */

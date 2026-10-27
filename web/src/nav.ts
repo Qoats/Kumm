@@ -17,7 +17,29 @@ export interface NavOptions {
   /** message affiché à l'arrivée (HTML) et boutons proposés */
   endHtml?: string;
   actions?: NavAction[];
+  /** navigation de bout en bout (flow.ts) : étape suivante, lancée d'elle-même à l'arrivée, sans écran de fin */
+  next?: () => void;
+  /** « Quitter » : arrête aussi le reste de la navigation (alertes de descente) */
+  onQuit?: () => void;
 }
+
+/** Étape en tram ou en bus d'une navigation de bout en bout : pas de consignes de marche, l'état vient de status() */
+export interface TransitOptions {
+  title: string;
+  /** tracé de la ligne, [longitude, latitude] */
+  path: [number, number][];
+  dest: LL & { label: string };
+  line: string;
+  /** couleur de la ligne et de son texte */
+  color: string;
+  ink: string;
+  status(): TransitStatus;
+  /** « Étape suivante » touché : l'étape est considérée comme faite */
+  skip(): void;
+  next?: () => void;
+  onQuit?: () => void;
+}
+export interface TransitStatus { done: boolean; text: string; dist: string; eta: string; rem: string; say?: string }
 
 const WALK_SPEED = 1.35;   // m/s, marche normale
 const BIKE_SPEED = 4.2;    // m/s, vélo en ville (~15 km/h)
@@ -29,6 +51,104 @@ let currentSpeed: number = WALK_SPEED;
 export function stopNav(): void {
   current?.();
   current = null;
+}
+
+/** Écran du guidage : consigne en haut, carte, temps restant et boutons en bas */
+function navLayer(): { layer: HTMLElement; $: <T extends HTMLElement>(id: string) => T } {
+  const layer = document.createElement("div");
+  layer.id = "navlayer";
+  layer.innerHTML = `
+    <div class="nv-top"><div class="nv-dir"><span id="nv-arrow">↑</span><small id="nv-dist"></small></div><b id="nv-text"></b></div>
+    <div id="nv-map"></div>
+    <button id="nv-recenter" hidden>➤ Recentrer</button>
+    <div id="nv-end" hidden></div>
+    <div class="nv-bottom">
+      <div><b id="nv-eta"></b><small id="nv-rem"></small></div>
+      <div class="nv-btns"><button id="nv-quit">Quitter</button></div>
+    </div>`;
+  document.body.appendChild(layer);
+  return { layer, $: <T extends HTMLElement>(id: string): T => layer.querySelector<T>("#" + id) as T };
+}
+
+function speak(text: string): void {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "fr-FR";
+  window.speechSynthesis.speak(u);
+}
+
+/** Étape en tram ou en bus : attente à l'arrêt, puis arrêts restants jusqu'à la descente ; la carte suit la position */
+export function startTransitNav(o: TransitOptions): void {
+  stopNav();
+  const { layer, $ } = navLayer();
+  layer.classList.add("nv-transit");
+  const arrow = $("nv-arrow");
+  arrow.textContent = o.line;
+  arrow.classList.add("nv-line");
+  arrow.style.background = o.color;
+  arrow.style.color = o.ink;
+  const skip = document.createElement("button");
+  skip.textContent = "Étape suivante";
+  skip.onclick = () => { o.skip(); done(); };
+  $("nv-quit").before(skip);
+
+  let view: NavView | null = null, stopped = false, lastPos: LL | null = null, finished = false, said = "";
+  void createNavView($("nv-map"), o.path, o.dest).then(({ view: v, mode }) => {
+    if (stopped) { v.destroy(); return; }
+    view = v;
+    layer.dataset.mode = mode;
+    v.onUserMove(() => { v.setFollow(false); $("nv-recenter").hidden = false; });
+    if (lastPos) v.setPosition(lastPos, null);
+  });
+
+  function done(): void {
+    if (finished) return;
+    finished = true;
+    if (o.next) { o.next(); return; }
+    $("nv-text").textContent = `Vous êtes arrivé : ${o.dest.label}`;
+    $("nv-dist").textContent = "";
+    const end = $("nv-end");
+    end.hidden = false;
+    end.innerHTML = `<b>${esc(o.title)}</b><p>Vous êtes arrivé à destination.</p><div class="nv-acts"><button class="nv-done">Terminer</button></div>`;
+    (end.querySelector(".nv-done") as HTMLElement).onclick = stopNav;
+  }
+
+  function update(): void {
+    if (finished) return;
+    const s = o.status();
+    if (s.done) { done(); return; }
+    $("nv-text").textContent = s.text;
+    $("nv-dist").textContent = s.dist;
+    $("nv-eta").textContent = s.eta;
+    $("nv-rem").textContent = s.rem;
+    if (s.say && s.say !== said) { said = s.say; speak(s.say); }
+  }
+  update();
+  const timer = window.setInterval(update, 2000);
+
+  let watchId: number | null = null;
+  if ("geolocation" in navigator) {
+    watchId = navigator.geolocation.watchPosition(
+      pos => { lastPos = { lat: pos.coords.latitude, lon: pos.coords.longitude }; view?.setPosition(lastPos, null); },
+      () => { /* la consigne vient des horaires : rien à afficher */ },
+      { enableHighAccuracy: true, maximumAge: 5000 }
+    );
+  }
+  $("nv-quit").onclick = () => { stopNav(); o.onQuit?.(); };
+  $("nv-recenter").onclick = () => {
+    $("nv-recenter").hidden = true;
+    view?.setFollow(true);
+    if (lastPos) view?.setPosition(lastPos, null);
+  };
+  current = () => {
+    window.clearInterval(timer);
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    window.speechSynthesis?.cancel();
+    stopped = true;
+    view?.destroy();
+    layer.remove();
+  };
 }
 
 export function startNav(o: NavOptions): void {
@@ -45,19 +165,7 @@ export function startNav(o: NavOptions): void {
   let finished = false, wasOnRoute = false, offCount = 0, lastReroute = 0, rerouting = false;
   let watchId: number | null = null;
 
-  const layer = document.createElement("div");
-  layer.id = "navlayer";
-  layer.innerHTML = `
-    <div class="nv-top"><div class="nv-dir"><span id="nv-arrow">↑</span><small id="nv-dist"></small></div><b id="nv-text"></b></div>
-    <div id="nv-map"></div>
-    <button id="nv-recenter" hidden>➤ Recentrer</button>
-    <div id="nv-end" hidden></div>
-    <div class="nv-bottom">
-      <div><b id="nv-eta"></b><small id="nv-rem"></small></div>
-      <div class="nv-btns"><button id="nv-quit">Quitter</button></div>
-    </div>`;
-  document.body.appendChild(layer);
-  const $ = <T extends HTMLElement>(id: string): T => layer.querySelector<T>("#" + id) as T;
+  const { layer, $ } = navLayer();
 
   const first = route.coords[0];
   // carte 3D (ou 2D de repli), créée en arrière-plan : les consignes s'affichent sans l'attendre
@@ -83,17 +191,11 @@ export function startNav(o: NavOptions): void {
   /** Heure d'arrivée estimée, à l'heure de Strasbourg */
   const arrival = (sec: number): string => new Date(Date.now() + sec * 1000).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
 
-  function speak(text: string): void {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "fr-FR";
-    window.speechSynthesis.speak(u);
-  }
-
   function finish(): void {
     if (finished) return;
     finished = true;
+    // navigation de bout en bout : arrivé à l'arrêt (ou à la correspondance), on enchaîne sur l'étape suivante
+    if (o.next) { speak(`Vous êtes arrivé : ${o.dest.label}`); o.next(); return; }
     $("nv-text").textContent = `Vous êtes arrivé : ${o.dest.label}`;
     $("nv-dist").textContent = "";
     $("nv-arrow").textContent = "⚑";
@@ -166,7 +268,14 @@ export function startNav(o: NavOptions): void {
   }
   onPos({ lat: first[1], lon: first[0] });
 
-  $("nv-quit").onclick = stopNav;
+  $("nv-quit").onclick = () => { stopNav(); o.onQuit?.(); };
+  if (o.next) {
+    // arrivé à l'arrêt mais la position ne le montre pas (GPS imprécis) : on passe à l'étape suivante soi-même
+    const skip = document.createElement("button");
+    skip.textContent = "Étape suivante";
+    skip.onclick = () => { if (!finished) { finished = true; o.next?.(); } };
+    $("nv-quit").before(skip);
+  }
   $("nv-recenter").onclick = () => {
     $("nv-recenter").hidden = true;
     view?.setFollow(true);

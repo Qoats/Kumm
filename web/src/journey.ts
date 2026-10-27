@@ -50,12 +50,12 @@ async function fetchTrip(q: string): Promise<TripDetail | null> {
 const ahead = (d: TripDetail, now = Date.now()): number => Math.max(0, d.calls.findIndex(c => c.arr > now - 20_000));
 
 /* ---------- itinéraire suivi : ses étapes, l'une après l'autre ---------- */
-let legs: RouteLeg[] = [], legIdx = 0, retryTimer = 0, missed = 0;
+let legs: RouteLeg[] = [], legIdx = 0, retryTimer = 0, missed = 0, legsDone = 0;
 
 /** Navigation lancée : les étapes en tram ou en bus de l'itinéraire seront suivies */
 export function followRoute(list: RouteLeg[]): void {
   stopJourney(true);
-  legs = list.filter(l => l.line); legIdx = 0; missed = 0;
+  legs = list.filter(l => l.line); legIdx = 0; missed = 0; legsDone = 0;
   if (legs.length) void startLeg(legs[0].start - 120_000, true);
 }
 
@@ -117,7 +117,25 @@ export function stopJourney(quiet = false): void {
 /** Fin d'une étape (arrivée, ou course terminée) : étape suivante */
 function legDone(): void {
   S.journey = null; hideBanner(true); render();
+  legsDone = Math.max(legsDone, legIdx + 1);
   nextLeg();
+}
+
+/** Pour la navigation de bout en bout (flow.ts) : où en est l'étape k (indice dans la liste donnée à followRoute) ;
+    null : pas encore suivie (course pas encore publiée par la CTS), l'écran se fie alors aux horaires de l'itinéraire */
+export function legState(k: number): { done: boolean; boarded: boolean; remaining: number; next: string; eta: number } | null {
+  if (k < legsDone) return { done: true, boarded: true, remaining: 0, next: "", eta: 0 };
+  const j = S.journey;
+  if (k !== legIdx || !j || !legs.length) return null;
+  return { done: false, ...state(j) };
+}
+
+/** La personne passe d'elle-même à l'étape suivante (« Étape suivante » du guidage) */
+export function skipLeg(k: number): void {
+  if (k !== legIdx || k < legsDone || !legs.length) return;
+  window.clearTimeout(retryTimer);
+  if (S.journey?.native) void Trip.stop().catch(() => { /* rien */ });
+  legDone();
 }
 
 /** Où en est le trajet : état du service natif, sinon d'après les horaires */
