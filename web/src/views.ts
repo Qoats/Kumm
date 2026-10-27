@@ -4,7 +4,8 @@ import { CONFIG, VERSION } from "./config";
 import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
-import { ACCENTS, THEMES, UIS } from "./themes";
+import { ACCENTS, ACCENT_TOKENS, THEMES, THEME_TOKENS, UIS } from "./themes";
+import type { Accent, Theme, Ui } from "./themes";
 import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_OBJETS_TROUVES, KUMM_CONTACT, isIOS } from "./links";
 import type { Layer } from "./kinds";
 import { marker, markerIcon } from "./markers";
@@ -98,13 +99,28 @@ export function bar(title: string, back?: string): string {
 }
 
 /* ============ ÉCRANS ============ */
-/** Tuile Vélhop : la station la plus proche et ses vélos disponibles */
+/** Tuile Vélhop : la station choisie (appui long sur la tuile), sinon la plus proche, et ses vélos disponibles */
 function bikeTile(): string {
-  const st = POIS.filter(p => p.kind === "velhop").map(p => ({ p, d: haversine(USER, p) })).sort((a, b) => a.d - b.d)[0];
+  const chosen = S.bikeStation ? POIS.find(p => p.id === S.bikeStation && p.kind === "velhop") : undefined;
+  const st = chosen ? { p: chosen, d: haversine(USER, chosen) }
+    : POIS.filter(p => p.kind === "velhop").map(p => ({ p, d: haversine(USER, p) })).sort((a, b) => a.d - b.d)[0];
   const n = st?.p.info?.match(/(\d+)\s*vélo/i)?.[1];
-  return `<button class="tile tile-bike" data-act="mapBikes"><h4>${ic("bike")}Vélhop</h4>${n !== undefined
+  return `<button class="tile tile-bike" data-act="mapBikes" data-hold="bikepick"><h4>${ic("bike")}Vélhop${chosen ? ` ${ic("star")}` : ""}</h4>${n !== undefined
     ? `<div class="big">${n}<small> vélo${n === "1" ? "" : "s"}</small></div><p>${esc(st!.p.name.replace(/^Vélhop\s*/i, ""))} · ${fmtDist(st!.d)}</p>`
-    : `<div class="big sm">Stations</div><p>Vélos en libre-service</p>`}</button>`;
+    : `<div class="big sm">Stations</div><p>${st ? esc(st.p.name.replace(/^Vélhop\s*/i, "")) : "Vélos en libre-service"}</p>`}</button>`;
+}
+
+/** Choix de la station Vélhop de l'accueil : la plus proche (par défaut), ou une station précise */
+export function overlayBikePick(): string {
+  const list = POIS.filter(p => p.kind === "velhop").map(p => ({ p, d: haversine(USER, p) })).sort((a, b) => a.d - b.d);
+  const row = (id: string, name: string, sub: string, on: boolean): string =>
+    `<button class="item${on ? " on" : ""}" data-bikest="${esc(id)}">${markerIcon("velhop", 28)}<span>${esc(name)}<br><small style="color:var(--mute)">${esc(sub)}</small></span>${on ? `<span class="ml pick">${check()}</span>` : ""}</button>`;
+  return `<div class="overlay">${bar("Station Vélhop de l’accueil")}<main><div class="pad">
+    <p class="src" style="margin:0 0 8px">La tuile Vélhop de l’accueil affiche les vélos disponibles à cette station.</p>
+    ${row("", "La plus proche", "Change selon votre position", !S.bikeStation)}
+    <div class="sub">Toutes les stations</div>
+    ${list.map(({ p, d }) => row(p.id, p.name.replace(/^Vélhop\s*/i, ""), `${p.info ? p.info + " · " : ""}${fmtDist(d)}`, S.bikeStation === p.id)).join("") || '<div class="empty">Stations en cours de chargement…</div>'}
+  </div></main></div>`;
 }
 
 /** Tuile infos trafic : nombre de perturbations et la première */
@@ -759,7 +775,7 @@ export function stopNotice(s: { name: string; lines: string[]; sncf?: string }, 
 export function debugBox(): string {
   if (CONFIG.USE_MOCK || (!debug.last.length && !debug.info)) return "";
   const txt = esc(JSON.stringify({ arret: debug.info, essais: debug.last }).slice(0, 2000));
-  return `<details style="margin-top:12px"><summary style="color:var(--mute)">Détails techniques</summary><pre style="white-space:pre-wrap;word-break:break-all;font-size:11px;user-select:all">${txt}</pre></details>`;
+  return `<details style="margin-top:12px"><summary style="color:var(--mute)">Détails techniques</summary><pre style="white-space:pre-wrap;word-break:break-all;font-size:11px">${txt}</pre></details>`;
 }
 
 /* ============ RÉGLAGES ============ */
@@ -787,26 +803,57 @@ function alertSettings(): string {
 }
 const check = (): string => '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>';
 
-export function overlaySettings(): string {
+/** Aperçu miniature de l'accueil de Kumm dans un thème, une couleur et une forme donnés (couleurs : themes.ts) */
+function miniApp(theme: Theme, accent: Accent, ui: Ui, tiny = false): string {
+  const one = (th: Exclude<Theme, "auto">): string => {
+    const t = THEME_TOKENS[th], a = ACCENT_TOKENS[accent][t.dark ? "dark" : "light"];
+    const [ha, hb] = t.head ?? [a[1], a[2]];
+    const vars = `--m-bg:${t.bg};--m-card:${t.card};--m-ink:${t.ink};--m-mute:${t.mute};--m-line:${t.line};--m-chip:${t.chip};--m-a:${a[0]};--m-ha:${ha};--m-hb:${hb};--m-soft:${a[3]}`;
+    const chip = (l: string): string => `<span class="mc" style="background:${COLORS[l]};color:${lineText(l)}">${l}</span>`;
+    return `<div class="mini ui-${ui}${th === "contrast" ? " hc" : ""}" style="${vars}">
+      <div class="m-head"><span><small>Mardi 28 octobre</small><b>Bonsoir</b></span><i></i><i></i></div>
+      <div class="m-go"><small>NAVIGUER</small><b>Où allez-vous ?</b></div>
+      <div class="m-row"><div class="m-tile"><b>★ Homme de Fer</b><p>${chip("A")}<span>Illkirch</span><em>2′</em></p><p>${chip("D")}<span>Kehl</span><em>5′</em></p></div>
+        <div class="m-tile"><b>★ République</b><p>${chip("B")}<span>Hoenheim</span><em>3′</em></p><p>${chip("E")}<span>Robertsau</span><em>6′</em></p></div></div>
+      <div class="m-row"><div class="m-tile m-alert"><b>INFO TRAFIC</b><p><span>Ligne C : travaux</span></p></div><div class="m-tile m-bike"><b>VÉLHOP</b><p class="m-n">7 <span>vélos</span></p></div></div>
+      <div class="m-tile m-lines"><b>TOUTES LES LIGNES</b><p>${["A", "B", "C", "D", "E", "F"].map(chip).join("")}</p></div>
+      <div class="m-row"><div class="m-tile m-svc"><i></i><b>Horaires</b></div><div class="m-tile m-svc"><i></i><b>Parkings</b></div></div>
+      <div class="m-nav"><i class="on"></i><i></i><i></i></div>
+    </div>`;
+  };
+  // automatique : moitié clair, moitié sombre
+  const inner = theme === "auto" ? `${one("light")}<div class="m-half">${one("dark")}</div>` : one(theme);
+  return `<span class="mini-wrap${tiny ? " tiny" : ""}" aria-hidden="true">${inner}</span>`;
+}
+
+/** Apparence : thème, couleur principale et forme de l'interface, chacun avec un aperçu de l'application */
+export function overlayLook(): string {
   const p = S.prefs;
-  const themes = THEMES.map(t => `<button class="theme-card ${p.theme === t.id ? "on" : ""}" data-theme-pick="${t.id}" aria-pressed="${p.theme === t.id}">
-      <div class="prev" style="background:${t.bg}"><b></b><i style="background:${t.bar}"></i></div>
-      <strong>${t.label}</strong><small>${t.hint}</small><span class="ok">${check()}</span></button>`).join("");
+  const themes = THEMES.map(t => `<button class="look-card${p.theme === t.id ? " on" : ""}" data-theme-pick="${t.id}" aria-pressed="${p.theme === t.id}">
+      ${miniApp(t.id, p.accent, p.ui)}<strong>${t.label}</strong><small>${t.hint}</small></button>`).join("");
   const accents = ACCENTS.map(a => `<button class="acc ${p.accent === a.id ? "on" : ""}" data-accent-pick="${a.id}" aria-pressed="${p.accent === a.id}" aria-label="${a.label}">
       <span class="dot" style="background:${a.color}">${check()}</span>${a.label}</button>`).join("");
-  // aperçu de chaque forme : en-tête, deux cartes et barre du bas, dessinés à sa façon (style.css, .ui-prev)
-  const uis = UIS.map(u => `<button class="theme-card ${p.ui === u.id ? "on" : ""}" data-ui-pick="${u.id}" aria-pressed="${p.ui === u.id}">
-      <div class="prev ui-prev ui-${u.id}"><b></b><i></i><i></i><u></u></div>
-      <strong>${u.label}</strong><small>${u.hint}</small><span class="ok">${check()}</span></button>`).join("");
-  return `<div class="overlay">${bar("Réglages")}<main><div class="pad">
-    <div class="sub" style="margin-top:4px">Thème</div>
-    <div class="theme-grid">${themes}</div>
-    <div class="sub">Forme de l’interface</div>
-    <div class="theme-grid">${uis}</div>
+  const uis = UIS.map(u => `<button class="look-card${p.ui === u.id ? " on" : ""}" data-ui-pick="${u.id}" aria-pressed="${p.ui === u.id}">
+      ${miniApp(p.theme, p.accent, u.id)}<strong>${u.label}</strong><small>${u.hint}</small></button>`).join("");
+  return `<div class="overlay">${bar("Apparence", "prefs")}<main><div class="pad">
+    <div class="look-hero">${miniApp(p.theme, p.accent, p.ui)}</div>
+    <div class="sub">Thème</div>
+    <div class="look-row" data-scroll="look-themes">${themes}</div>
     <div class="sub">Couleur principale</div>
     <div class="accent-row">${accents}</div>
+    <div class="sub">Forme de l’interface</div>
+    <div class="look-row" data-scroll="look-uis">${uis}</div>
     <div class="sub">Carte</div>
     <button class="row-switch" data-darkmap="1"><span>Carte sombre avec les thèmes sombres</span><span class="switch ${p.darkMap ? "on" : ""}"></span></button>
+  </div></main></div>`;
+}
+
+export function overlaySettings(): string {
+  const p = S.prefs;
+  const t = THEMES.find(x => x.id === p.theme), u = UIS.find(x => x.id === p.ui), c = ACCENTS.find(x => x.id === p.accent);
+  return `<div class="overlay">${bar("Réglages")}<main><div class="pad">
+    <div class="sub" style="margin-top:4px">Apparence</div>
+    <button class="look-link" data-act="look">${miniApp(p.theme, p.accent, p.ui, true)}<span><b>Thème, couleur et forme</b><small>${esc(t?.label ?? "")} · ${esc(c?.label ?? "")} · ${esc(u?.label ?? "")}</small></span>${ic("chev", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"')}</button>
     <div class="sub">Alertes trafic</div>
     <button class="row-switch" data-alerts="toggle"><span>Me prévenir des perturbations<br><small style="color:var(--mute)">${NATIVE && !PUSH_READY ? "Indisponible dans cette version de l'application" : "Une notification pour chaque nouvel incident sur les lignes suivies"}</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
     ${S.alerts.enabled ? alertSettings() : ""}

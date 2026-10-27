@@ -16,10 +16,10 @@ import { ic, type IconName } from "./icons";
 import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, placeOnTramQuays } from "./api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
-import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
+import { POIS, S, STOPS, USER, hooks, project, render, setBikeStation, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenHome, favRows, departureBoard,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayVehicle, overlayStop, screenHome, favRows, departureBoard,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -79,7 +79,7 @@ function draw(): void {
   else body = `<main>${screenTrips()}</main>`;
 
   const o = S.overlay;
-  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
+  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "look" ? overlayLook() : o.k === "bikepick" ? overlayBikePick() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
 
   // positions de défilement de toutes les zones (listes, fiches, rangées de catégories…), par écran : voir scroll.ts
   const screen = o ? `${t}|${o.k}:${"id" in o ? String(o.id) : ""}` : t;
@@ -236,7 +236,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset],[data-bikest]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -244,6 +244,10 @@ app.addEventListener("click", e => {
   if (!b || !app.contains(b)) return;
   const d = b.dataset;
   if (d.onb) { void onboardingAction(d.onb); return; }
+  if (d.bikest !== undefined) {
+    setBikeStation(d.bikest || null); S.overlay = null;
+    toast(d.bikest ? "Station Vélhop enregistrée pour l’accueil" : "La station la plus proche sera affichée"); render(); return;
+  }
   if (d.ride) { if (d.ride === "stop") stopSharing(); else answerRide(d.ride === "yes"); return; }
   if (d.jstop) { stopJourney(); toast("Alertes de descente arrêtées"); return; }
   if (d.upd) { updateAction(d.upd); return; }
@@ -349,6 +353,7 @@ app.addEventListener("click", e => {
     case "mapParkings": showOnMap(["pr"]); return;
     case "mapBikes": showOnMap(["velhop", "velopark"], true); return;
     case "prefs": S.overlay = { k: "settings" }; break;
+    case "look": S.overlay = { k: "look" }; break;
     case "checkUpdate": void offerUpdate(true); return;
     case "unfollow": S.follow = null; break;
     case "refollow": if (S.follow) S.follow.paused = false; break;
@@ -583,6 +588,27 @@ app.addEventListener("focusin", e => {
   }
   if (t.id === "tfrom" && S.trip.fromIsMe) t.select();
 });
+
+/* appui long (data-hold) : action secondaire d'une tuile, par exemple choisir la station Vélhop de l'accueil ;
+   le clic qui suit l'appui long est ignoré, et le menu du navigateur (copier, partager…) n'apparaît jamais */
+let holdTimer = 0, held = false, holdAt: [number, number] | null = null;
+const cancelHold = (): void => { window.clearTimeout(holdTimer); holdAt = null; };
+app.addEventListener("pointerdown", e => {
+  held = false;   // l'appui long précédent n'a pas toujours été suivi d'un clic (l'écran a changé sous le doigt)
+  const h = (e.target as HTMLElement).closest<HTMLElement>("[data-hold]");
+  if (!h) return;
+  holdAt = [e.clientX, e.clientY];
+  holdTimer = window.setTimeout(() => {
+    held = true; holdAt = null;
+    try { navigator.vibrate?.(25); } catch { /* rien */ }
+    if (h.dataset.hold === "bikepick") { S.overlay = { k: "bikepick" }; render(); }
+  }, 550);
+});
+app.addEventListener("pointermove", e => { if (holdAt && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 10) cancelHold(); });
+app.addEventListener("pointerup", cancelHold);
+app.addEventListener("pointercancel", cancelHold);
+app.addEventListener("click", e => { if (held) { held = false; e.stopPropagation(); e.preventDefault(); } }, true);
+document.addEventListener("contextmenu", e => { if (!(e.target as HTMLElement).closest("input,textarea")) e.preventDefault(); });
 
 /* glisser le panneau « À proximité » vers le haut ou le bas */
 let y0: number | null = null;

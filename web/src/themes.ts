@@ -69,4 +69,23 @@ export function applyTheme(p: Prefs): void {
   if (head) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", head);
 }
 
+/** Couleurs de chaque thème et de chaque couleur principale, pour les aperçus de l'écran Apparence (mêmes valeurs que style.css) */
+export interface Tokens { bg: string; card: string; ink: string; mute: string; line: string; chip: string; dark: boolean; head?: [string, string] }
+export const THEME_TOKENS: Record<Exclude<Theme, "auto">, Tokens> = {
+  light:    { bg: "#F2F6F3", card: "#FFFFFF", ink: "#15201B", mute: "#5F6E66", line: "#E0E8E2", chip: "#E7EEE9", dark: false },
+  sand:     { bg: "#F5EFE4", card: "#FFFCF6", ink: "#2B2218", mute: "#7A6A58", line: "#E8DDCC", chip: "#EEE5D5", dark: false },
+  dark:     { bg: "#0D1612", card: "#15211B", ink: "#E8F1EC", mute: "#8FA298", line: "#22312A", chip: "#1C2A23", dark: true },
+  ocean:    { bg: "#0A1222", card: "#111C31", ink: "#E6EEFA", mute: "#8C9BB5", line: "#1D2A42", chip: "#18253D", dark: true, head: ["#0F2244", "#173563"] },
+  night:    { bg: "#000000", card: "#0F0F11", ink: "#F2F2F2", mute: "#9A9AA0", line: "#1C1C20", chip: "#1A1A1D", dark: true, head: ["#0F0F11", "#16161A"] },
+  contrast: { bg: "#000000", card: "#0A0A0A", ink: "#FFFFFF", mute: "#E6E6E6", line: "#FFFFFF", chip: "#1A1A1A", dark: true, head: ["#000000", "#000000"] }
+};
+/** [couleur, en-tête début, en-tête fin, fond doux] en clair puis en sombre */
+export const ACCENT_TOKENS: Record<Accent, { light: [string, string, string, string]; dark: [string, string, string, string] }> = {
+  green:  { light: ["#1C8A5A", "#136A45", "#1C8A5A", "#DDF2E8"], dark: ["#4ED39B", "#0E3A2A", "#17382B", "#17382B"] },
+  teal:   { light: ["#0C8C95", "#096A71", "#0C8C95", "#D7F0F2"], dark: ["#3DD0D8", "#0B3A3E", "#143A3D", "#143A3D"] },
+  blue:   { light: ["#2563C9", "#1B4A9C", "#2563C9", "#DFE9FB"], dark: ["#74A6FF", "#13305F", "#172C4F", "#172C4F"] },
+  purple: { light: ["#7B47C8", "#5C33A2", "#7B47C8", "#EBE0F8"], dark: ["#B791FF", "#35205F", "#2A2046", "#2A2046"] },
+  red:    { light: ["#C8333B", "#A2262D", "#C8333B", "#F9E1E2"], dark: ["#FF7077", "#4B1A1D", "#3A1F21", "#3A1F21"] }
+};
+
 export const accentColor = (): string => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#1C8A5A";
