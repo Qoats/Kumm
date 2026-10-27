@@ -8,18 +8,30 @@ import path from "node:path";
 
 const OUT = path.join(process.cwd(), "data", "shapes.json");
 const QUERY = '[out:json][timeout:180];relation["type"="route"]["route"~"^(tram|bus)$"]["network"="Compagnie des Transports Strasbourgeois"](48.30,7.45,48.75,7.95);out geom;';
-const SERVERS = ["https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
+// Serveurs publics d'OpenStreetMap, essayés à tour de rôle. Ils tombent parfois en panne (502, 504) :
+// on refait plusieurs tours espacés, et si aucun ne répond, on garde les tracés de la veille sans faire échouer le travail.
+const SERVERS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
+const PAUSES_S = [0, 60, 180];
 const TOLERANCE_M = 3;   // simplification du tracé : écart maximal toléré, en mètres
 
 async function download() {
-  for (const url of SERVERS) {
-    try {
-      const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: QUERY }), headers: { "User-Agent": "Kumm (build-shapes)" } });
-      if (r.ok) return await r.json();
-      console.warn(`${url} : HTTP ${r.status}`);
-    } catch (e) { console.warn(`${url} : ${e.message}`); }
+  for (const [round, pause] of PAUSES_S.entries()) {
+    if (pause) { console.warn(`nouvel essai dans ${pause} s (tour ${round + 1}/${PAUSES_S.length})`); await new Promise((r) => setTimeout(r, pause * 1000)); }
+    for (const url of SERVERS) {
+      try {
+        const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: QUERY }), headers: { "User-Agent": "Kumm (build-shapes)" }, signal: AbortSignal.timeout(240_000) });
+        if (r.ok) return await r.json();
+        console.warn(`${url} : HTTP ${r.status}`);
+      } catch (e) { console.warn(`${url} : ${e.message}`); }
+    }
   }
-  throw new Error("aucun serveur Overpass n'a répondu");
+  console.log("::warning::Aucun serveur OpenStreetMap (Overpass) n'a répondu : les tracés actuels sont gardés, nouvel essai la nuit prochaine.");
+  process.exit(0);
 }
 
 const R = 6371000, rad = d => (d * Math.PI) / 180;
