@@ -791,3 +791,4 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .item .pick svg{width:15px;height:15px;stroke:var(--on-accent);fill:none;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
 :root[data-scheme="contrast"] .look-card,:root[data-scheme="contrast"] .look-link,:root[data-scheme="contrast"] .look-hero{border:2px solid #fff;box-shadow:none}
 :root[data-scheme="contrast"] .look-card.on{border-color:var(--accent)}
+.fcode{cursor:pointer}

@@ -277,7 +277,7 @@ function followPanel(f: { id: string; paused: boolean }): string {
   const v = VEHICLES.get(f.id);
   if (!v) return `<h3>Véhicule</h3><div class="empty">Ce véhicule n'est plus en circulation.</div>`;
   const info = followInfo(v), first = info.next[0];
-  return `<div class="fhead">${lineChip(v.line)}<div class="ft"><b>vers ${esc(v.dest)}</b>${v.n ? `<small>Trajet ${esc(v.n)}</small>` : ""}</div>
+  return `<div class="fhead">${lineChip(v.line)}<div class="ft"><b>vers ${esc(v.dest)}</b>${v.n ? `<small class="fcode" data-hold="copy:${esc(v.n)}">Trajet ${esc(v.n)}</small>` : ""}</div>
       <button class="fclose" data-act="unfollow" aria-label="Arrêter de suivre"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     ${v.g ? `<div class="fshared"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
     ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : ""}
@@ -306,7 +306,7 @@ export function overlayVehicle(id: string): string {
     ${v.g ? `<div class="fshared" style="margin:0 0 10px"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
     ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : ""}
     ${wait !== null ? `<div class="box vwait"><b>Au terminus</b><span>Départ ${wait < 1 ? "imminent" : `dans ${wait} min`}</span></div>` : ""}
-    ${v.n ? `<div class="vno">Trajet <b>${esc(v.n)}</b><small>${v.m === "ter" ? "TER d’Alsace (Elsàss en alsacien) et numéro du train." : "Terminus de départ, ligne, date et heure de départ prévue."}</small></div>` : ""}
+    ${v.n ? `<div class="vno" data-hold="copy:${esc(v.n)}">Trajet <b>${esc(v.n)}</b><small>${v.m === "ter" ? "TER d’Alsace (Elsàss en alsacien) et numéro du train." : "Terminus de départ, ligne, date et heure de départ prévue."}</small></div>` : ""}
     <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small>
     ${messagesFor(v.line).map(m => `<button class="box" data-act="msgs" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;text-align:left${m.channel === "disruption" ? ";border-color:#E8402F" : ""}"><span class="warn">!</span><span style="flex:1"><b>${esc(m.title)}</b>${m.period ? `<br><small style="color:var(--mute)">${esc(m.period)}</small>` : ""}</span></button>`).join("")}
     <div class="sub" style="margin-top:0">Prochains arrêts</div>

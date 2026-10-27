@@ -602,6 +602,7 @@ app.addEventListener("pointerdown", e => {
     held = true; holdAt = null;
     try { navigator.vibrate?.(25); } catch { /* rien */ }
     if (h.dataset.hold === "bikepick") { S.overlay = { k: "bikepick" }; render(); }
+    else if (h.dataset.hold?.startsWith("copy:")) void copyText(h.dataset.hold.slice(5));
   }, 550);
 });
 app.addEventListener("pointermove", e => { if (holdAt && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 10) cancelHold(); });
@@ -609,6 +610,20 @@ app.addEventListener("pointerup", cancelHold);
 app.addEventListener("pointercancel", cancelHold);
 app.addEventListener("click", e => { if (held) { held = false; e.stopPropagation(); e.preventDefault(); } }, true);
 document.addEventListener("contextmenu", e => { if (!(e.target as HTMLElement).closest("input,textarea")) e.preventDefault(); });
+
+/** Copie dans le presse-papiers (appui long sur un code de trajet) */
+async function copyText(t: string): Promise<void> {
+  try { await navigator.clipboard.writeText(t); }
+  catch {
+    // presse-papiers refusé (ancien WebView) : copie par une zone de texte temporaire
+    const ta = document.createElement("textarea");
+    ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch { /* rien */ }
+    ta.remove();
+  }
+  toast(`Code du trajet copié : ${t}`);
+}
 
 /* glisser le panneau « À proximité » vers le haut ou le bas */
 let y0: number | null = null;
