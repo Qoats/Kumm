@@ -26,7 +26,6 @@ const views = [
   ["À proximité", { tab: "nearby", overlay: null }],
   ["Itinéraires", { tab: "trips", overlay: null }],
   ["Itinéraires (trajet)", { tab: "trips", overlay: null, trip: { fromText: "Ma position", toText: "Gare Centrale", mode: "transit", fromIsMe: true, from: null, dest: { label: "Gare Centrale", lat: 48.5846, lon: 7.7350 }, sugg: null, sel: 0, when: { kind: "now", at: 0 }, whenDraft: null } }],
-  ["Billets", { tab: "buy", overlay: null }],
   ["Réglages", { tab: "home", overlay: { k: "settings" } }],
   ["Infos trafic", { tab: "home", overlay: { k: "msgs" } }],
   ["Favoris", { tab: "home", overlay: { k: "favs" } }],

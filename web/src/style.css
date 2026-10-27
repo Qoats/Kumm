@@ -78,17 +78,17 @@ h2{font-size:20px;font-weight:800;letter-spacing:-.3px;margin:26px 0 10px;displa
 h2:first-child{margin-top:4px}
 .pill{background:var(--accent-soft);color:var(--accent-ink);font-size:13.5px;font-weight:700;border-radius:20px;padding:6px 14px;margin-left:6px}
 .row{display:flex;gap:2px;align-items:center}
-.box,.dep,.trip,.ticket{background:var(--card);border:1px solid transparent;border-radius:var(--r);box-shadow:var(--sh)}
+.box,.dep,.trip{background:var(--card);border:1px solid transparent;border-radius:var(--r);box-shadow:var(--sh)}
 .box{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:15px;width:100%;text-align:left}
 .box .rb{flex:none;width:42px;height:42px;border-radius:50%;background:var(--accent);display:grid;place-items:center}
 .box .rb svg{width:22px;height:22px;stroke:var(--on-accent);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.box:active,.dep:active,.ticket:active,.qa button:active,.item:active{transform:scale(.985);transition:transform .08s}
+.box:active,.dep:active,.qa button:active,.item:active{transform:scale(.985);transition:transform .08s}
 .sub{color:var(--mute);font-weight:700;font-size:14px;margin:18px 0 8px}
 .go{background:var(--accent);color:var(--on-accent);border-radius:22px;padding:10px 20px;font-weight:700}
 /* icône et texte d'un bouton centrés sur la même ligne */
 button.go{display:inline-flex;align-items:center;justify-content:center;gap:8px}
 button.go>svg{flex:none}
-.qa{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 4px}
+.qa{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:2px 0 4px}
 .qa button{background:var(--card);box-shadow:var(--sh);border:1px solid transparent;border-radius:18px;padding:14px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:9px;font-weight:700;font-size:13.5px}
 .qa .qi{width:46px;height:46px;border-radius:16px;background:var(--accent-soft);display:grid;place-items:center}
 .qa svg{width:26px;height:26px;fill:none;stroke:var(--accent-ink);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -249,10 +249,6 @@ nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .tm-b{width:auto!important;height:auto!important}
 .tm-bubble{display:inline-block;transform:translate(-50%,-125%);background:var(--card);color:var(--ink);font-weight:800;font-size:13px;white-space:nowrap;padding:4px 9px;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer}
 .tm-bubble.on{background:#1A73E8;color:#fff}
-.ticket{padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
-.ticket b{font-size:17px;display:block}
-.ticket span{color:var(--mute);font-size:14px}
-.ticket .buy{background:var(--accent);color:var(--on-accent);border-radius:22px;padding:9px 18px;font-weight:700;white-space:nowrap}
 .ldirs{display:flex;gap:3px;margin-top:12px;padding:3px;border-radius:12px;background:var(--chip)}
 .ldirs button{flex:1 1 0;min-width:0;padding:9px 10px;border-radius:10px;font-size:14px;font-weight:600;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ldirs button.on{background:var(--c);color:#fff;font-weight:800}
@@ -370,7 +366,7 @@ nav svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.9;st
 .nv-transit #nv-quit{background:transparent!important;color:#D93025;box-shadow:inset 0 0 0 2px #D93025;padding:13px 10px!important}
 
 /* ---------- contraste élevé ---------- */
-:root[data-scheme="contrast"] :is(.box,.dep,.trip,.jrow,.ticket,.qa button,.field,.theme-card,.row-switch,.lyr,.sheet,.tools){border:2px solid #fff;box-shadow:none}
+:root[data-scheme="contrast"] :is(.box,.dep,.trip,.jrow,.qa button,.field,.theme-card,.row-switch,.lyr,.sheet,.tools){border:2px solid #fff;box-shadow:none}
 :root[data-scheme="contrast"] .theme-card.on{border-color:var(--accent)}
 :root[data-scheme="contrast"] .pill,:root[data-scheme="contrast"] .seg button{border:1.5px solid #fff}
 
@@ -394,21 +390,9 @@ header .brand .mark svg{width:24px;height:24px}
 
 header .top{min-height:38px}
 
-/* ===== Écran « Billets » : renvoi vers l'application officielle ===== */
-.buy-hero{background:var(--card);border-radius:24px;box-shadow:var(--sh);padding:22px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;border:1px solid transparent}
-.buy-hero .qi{width:64px;height:64px;border-radius:22px}
-.buy-hero .qi svg{width:34px;height:34px}
-.buy-hero h3{margin:0;font-size:19px;line-height:1.25}
-.buy-hero p{margin:0;font-size:14.5px;line-height:1.5;color:var(--mute)}
-.buy-hero p.alt{font-size:12.5px}
-.buy-hero p.alt a{color:var(--accent-ink);font-weight:700}
 a.go{display:inline-block;text-decoration:none}
-a.go.big{padding:14px 28px;font-size:16.5px;border-radius:26px;box-shadow:0 6px 16px -6px var(--accent)}
 a.box,.more a{text-decoration:none;color:inherit}
 .more a{flex:none;width:84px;text-align:center;font-size:13.5px;font-weight:600;line-height:1.2}
-:root[data-scheme="contrast"] .buy-hero{border:2px solid #fff;box-shadow:none}
-.buy-hero .qi{display:grid;place-items:center;background:var(--accent-soft)}
-.buy-hero .qi svg{fill:none;stroke:var(--accent-ink);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .stopnote{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:color-mix(in srgb,#E8402F 12%,var(--card));border:1px solid color-mix(in srgb,#E8402F 35%,transparent);border-radius:16px;padding:12px 14px;margin:0 0 10px;color:var(--ink);font:inherit}
 .stopnote b{display:block;font-size:15.5px;line-height:1.35}
 .stopnote small{display:block;color:var(--mute);margin-top:2px;font-size:13.5px}

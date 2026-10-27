@@ -19,7 +19,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenBuy, screenHome,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayVehicle, overlayStop, screenHome,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -50,7 +50,7 @@ import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, s
 const app = document.getElementById("app") as HTMLElement;
 
 const NAV: [Tab, string, IconName][] = [
-  ["home", "Accueil", "home"], ["nearby", "Carte", "pin"], ["search", "Recherche", "search"], ["buy", "Billets", "ticket"]
+  ["home", "Accueil", "home"], ["search", "Recherche", "search"], ["nearby", "Carte", "pin"]
 ];
 
 /* ============ RENDU ============ */
@@ -76,8 +76,7 @@ function draw(): void {
   else if (t === "search") body = `<main>${screenSearch()}</main>`;
   else if (t === "lines") body = `<main>${screenLines()}</main>`;
   else if (t === "nearby") body = `<main>${screenNearby()}</main>`;
-  else if (t === "trips") body = `<main>${screenTrips()}</main>`;
-  else body = `<main>${screenBuy()}</main>`;
+  else body = `<main>${screenTrips()}</main>`;
 
   const o = S.overlay;
   const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();

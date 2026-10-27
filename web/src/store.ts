@@ -11,7 +11,7 @@ import type { Layer } from "./kinds";
 import { CONFIG } from "./config";
 import { CENTER, KX, KY, MOCK_POIS, MOCK_STOPS } from "./data";
 
-export type Tab = "home" | "search" | "lines" | "nearby" | "trips" | "buy";
+export type Tab = "home" | "search" | "lines" | "nearby" | "trips";
 export type Filter = "all" | "bus" | "tram";
 export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string; /** onglet des départs : tous, ou un seul mode (arrêts desservis par trams et bus) */ mode?: "tram" | "bus" | "ter" } | { k: "poi"; id: string } | { k: "veh"; id: string } | { k: "settings" } | { k: "msgs" } | { k: "favs" } | { k: "account" } | { k: "help" } | { k: "widget" } | null;
 export interface Modal { t: string; p: string; b: string[]; go?: () => void }

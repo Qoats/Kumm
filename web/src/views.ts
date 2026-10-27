@@ -5,7 +5,7 @@ import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, h
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, THEMES, UIS } from "./themes";
-import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_OBJETS_TROUVES, CTS_POINTS_DE_VENTE, CTS_SITE, KUMM_CONTACT, isIOS } from "./links";
+import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_OBJETS_TROUVES, KUMM_CONTACT, isIOS } from "./links";
 import type { Layer } from "./kinds";
 import { marker, markerIcon } from "./markers";
 import { ic, type IconName } from "./icons";
@@ -123,7 +123,7 @@ export function screenHome(): string {
     ["Vélo", "#86B80B", "bike", "act:mapBikes"], ["FAQ/ Contact", "#AAB4BC", "help", "act:help"]
   ];
   return `<div class="pad">
-    <div class="qa"><button data-tab="search"><span class="qi">${ic("navigate")}</span>Naviguer</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>Carte</button><button data-tab="buy"><span class="qi">${ic("ticket")}</span>Billets</button></div>
+    <div class="qa"><button data-tab="search"><span class="qi">${ic("navigate")}</span>Naviguer</button><button data-tab="nearby"><span class="qi">${ic("pin")}</span>Carte</button></div>
     <h2>Prochains passages <button class="pill" data-act="favs">Personnaliser</button></h2>
     ${favStops.length ? favStops.map(s => `<div id="fav-${esc(s.id)}"></div>`).join("") :
       `<div class="box"><span>Affichez les prochains passages à vos arrêts favoris</span><span class="rb">${ic("heart")}</span></div>`}
@@ -466,25 +466,6 @@ export function tripsDemo(): string {
       <div class="legs"><small>🚶 ${o.w} min</small>${o.l.map(l => `${chev}${lineChip(l, true)}`).join("")}${chev}<small>🚶 3 min</small></div>
       <small style="color:var(--mute)">${o.c ? "1 correspondance" : "Direct"}</small></div>`;
   }).join("") + `<small style="color:var(--mute)">Itinéraires de démonstration.</small>`;
-}
-
-export function screenBuy(): string {
-  const ios = isIOS();
-  const primary = ios ? CTS_APP_IOS : CTS_APP_ANDROID;
-  const ext = 'target="_blank" rel="noopener noreferrer"';
-  return `<div class="bar" style="font-size:22px">Billets</div><div class="pad" style="padding-top:14px">
-    <div class="buy-hero">
-      <span class="qi">${ic("ticket")}</span>
-      <h3>Les billets s’achètent dans l’application officielle de la CTS</h3>
-      <p>Kumm est une application indépendante : elle ne vend aucun titre de transport. Pour acheter vos titres, utiliser Badgéo sur mobile ou recharger votre carte Badgéo, passez par l’application officielle « CTS Transports Strasbourg ».</p>
-      <a class="go big" href="${primary}" ${ext}>Ouvrir l’application CTS</a>
-      <p class="alt">${ios ? "iPhone (App Store)" : "Android (Google Play)"} · autre téléphone : <a href="${ios ? CTS_APP_ANDROID : CTS_APP_IOS}" ${ext}>${ios ? "Google Play" : "App Store"}</a></p>
-    </div>
-    <div class="sub">Autres moyens</div>
-    <a class="box link" href="${CTS_POINTS_DE_VENTE}" ${ext}><span><b>Points de vente CTS</b><br><small style="color:var(--mute)">Agences et distributeurs : page officielle</small></span>${ic("chev", 'width="22" height="22" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"')}</a>
-    <a class="box link" href="${CTS_SITE}" ${ext} style="margin-top:10px"><span><b>Site de la CTS</b><br><small style="color:var(--mute)">Tarifs, titres et informations officielles</small></span>${ic("chev", 'width="22" height="22" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"')}</a>
-    <p class="src" style="margin-top:16px">Les prix et les conditions de vente sont ceux de la CTS : consultez-les dans son application ou sur son site. Si l’application est déjà installée, le magasin d’applications propose de l’ouvrir.</p>
-  </div>`;
 }
 
 /* ============ ÉCRANS SUPERPOSÉS ============ */
