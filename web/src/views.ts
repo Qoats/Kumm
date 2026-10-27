@@ -221,7 +221,6 @@ export function screenNearby(): string {
     <div class="layers">${chips}</div>
     <div class="mapbtns"><div class="tools"><button data-act="prefs" aria-label="Réglages">${ic("gear", 'stroke="currentColor"')}</button><button data-act="locate" aria-label="Me localiser">${ic("target", 'stroke="var(--accent)"')}</button></div>
     ${CONFIG.USE_MOCK ? "" : `<div class="tools zoom"><button data-act="zoomIn" aria-label="Zoomer">${ic("plus", 'stroke="currentColor"')}</button><button data-act="zoomOut" aria-label="Dézoomer">${ic("minus", 'stroke="currentColor"')}</button></div>`}</div>
-    ${S.follow || S.sheet === 2 ? "" : `<button class="mfab" data-tab="search" style="bottom:calc(${h} + 14px)">${ic("navigate")}Itinéraire</button>`}
     <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
       <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
       ${S.follow ? followPanel(S.follow) : `<h3 class="shead"${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>

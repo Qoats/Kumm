@@ -707,21 +707,23 @@ header.thead svg{stroke:var(--ink)}
 :root[data-ui="compact"] .tile-alert,:root[data-ui="compact"] .tile-ok,:root[data-ui="compact"] .tile-bike{min-height:0}
 
 /* ============================================================
-   Carte d'abord : recherche flottante, bouton Itinéraire, panneau des passages
+   Carte d'abord : recherche flottante, filtres, panneau des passages
    ============================================================ */
 .msearch{position:absolute;top:calc(12px + var(--safe-top));left:12px;right:12px;z-index:1002;height:50px;border-radius:25px;background:var(--card);color:var(--mute);box-shadow:0 8px 24px rgba(0,0,0,.2);display:flex;align-items:center;gap:10px;padding:0 18px;font-size:16px;text-align:left}
 .msearch svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round}
-.map .layers{top:calc(70px + var(--safe-top))}
+.map .layers{top:calc(70px + var(--safe-top));padding:4px 4px 12px}
+/* ombre courte : une ombre large serait coupée par le bord de la rangée qui défile, et dessinerait une bande sous les filtres */
+.map .lyr{box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.map .lyr.on{box-shadow:0 0 0 2px var(--accent),0 2px 6px rgba(0,0,0,.25)}
+.map .lyr.nodata{box-shadow:0 2px 6px rgba(0,0,0,.25)}
 .map .mapbtns{top:calc(124px + var(--safe-top))}
-.mfab{position:absolute;right:14px;z-index:1002;display:flex;align-items:center;gap:8px;background:var(--accent);color:var(--on-accent);border-radius:26px;padding:13px 20px;font-weight:800;font-size:15.5px;box-shadow:0 10px 24px -6px color-mix(in srgb,var(--accent) 70%,transparent);transition:bottom .25s ease}
-.mfab svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .sheet h3.shead{text-align:left;padding:0 18px;margin:0 0 12px}
 .seg.pills{gap:8px;padding:0 18px 12px}
 .seg.pills button{flex:none;flex-direction:row;gap:6px;padding:8px 15px;border-radius:18px;font-size:14px;font-weight:700}
 .seg.pills button.on{background:var(--ink);color:var(--bg)}
 .seg.pills svg{width:18px;height:18px}
 :root[data-ui="bulles"] .msearch{border-radius:30px}
-:root[data-ui="epure"] .msearch,:root[data-ui="epure"] .mfab{box-shadow:0 0 0 1px var(--line)}
+:root[data-ui="epure"] .msearch{box-shadow:0 0 0 1px var(--line)}
 :root[data-ui="compact"] .msearch{height:44px}
 :root[data-ui="compact"] .map .layers{top:calc(62px + var(--safe-top))}
 
