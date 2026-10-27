@@ -816,9 +816,7 @@ function miniApp(theme: Theme, accent: Accent, ui: Ui, tiny = false): string {
       <div class="m-row"><div class="m-tile"><b>★ Homme de Fer</b><p>${chip("A")}<span>Illkirch</span><em>2′</em></p><p>${chip("D")}<span>Kehl</span><em>5′</em></p></div>
         <div class="m-tile"><b>★ République</b><p>${chip("B")}<span>Hoenheim</span><em>3′</em></p><p>${chip("E")}<span>Robertsau</span><em>6′</em></p></div></div>
       <div class="m-row"><div class="m-tile m-alert"><b>INFO TRAFIC</b><p><span>Ligne C : travaux</span></p></div><div class="m-tile m-bike"><b>VÉLHOP</b><p class="m-n">7 <span>vélos</span></p></div></div>
-      <div class="m-tile m-lines"><b>TOUTES LES LIGNES</b><p>${["A", "B", "C", "D", "E", "F"].map(chip).join("")}</p></div>
-      <div class="m-row"><div class="m-tile m-svc"><i></i><b>Horaires</b></div><div class="m-tile m-svc"><i></i><b>Parkings</b></div></div>
-      <div class="m-nav"><i class="on"></i><i></i><i></i></div>
+
     </div>`;
   };
   // automatique : moitié clair, moitié sombre
