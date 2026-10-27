@@ -475,7 +475,7 @@ a.box{text-decoration:none;color:inherit}
 .fhead .ft small{color:var(--mute);font-size:13px}
 .fclose{width:38px;height:38px;border-radius:12px;background:var(--chip);display:grid;place-items:center}
 .fclose svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.fstats{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:8px;padding:0 14px 12px}
+.fstats{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 14px 12px}
 .fstats .fstate{display:flex;align-items:center}
 .fstats .fstate b{font-size:16px;white-space:normal;line-height:1.25}
 .fstats > div{background:var(--chip);border-radius:14px;padding:10px 12px;min-width:0}

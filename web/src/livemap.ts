@@ -9,7 +9,7 @@ import { POIS, S, STOPS, USER, render, toast } from "./store";
 import { COLORS, lineLabel, lineText } from "./data";
 import { esc } from "./util";
 import { VEHICLES, followInfo, refreshVehicles, shownPath, shownProgress, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
-import { followStops, speedText } from "./views";
+import { followStops } from "./views";
 import type { Vehicle } from "./vehicles";
 
 /**
@@ -322,7 +322,6 @@ function followTick(): void {
   if (m && !f.paused) map.panTo(aboveSheet(map, m.getLatLng()), { animate: true, duration: 0.9, easeLinearity: 1 });
   const info = followInfo(v), first = info.next[0];
   const set = (id: string, t: string): void => { const el = document.getElementById(id); if (el && el.textContent !== t) el.textContent = t; };
-  set("fv-speed", speedText(info));
   set("fv-state", info.state);
   set("fv-next", first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—");
   set("fv-nextname", first ? first[0] : "terminus");

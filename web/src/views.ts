@@ -270,10 +270,8 @@ export const delayText = (sec: number): string => {
   return m >= 1 ? `${m} min de retard sur l’horaire annoncé` : m <= -1 ? `${-m} min d’avance sur l’horaire annoncé` : "à l’heure";
 };
 
-/** Case de vitesse : la vitesse estimée (0 à l'arrêt, « — » si elle ne peut pas être calculée) */
-export const speedText = (i: { speed: number | null }): string => (i.speed === null ? "—" : String(i.speed));
 
-/** Panneau « À proximité » remplacé par le véhicule suivi : ligne, trajet, vitesse estimée, prochains arrêts */
+/** Panneau « À proximité » remplacé par le véhicule suivi : ligne, trajet, prochain arrêt, état, prochains arrêts */
 function followPanel(f: { id: string; paused: boolean }): string {
   const v = VEHICLES.get(f.id);
   if (!v) return `<h3>Véhicule</h3><div class="empty">Ce véhicule n'est plus en circulation.</div>`;
@@ -283,14 +281,13 @@ function followPanel(f: { id: string; paused: boolean }): string {
     ${v.g ? `<div class="fshared"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
     ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : ""}
     <div class="fstats">
-      <div><b id="fv-speed">${esc(speedText(info))}</b><small>km/h estimés</small></div>
       <div><b id="fv-next">${first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—"}</b><small id="fv-nextname">${first ? esc(first[0]) : "terminus"}</small></div>
       <div class="fstate"><b id="fv-state">${esc(info.state)}</b></div>
     </div>
     ${S.journey?.detail.id === v.id ? `<div class="ftrip"><span>${ic("bell", 'width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"')}Alerte avant ${esc(S.journey.detail.calls[S.journey.alight]?.name ?? "")}</span><button class="stop" data-jstop="1">Arrêter</button></div>` : ""}
     ${f.paused ? `<button class="go fre" data-act="refollow">${ic("target", 'stroke="currentColor"')} Suivre de nouveau</button>` : ""}
     <div class="list"><div style="position:relative;--c:${COLORS[lineLabel(v.line)] ?? "#1296A8"}"><div class="rail"></div><div id="fv-stops">${followStops(info.next)}</div></div>
-      <small class="src" style="display:block;margin-top:10px">Position et vitesse estimées d'après les horaires ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small></div>`;
+      <small class="src" style="display:block;margin-top:10px">Position estimée d'après les horaires ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small></div>`;
 }
 
 export function overlayVehicle(id: string): string {
