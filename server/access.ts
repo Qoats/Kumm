@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { ORIGINS } from "./config.js";
+import { APP_KEY, ORIGINS } from "./config.js";
 import { clientIp } from "./limit.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -58,8 +58,22 @@ function cookieUser(req: IncomingMessage): string | null {
   return user;
 }
 
-/** Requête de l'APK Android : son navigateur interne indique son origine (fetch) ou sa page (images de la carte) */
-function fromApp(req: IncomingMessage): boolean {
+/** Comparaison à temps constant : le temps de réponse ne révèle pas la clé, caractère par caractère */
+export function keyMatches(sent: unknown): boolean {
+  const a = Buffer.from(String(sent ?? "")), b = Buffer.from(APP_KEY);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+if (WEB_PRIVATE && !APP_KEY) console.warn("Accès privé : APP_KEY n'est pas défini, l'APK est reconnu à son seul en-tête Origin (falsifiable). Définissez APP_KEY (serveur) et VITE_APP_KEY (APK).");
+
+/** Requête de l'APK Android.
+ *  - API (/api, /geo, /poi) : avec APP_KEY défini, la clé X-App-Key est exigée (Origin et Referer sont falsifiables par n'importe quel client, donc jamais suffisants) ;
+ *  - tuiles : un <img> ne peut pas envoyer d'en-tête, on se fie à Origin/Referer (données publiques, limitées par adresse) ;
+ *  - tout le reste (pages, fichiers) : jamais sans connexion, l'APK les charge localement. */
+function fromApp(req: IncomingMessage, p: string): boolean {
+  const service = p.startsWith("/api/") || p.startsWith("/geo/") || p.startsWith("/poi/");
+  if (service && APP_KEY) return keyMatches(req.headers["x-app-key"]);
+  if (!service && !p.startsWith("/tiles/")) return false;
   const o = req.headers.origin;
   if (typeof o === "string" && ORIGINS.includes(o)) return true;
   const ref = req.headers.referer;
@@ -72,7 +86,7 @@ const OPEN = (p: string): boolean => p === "/connexion" || p === "/health" || p.
 
 /** true : la requête peut continuer ; false : la réponse (page de connexion ou 401) a déjà été envoyée */
 export function allowed(req: IncomingMessage, res: ServerResponse, p: string): boolean {
-  if (!WEB_PRIVATE || OPEN(p) || fromApp(req) || cookieUser(req)) return true;
+  if (!WEB_PRIVATE || OPEN(p) || fromApp(req, p) || cookieUser(req)) return true;
   const isPage = req.method === "GET" && (p === "/" || p.endsWith(".html") || !p.includes("."));
   if (isPage && !p.startsWith("/api/") && !p.startsWith("/geo/") && !p.startsWith("/poi/") && !p.startsWith("/tiles/")) {
     res.writeHead(302, { Location: "/connexion", "Cache-Control": "no-store" });
