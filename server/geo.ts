@@ -39,12 +39,26 @@ export function geoUpstream(url: URL): GeoUpstream | null {
     if (arrive) u.searchParams.set("arriveBy", "true");
     return { url: u.toString(), ttl: 60, stale: 120 };
   }
+/** Horaires théoriques d'un arrêt CTS à une date et une heure données (Transitous : données ouvertes GTFS de la CTS) */
+const CTS_FEED = "fr-donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts_";
+const QUAY = /^[A-Z0-9]{2,12}_[0-9A-Z]{1,4}$/i;
+function stopTimes(url: URL): GeoUpstream | null {
+  const stop = url.searchParams.get("stop") ?? "", time = url.searchParams.get("time") ?? "";
+  if (!QUAY.test(stop) || !ISO_TIME.test(time)) return null;
+  const u = new URL(TRANSIT.replace(/\/plan$/, "/stoptimes"));
+  u.searchParams.set("stopId", CTS_FEED + stop);
+  u.searchParams.set("time", time);
+  u.searchParams.set("n", "80");
+  return { url: u.toString(), ttl: 3600, stale: 86400 };
+}
+
 /** Construit la requête OSRM (piéton ou vélo) à partir de coordonnées validées */
 function osrm(base: string, from: string, to: string, alternatives: boolean): string | null {
   const [fa, fo] = from.split(","), [ta, tn] = to.split(",");
   return `${base}/${fo},${fa};${tn},${ta}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives}`;
 }
 
+  if (url.pathname === "/geo/stoptimes") return stopTimes(url);
   if (url.pathname === "/geo/walk") {
     const from = url.searchParams.get("from") ?? "", to = url.searchParams.get("to") ?? "";
     if (!LATLON.test(from) || !LATLON.test(to)) return null;

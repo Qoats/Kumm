@@ -13,7 +13,9 @@ import { CENTER, KX, KY, MOCK_POIS, MOCK_STOPS } from "./data";
 
 export type Tab = "home" | "search" | "lines" | "nearby" | "trips";
 export type Filter = "all" | "bus" | "tram" | "ter";
-export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string; /** onglet des départs : tous, ou un seul mode (arrêts desservis par trams et bus) */ mode?: "tram" | "bus" | "ter" } | { k: "poi"; id: string } | { k: "veh"; id: string } | { k: "settings" } | { k: "look" } | { k: "bikepick" } | { k: "placeset"; which: PlaceKey } | { k: "msgs" } | { k: "favs" } | { k: "account" } | { k: "help" } | { k: "widget" } | null;
+export type Overlay = { k: "line"; id: string } | { k: "stop"; id: string; /** onglet des départs : tous, ou un seul mode (arrêts desservis par trams et bus) */ mode?: "tram" | "bus" | "ter";
+  /** horaires prévus à partir de cette heure (sinon : passages en temps réel) ; pick : choix de la date en cours */
+  at?: number; pick?: boolean; /** date et heure en cours de choix (gardées si l'écran se redessine) */ draft?: number } | { k: "poi"; id: string } | { k: "veh"; id: string } | { k: "settings" } | { k: "look" } | { k: "bikepick" } | { k: "placeset"; which: PlaceKey } | { k: "msgs" } | { k: "favs" } | { k: "account" } | { k: "help" } | { k: "widget" } | null;
 /** adresses enregistrées de l'accueil */
 export type PlaceKey = "home" | "work";
 

@@ -13,7 +13,7 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, placeOnTramQuays } from "./api";
+import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, placeOnTramQuays, plannedDepartures } from "./api";
 import { fmtDist, haversine } from "./geo";
 import { STRASBOURG_VILLE } from "../../shared/ter";
 import { KINDS } from "./kinds";
@@ -22,7 +22,7 @@ import { POIS, S, STOPS, USER, hooks, project, render, setBikeStation, setPlace,
 import type { PlaceKey } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayPlaceSet, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo, arrivalPicker,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayPlaceSet, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo, arrivalPicker, plannedBoard,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -128,7 +128,7 @@ hooks.render = draw;
 const slotCache = new Map<string, string>();
 const slotKey = (id: string): string =>
   id === "nearlist" ? `nearlist|${S.filter}`
-  : id === "stopdeps" ? `stopdeps|${S.overlay?.k === "stop" ? S.overlay.id : ""}`
+  : id === "stopdeps" ? `stopdeps|${S.overlay?.k === "stop" ? S.overlay.id + "|" + (S.overlay.at ?? "") : ""}`
   : id === "trips" ? `trips|${S.trip.mode}|${S.trip.dest?.label ?? ""}|${S.trip.fromIsMe ? "me" : S.trip.from?.label ?? ""}`
   : id;
 /** Remplit une zone avec un résultat arrivé après une attente : ignoré si l'écran a changé entre-temps
@@ -209,7 +209,11 @@ async function loadDepsNow(): Promise<void> {
         await fillSlot("fav-" + id, async () => favRows((await nextDepartures(s)).map(d => ({ stop: s, d }))));
       }
     }
-    if (S.overlay?.k === "stop") {
+    if (S.overlay?.k === "stop" && S.overlay.at) {
+      // horaires prévus d'un autre jour ou d'une autre heure (horaires ouverts de la CTS, par Transitous)
+      const s = stopById(S.overlay.id), at = S.overlay.at;
+      if (s && document.getElementById("stopdeps")) await fillSlot("stopdeps", async () => plannedBoard(s.name, await plannedDepartures(s, at), at));
+    } else if (S.overlay?.k === "stop") {
       const s = stopById(S.overlay.id);
       if (s && document.getElementById("stopdeps")) {
         await fillSlot("stopdeps", async () => {
@@ -400,6 +404,14 @@ app.addEventListener("click", e => {
     case "mapBikes": showOnMap(["velhop", "velopark"], true); return;
     case "prefs": S.overlay = { k: "settings" }; break;
     case "look": S.overlay = { k: "look" }; break;
+    case "stopPick": if (S.overlay?.k === "stop") S.overlay.pick = true; break;
+    case "stopNow": if (S.overlay?.k === "stop") { delete S.overlay.at; delete S.overlay.pick; } break;
+    case "stopAt": {
+      const date = (document.getElementById("sdate") as HTMLInputElement | null)?.value, time = (document.getElementById("stime") as HTMLInputElement | null)?.value;
+      const at = date && time ? new Date(`${date}T${time}`).getTime() : NaN;
+      if (S.overlay?.k === "stop" && Number.isFinite(at)) { S.overlay.at = at; delete S.overlay.pick; delete S.overlay.draft; }
+      break;
+    }
     case "contremarque": S.modal = contremarqueInfo(); break;
     case "checkUpdate": void offerUpdate(true); return;
     case "unfollow": S.follow = null; break;
@@ -639,6 +651,12 @@ app.addEventListener("input", e => {
 /* heure du trajet : champs date et heure du panneau (le choix n'est appliqué qu'avec « Valider ») */
 app.addEventListener("change", e => {
   const t = e.target as HTMLInputElement, w = S.trip.whenDraft;
+  if ((t.id === "sdate" || t.id === "stime") && S.overlay?.k === "stop") {
+    const date = (document.getElementById("sdate") as HTMLInputElement | null)?.value, time = (document.getElementById("stime") as HTMLInputElement | null)?.value;
+    const ms = date && time ? new Date(`${date}T${time}`).getTime() : NaN;
+    if (Number.isFinite(ms)) S.overlay.draft = ms;
+    return;
+  }
   if (!w || (t.id !== "wdate" && t.id !== "wtime")) return;
   const date = (document.getElementById("wdate") as HTMLInputElement | null)?.value, time = (document.getElementById("wtime") as HTMLInputElement | null)?.value;
   const ms = date && time ? new Date(`${date}T${time}`).getTime() : NaN;

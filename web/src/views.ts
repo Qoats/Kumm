@@ -1,5 +1,6 @@
 import type { Place, Stop, StopDeparture } from "../../shared/types";
 import { CONTREMARQUE_TER, TER_STATIONS_EMS } from "../../shared/ter";
+import type { PlannedDeparture } from "./api";
 import type { TrainDeparture } from "../../shared/ter";
 import { CONFIG, VERSION } from "./config";
 import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
@@ -15,7 +16,7 @@ import { MAPPATHS, mapRoutes } from "./map";
 import { POIS, S, STOPS, USER, mins, stopById } from "./store";
 import type { PlaceKey } from "./store";
 import { commuteTo } from "./commute";
-import { LINE_ROUTES, debug, nextDepartures } from "./api";
+import { LINE_ROUTES, debug, nextDepartures, quayOf } from "./api";
 import type { LineRoute } from "./api";
 import { stopKey } from "./network";
 import { fmtDist, fmtDur, haversine, walkMin } from "./geo";
@@ -592,6 +593,36 @@ export function overlayLine(l: string): string {
    ${list}</div></main></div>`;
 }
 
+/** Fiche d'un arrêt : passer des passages en direct aux horaires prévus d'un autre jour ou d'une autre heure */
+function whenControl(s: Stop): string {
+  const o = S.overlay?.k === "stop" ? S.overlay : null;
+  if (!o || !quayOf(s)) return "";
+  if (o.pick) {
+    const d = new Date(o.draft ?? o.at ?? Date.now() + 3600_000), pad = (n: number): string => String(n).padStart(2, "0");
+    const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `<div class="whenbox"><b>Horaires prévus</b><div class="wrow"><input type="date" id="sdate" value="${date}"><input type="time" id="stime" value="${time}"></div>
+      <div class="wbt"><button class="ghost" data-act="stopNow">Annuler</button><button class="go" data-act="stopAt">Afficher</button></div></div>`;
+  }
+  if (o.at) {
+    const day = new Date(o.at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+    return `<div class="whenbox on">${ic("clock")}<span><b>Horaires prévus</b><small>${esc(day)} à partir de ${hm(o.at)}</small></span>
+      <span class="wb"><button class="pill" data-act="stopPick">Changer</button><button class="pill" data-act="stopNow">Direct</button></span></div>`;
+  }
+  return `<button class="whenlink" data-act="stopPick">${ic("clock")}Horaires d’un autre jour ou d’une autre heure</button>`;
+}
+
+/** Horaires prévus d'un arrêt : une ligne par ligne et direction, avec les heures de passage */
+export function plannedBoard(name: string, list: PlannedDeparture[], at: number): string {
+  const rows = new Map<string, { line: string; dest: string; t: number[] }>();
+  for (const d of list.filter(x => x.t >= at - 60_000).sort((a, b) => a.t - b.t)) {
+    const k = d.line + "|" + d.dest;
+    (rows.get(k) ?? rows.set(k, { line: d.line, dest: d.dest, t: [] }).get(k)!).t.push(d.t);
+  }
+  if (!rows.size) return '<div class="empty" style="padding:24px">Aucun passage prévu à cette heure</div>';
+  const body = [...rows.values()].map(r => `<div class="lb-r" role="button" tabindex="0" data-line="${esc(r.line)}">${lineChip(r.line, true)}<span class="lb-d"><b>${esc(r.dest)}</b><small>${r.t.slice(1, 5).map(hm).join(" · ")}</small></span><span class="lb-m">${hm(r.t[0])}</span></div>`).join("");
+  return `<div class="lboard"><div class="lb-h"><span><small>Horaires prévus · CTS</small><b>${esc(name)}</b></span></div>${body}</div>`;
+}
+
 export function overlayStop(id: string): string {
   const s = stopById(id);
   if (!s) return "";
@@ -600,7 +631,7 @@ export function overlayStop(id: string): string {
    <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700;flex:1">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap${s.lines.length > 5 ? ";order:3;flex-basis:100%" : ""}">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
    <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div>
    ${s.sncf && CONTREMARQUE_TER.has(s.sncf) ? ctmBadge() : ""}
-   <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button><div id="stopdeps"></div></div></main></div>`;
+   <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button>${whenControl(s)}<div id="stopdeps"></div></div></main></div>`;
 }
 
 export function overlayMsgs(): string {

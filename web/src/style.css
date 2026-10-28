@@ -809,3 +809,17 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .leads .lead.on{background:var(--accent);color:var(--on-accent)}
 .leads .lead:disabled{opacity:.35}
 .leads.which{grid-template-columns:repeat(3,1fr);margin-bottom:10px}
+
+/* fiche d'un arrêt : horaires d'un autre jour ou d'une autre heure */
+.whenlink{display:flex;align-items:center;gap:8px;margin:0 0 12px;color:var(--accent-ink);font-weight:700;font-size:14.5px}
+.whenlink svg,.whenbox svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;flex:none}
+.whenbox{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px;margin:0 0 12px;display:flex;flex-direction:column;gap:10px}
+.whenbox.on{flex-direction:row;align-items:center;gap:10px;background:color-mix(in srgb,var(--accent) 12%,var(--card))}
+.whenbox.on span{flex:1;display:flex;flex-direction:column;min-width:0}
+.whenbox.on small{color:var(--mute);font-size:13px}
+.whenbox .wrow{display:flex;gap:8px}
+.whenbox input{flex:1;min-width:0;background:var(--chip);color:var(--ink);border:0;border-radius:12px;padding:11px;font-size:16px;font-weight:700;font-family:inherit;color-scheme:light dark}
+.whenbox .wbt{display:flex;gap:8px;justify-content:flex-end}
+.whenbox .wbt .ghost{margin:0}
+.whenbox.on .wb{flex:none;display:flex;flex-direction:column;gap:6px}
+.whenbox.on .wb .pill{margin:0;text-align:center}

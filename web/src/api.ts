@@ -171,6 +171,24 @@ export async function loadStops(): Promise<Stop[]> {
   return stops;
 }
 
+/** Passage prévu (horaires théoriques de la CTS) */
+export interface PlannedDeparture { line: string; dest: string; t: number }
+
+/** Quai d'un arrêt CTS au format des horaires ouverts (« HOFER_13 ») : Transitous renvoie alors tous les quais de l'arrêt */
+export const quayOf = (stop: Stop): string | undefined => [stop.id, ...(stop.refs ?? [])].find(r => /^[A-Z0-9]{2,12}_[0-9A-Z]{1,4}$/i.test(r));
+
+/** Horaires prévus à un arrêt à partir d'une date et d'une heure (jusqu'à 80 passages) */
+export async function plannedDepartures(stop: Stop, at: number): Promise<PlannedDeparture[]> {
+  const q = quayOf(stop);
+  if (!q) throw new Error("Horaires prévus indisponibles pour cet arrêt");
+  const r = await fetch(url(`/geo/stoptimes?stop=${encodeURIComponent(q)}&time=${encodeURIComponent(new Date(at).toISOString())}`), { headers: appHeaders() });
+  if (!r.ok) throw new Error("Horaires prévus indisponibles pour le moment");
+  const j = (await r.json()) as { stopTimes?: { routeShortName?: string; headsign?: string; place?: { departure?: string; scheduledDeparture?: string }; cancelled?: boolean }[] };
+  return (j.stopTimes ?? []).filter(x => !x.cancelled && x.routeShortName && x.place)
+    .map(x => ({ line: x.routeShortName!, dest: x.headsign ?? "", t: Date.parse(x.place!.scheduledDeparture ?? x.place!.departure ?? "") }))
+    .filter(x => Number.isFinite(x.t));
+}
+
 /** Derniers départs de trains connus de chaque gare (code UIC), pour le tableau des départs de sa fiche */
 export const TRAINS: Record<string, TrainDeparture[]> = {};
 
