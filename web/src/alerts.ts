@@ -107,5 +107,59 @@ export function checkAlerts(p: AlertPrefs, messages: TrafficMsg[]): void {
 /** Notification touchée (application fermée ou ouverte) : ouvrir les infos trafic */
 export function onAlertTap(open: () => void): void {
   if (!NATIVE || !PUSH_READY) return;
-  void pushModule().then(m => m.PushNotifications.addListener("pushNotificationActionPerformed", () => open())).catch(() => {});
+  // alerte avant un passage (data.arrival) : l'application s'ouvre simplement, sans aller aux infos trafic
+  void pushModule().then(m => m.PushNotifications.addListener("pushNotificationActionPerformed", a => { if (!a.notification.data?.arrival) open(); })).catch(() => {});
+}
+
+/* ---------- « Prévenez-moi avant le passage » ---------- */
+/** Alerte demandée : arrêt, ligne, direction, heure du passage (suivie en temps réel par le serveur) et délai en minutes */
+export interface ArrivalAlert { stopId: string; refs: string[]; stop: string; line: string; dest: string; at: number; lead: number }
+const ARR_KEY = "arrivals";
+const webTimers = new Map<string, number>();
+export const arrivalKey = (a: Pick<ArrivalAlert, "stopId" | "line" | "dest">): string => `${a.stopId}|${a.line}|${a.dest}`;
+
+/** Alertes en cours (celles dont le passage est encore à venir) */
+export function arrivals(): ArrivalAlert[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(ARR_KEY) ?? "[]") as ArrivalAlert[];
+    return list.filter(a => a.at > Date.now() - 2 * 60_000);
+  } catch { return []; }
+}
+function saveArrivals(list: ArrivalAlert[]): void {
+  try { localStorage.setItem(ARR_KEY, JSON.stringify(list)); } catch { /* ignoré */ }
+}
+
+/**
+ * Programme l'alerte. Application Android : le serveur suit le passage (retards compris) et envoie la notification, même
+ * application fermée. Version web : notification du navigateur à l'heure prévue, tant que la page reste ouverte.
+ */
+export async function addArrival(a: ArrivalAlert, onWebFire: (a: ArrivalAlert) => void): Promise<void> {
+  if (!(await askPermission())) throw new Error("Notifications refusées : autorisez-les pour Kumm dans les réglages du téléphone");
+  if (NATIVE) {
+    if (!PUSH_READY) throw new Error("Notifications indisponibles dans cette version de l'application");
+    const r = await fetch(url("/api/arrival"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ token: await pushToken(), refs: a.refs, stop: a.stop, line: a.line, dest: a.dest, at: a.at, lead: a.lead }) });
+    if (!r.ok) { const j = (await r.json().catch(() => ({}))) as { message?: string }; throw new Error(j.message ?? "HTTP " + r.status); }
+  } else {
+    const k = arrivalKey(a);
+    window.clearTimeout(webTimers.get(k));
+    webTimers.set(k, window.setTimeout(() => {
+      webTimers.delete(k);
+      saveArrivals(arrivals().filter(x => arrivalKey(x) !== k));
+      try { new Notification(`${a.line} vers ${a.dest} · arrive dans ${a.lead} min`, { body: a.stop, icon: "/icon-192.png", tag: "arr-" + k }); } catch { /* rien */ }
+      onWebFire(a);
+    }, Math.max(0, a.at - a.lead * 60_000 - Date.now())));
+  }
+  saveArrivals([...arrivals().filter(x => arrivalKey(x) !== arrivalKey(a)), a]);
+}
+
+export async function removeArrival(a: ArrivalAlert): Promise<void> {
+  const k = arrivalKey(a);
+  saveArrivals(arrivals().filter(x => arrivalKey(x) !== k));
+  window.clearTimeout(webTimers.get(k)); webTimers.delete(k);
+  if (NATIVE && PUSH_READY) {
+    const saved = localStorage.getItem(TOKEN_KEY);
+    if (saved) await fetch(url("/api/arrival"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ token: saved, cancel: true, refs: a.refs, line: a.line, dest: a.dest }) }).catch(() => {});
+  }
 }

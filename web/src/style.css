@@ -797,3 +797,15 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .tile-place p .ln{flex:none}
 .tile-place.empty{background:transparent;box-shadow:none;border:2px dashed var(--line)}
 .tile-place.empty .big{color:var(--mute)}
+
+/* cloche « prévenez-moi avant le passage » et choix du délai */
+.lb-bell{flex:none;width:36px;height:36px;margin-left:2px;border-radius:50%;display:grid;place-items:center;color:#8B939C;background:transparent}
+.lb-bell svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lb-bell.on{color:#FFD166;background:rgba(255,209,102,.14)}
+.lb-bell.on svg{fill:rgba(255,209,102,.35)}
+.arrdlg h4{display:flex;align-items:center;gap:8px}
+.leads{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 6px}
+.leads .lead{padding:12px 4px;border-radius:14px;background:var(--chip);font-weight:800;font-size:16px;color:var(--ink)}
+.leads .lead.on{background:var(--accent);color:var(--on-accent)}
+.leads .lead:disabled{opacity:.35}
+.leads.which{grid-template-columns:repeat(3,1fr);margin-bottom:10px}

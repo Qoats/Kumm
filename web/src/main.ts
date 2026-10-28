@@ -22,7 +22,7 @@ import { POIS, S, STOPS, USER, hooks, project, render, setBikeStation, setPlace,
 import type { PlaceKey } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayPlaceSet, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayPlaceSet, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo, arrivalPicker,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -48,7 +48,7 @@ import { stopJourney } from "./journey";
 import { answerRide, rideBanner, rideDebug, startRideDetection, stopRideDetection, stopSharing } from "./ride";
 import { acceptTerms, allSteps, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
 import type { Release } from "./update";
-import { NATIVE, PUSH_READY, askPermission, checkAlerts, followed, onAlertTap, saveAlerts, syncAlerts } from "./alerts";
+import { NATIVE, PUSH_READY, addArrival, askPermission, checkAlerts, followed, onAlertTap, removeArrival, saveAlerts, syncAlerts } from "./alerts";
 
 const app = document.getElementById("app") as HTMLElement;
 
@@ -96,6 +96,7 @@ function draw(): void {
     `<nav>${NAV.map(n => `<button data-tab="${n[0]}" class="${t === n[0] || (n[0] === "search" && t === "lines") ? "on" : ""}"><span class="ni">${ic(n[2])}</span>${n[1]}</button>`).join("")}</nav>` +
     whenSheet() +
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
+    (S.arrPick ? arrivalPicker(S.arrPick) : "") +
     (S.journey ? "" : rideBanner()) +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
 
@@ -220,8 +221,8 @@ async function loadDepsNow(): Promise<void> {
           // gare : tableau des départs des trains (retards, suppressions), sous les trams et bus dans l'onglet « Tous »
           const trains = s.sncf ? TRAINS[s.sncf] ?? [] : [], others = all.filter(x => lineKind(x.d.line) !== "ter");
           const h = tabs + (cur === "ter" ? trainBoard(trains)
-            : cur ? departureBoard(s.name, all.filter(x => lineKind(x.d.line) === cur))
-            : (others.length || !s.sncf ? departureBoard(s.name, others) : "") + (s.sncf && (trains.length || !others.length) ? trainBoard(trains, others.length ? 6 : 15) : ""));
+            : cur ? departureBoard(s.name, all.filter(x => lineKind(x.d.line) === cur), 16, s.id)
+            : (others.length || !s.sncf ? departureBoard(s.name, others, 16, s.id) : "") + (s.sncf && (trains.length || !others.length) ? trainBoard(trains, others.length ? 6 : 15) : ""));
           // sans passage : souvent un arrêt non desservi (travaux, déviation) ; l'info trafic l'explique mieux que les détails techniques
           const none = !h.includes('class="lb-r');
           return stopNotice(s, none) + (none ? h + debugBox() : h);
@@ -247,7 +248,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset],[data-bikest],[data-place],[data-pset]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset],[data-bikest],[data-place],[data-pset],[data-arr],[data-arrlead],[data-arrat]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -255,6 +256,25 @@ app.addEventListener("click", e => {
   if (!b || !app.contains(b)) return;
   const d = b.dataset;
   if (d.onb) { void onboardingAction(d.onb); return; }
+  if (d.arr && S.overlay?.k === "stop") {
+    const [line, dest, ts] = d.arr.split("|"), times = ts.split(",").map(Number).filter(t => t > Date.now());
+    if (!times.length) return;
+    // le premier passage s'il laisse au moins 2 min, sinon le suivant
+    const at = times.find(t => t - Date.now() > 2 * 60_000) ?? times[0];
+    S.arrPick = { line, dest, at, times, stopId: S.overlay.id }; render(); return;
+  }
+  if (d.arrat && S.arrPick) { S.arrPick.at = Number(d.arrat); render(); return; }
+  if (d.arrlead !== undefined && S.arrPick) {
+    const pick = S.arrPick, s = stopById(pick.stopId);
+    S.arrPick = null; render();
+    if (d.arrlead === "x" || !s) return;
+    const a = { stopId: s.id, refs: s.refs?.length ? s.refs : [s.id], stop: s.name, line: pick.line, dest: pick.dest, at: pick.at, lead: Number(d.arrlead) };
+    if (d.arrlead === "del") { void removeArrival(a).then(() => { toast("Alerte annulée"); render(); }); return; }
+    void addArrival(a, x => { toast(`${x.line} vers ${x.dest} : passage dans ${x.lead} min`); render(); })
+      .then(() => { toast(`Kumm vous préviendra ${a.lead} min avant le passage du ${a.line}`); render(); })
+      .catch(e => toast(e instanceof Error ? e.message : "Alerte impossible"));
+    return;
+  }
   if (d.place) {
     const w = d.place as PlaceKey, p = S.places[w];
     if (p) openTrip(p); else openPlaceSet(w);
@@ -807,6 +827,7 @@ if (Capacitor.isNativePlatform()) {
     else if (S.onb) { if (S.onb.i > 0) { S.onb.i--; render(); } }
     else if (document.getElementById("navlayer")) stopNav();
     else if (S.modal) { S.modal = null; render(); }
+    else if (S.arrPick) { S.arrPick = null; render(); }
     else if (S.trip.whenDraft) { S.trip.whenDraft = null; render(); }
     else if (S.overlay) { S.overlay = null; render(); }
     else if (S.follow) { S.follow = null; render(); }   // arrête de suivre le véhicule

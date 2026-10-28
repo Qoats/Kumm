@@ -26,7 +26,7 @@ import type { PlanCtx } from "./trip";
 import type { LL } from "./geo";
 import { esc, fold } from "./util";
 import { VEHICLES, followInfo, serverNow } from "./vehicles";
-import { NATIVE, PUSH_READY } from "./alerts";
+import { NATIVE, PUSH_READY, arrivalKey, arrivals } from "./alerts";
 import { CAN_UPDATE } from "./update";
 
 /* ============ COMPOSANTS ============ */
@@ -749,8 +749,22 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
   return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
 }
 
+/** Choix du délai de l'alerte avant un passage (fenêtre ouverte par la cloche d'un départ) */
+export function arrivalPicker(p: { line: string; dest: string; at: number; times: number[]; stopId: string }): string {
+  const left = Math.round((p.at - Date.now()) / 60_000);
+  // quel passage : le prochain ou un des suivants
+  const which = p.times.length > 1 ? `<div class="leads which">${p.times.map(t => `<button class="lead${t === p.at ? " on" : ""}" data-arrat="${t}">${hm(t)}</button>`).join("")}</div>` : "";
+  const on = arrivals().find(a => arrivalKey(a) === `${p.stopId}|${p.line}|${p.dest}`);
+  const leads = [1, 2, 3, 5, 10, 15].map(l => `<button class="lead${on?.lead === l ? " on" : ""}" data-arrlead="${l}"${l >= left ? " disabled" : ""}>${l} min</button>`).join("");
+  return `<div class="modal"><div class="dlg arrdlg"><h4>${lineChip(p.line, true)} vers ${esc(p.dest)}</h4>
+    ${which ? `<p>Passage :</p>${which}` : ""}
+    <p>Passage à <b>${hm(p.at)}</b> (dans ${Math.max(0, left)} min), suivi en temps réel. Me prévenir :</p>
+    <div class="leads">${leads}</div><small class="src">avant le passage${left <= 1 ? " · trop proche : choisissez un passage suivant" : ""}</small>
+    <div class="bt">${on ? '<button data-arrlead="del">Annuler l’alerte</button>' : ""}<button data-arrlead="x">Fermer</button></div></div></div>`;
+}
+
 /** Départs d'un arrêt façon écran en station : une ligne par ligne et direction, prochain passage en grand, le suivant à côté */
-export function departureBoard(name: string, list: StopDeparture[], max = 16): string {
+export function departureBoard(name: string, list: StopDeparture[], max = 16, stopId = ""): string {
   const now = Date.now();
   const rows = new Map<string, { line: string; dest: string; t: number[]; cx: number[] }>();
   for (const { d } of list) {
@@ -763,7 +777,10 @@ export function departureBoard(name: string, list: StopDeparture[], max = 16): s
   if (!list2.length) return '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
   const body = list2.map(r => {
     const m = mins(r.t[0]), n = r.t[1] !== undefined ? mins(r.t[1]) : null;
-    return `<button class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b>${esc(r.dest)}</b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}</button>`;
+    // cloche : « prévenez-moi avant ce passage » (délai au choix) ; allumée si une alerte est en cours
+    const on = stopId && arrivals().some(a => arrivalKey(a) === `${stopId}|${r.line}|${r.dest}`);
+    const bell = stopId ? `<button class="lb-bell${on ? " on" : ""}" data-arr="${esc(`${r.line}|${r.dest}|${r.t.slice(0, 3).join(",")}`)}" aria-label="Me prévenir avant le passage">${ic("bell")}</button>` : "";
+    return `<div class="lb-r" role="button" tabindex="0" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b>${esc(r.dest)}</b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}${bell}</div>`;
   }).join("");
   return `<div class="lboard"><div class="lb-h"><span><small>Prochains départs</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
 }

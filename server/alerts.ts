@@ -51,8 +51,10 @@ function saveSoon(): void {
 }
 
 /* ---------- abonnements ---------- */
-const TOKEN_FORMAT = /^[A-Za-z0-9:_\-]{100,400}$/;
-const LINE = /^[A-Za-z0-9\-]{1,12}$|^\*$/;
+export const TOKEN_FORMAT = /^[A-Za-z0-9:_\-]{100,400}$/;
+export const LINE = /^[A-Za-z0-9\-]{1,12}$|^\*$/;
+/** Notifications possibles (clé Firebase présente) */
+export const alertsReady = (): boolean => !!account;
 
 /** Inscription, mise à jour ou désinscription d'un téléphone ; renvoie un code HTTP et un message */
 export function subscribe(body: unknown): { status: number; msg: string } {
@@ -104,14 +106,18 @@ async function requestToken(): Promise<string> {
 async function push(token: string, m: TrafficMessage): Promise<boolean> {
   const lines = m.lines.slice(0, 4).join(", ");
   const body = [lines ? `Lignes ${lines}` : "", m.period].filter(Boolean).join(" · ") || "Touchez pour voir le détail";
-  const r = await fetch(`https://fcm.googleapis.com/v1/projects/${account!.project_id}/messages:send`, {
+  return notify(token, (m.channel === "disruption" ? "Perturbation · " : "Travaux · ") + m.title, body, m.id.slice(0, 60), { msg: m.id });
+}
+
+/** Notification quelconque (alerte trafic, arrivée d'un tram…) ; false si le jeton n'est plus valable */
+export async function notify(token: string, title: string, body: string, tag: string, data: Record<string, string> = {}): Promise<boolean> {
+  if (!account) return true;
+  const r = await fetch(`https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`, {
     method: "POST",
     headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
     body: JSON.stringify({ message: {
-      token,
-      notification: { title: (m.channel === "disruption" ? "Perturbation · " : "Travaux · ") + m.title, body },
-      data: { msg: m.id },
-      android: { priority: "HIGH", notification: { channel_id: "alertes", icon: "ic_stat_kumm", color: "#136342", tag: m.id.slice(0, 60) } }
+      token, notification: { title, body }, data,
+      android: { priority: "HIGH", notification: { channel_id: "alertes", icon: "ic_stat_kumm", color: "#136342", tag } }
     } })
   });
   if (r.ok) { counts.envoyees++; return true; }

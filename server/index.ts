@@ -23,6 +23,7 @@ import { roadStatus } from "./roads.js";
 import { widgetData } from "./widgets.js";
 import { stallStatus } from "./stalls.js";
 import { lineRoutes, routesStatus } from "./routes.js";
+import { arrivalsStatus, startArrivals, watchArrival } from "./arrivals.js";
 import { observationStatus } from "./observations.js";
 import { tripAt, tripById } from "./trips.js";
 import { TER_STATIONS_EMS } from "../shared/ter.js";
@@ -315,6 +316,7 @@ function health(res: ServerResponse): Promise<void> {
     cts: { en_pause: paused.paused, secondes: paused.paused ? paused.seconds : 0, appels_derniere_minute: ctsCallsLastMinute(), plafond_par_minute: CTS_BUDGET_PER_MIN, refuses_plafond: stats.budgetRefused, arrets_connus: knownRefs?.size ?? null, arrets_inconnus_demandes: stats.unknownRefs, arrets_inconnus_refuses: stats.unknownRefused },
     reseau_en_memoire: { ...realtimeStatus(), arrets_servis_depuis_la_memoire: stats.snapshotServed },
     alertes: alertsStatus(),
+    alertes_passage: arrivalsStatus(),
     apk: updateStatus(),
     trajets_partages: rideStatus(),
     trains_ter: terStatus(),
@@ -349,7 +351,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (origin && ORIGINS.includes(origin)) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
   if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-App-Key", "Access-Control-Max-Age": "86400" }); return void res.end(); }
   // seule écriture possible : l'abonnement aux alertes trafic
-  const isPost = req.method === "POST" && (url.pathname === "/api/alerts" || url.pathname === "/api/ride" || url.pathname === "/connexion");
+  const isPost = req.method === "POST" && (url.pathname === "/api/alerts" || url.pathname === "/api/ride" || url.pathname === "/api/arrival" || url.pathname === "/connexion");
   if (req.method !== "GET" && req.method !== "HEAD" && !isPost) return send(res, 405, "text/plain", "Méthode non autorisée");
 
   const p = url.pathname;
@@ -373,6 +375,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (isPost) {
     let body: unknown;
     try { body = JSON.parse(await readBody(req)); } catch { return send(res, 400, "text/plain", "Requête invalide"); }
+    if (url.pathname === "/api/arrival") {
+      const r = watchArrival(body);
+      return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
+    }
     if (url.pathname === "/api/ride") {
       // position partagée par un voyageur à bord (voir ride.ts)
       const all = allCourses();
@@ -428,5 +434,6 @@ server.listen(PORT, () => {
   startRealtime();
   startTer();
   startAlerts(currentMessages);
+  startArrivals();
   setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
 });
