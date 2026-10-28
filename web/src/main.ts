@@ -13,7 +13,7 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, OFFLINE, onOfflineChange, placeOnTramQuays, plannedDepartures } from "./api";
+import { TRAINS, ensureLineRoute, ensureStats, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, OFFLINE, onOfflineChange, placeOnTramQuays, plannedDepartures } from "./api";
 import { fmtDist, haversine } from "./geo";
 import { hm } from "./transit";
 import { STRASBOURG_VILLE } from "../../shared/ter";
@@ -23,7 +23,7 @@ import { POIS, S, STOPS, USER, hooks, project, render, setBikeStation, setPlace,
 import type { PlaceKey } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayPlaceSet, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo, arrivalPicker, plannedBoard,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayStats, overlayBikePick, overlayPlaceSet, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo, arrivalPicker, plannedBoard,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -83,7 +83,7 @@ function draw(): void {
   else body = `<main>${screenTrips()}</main>`;
 
   const o = S.overlay;
-  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "look" ? overlayLook() : o.k === "bikepick" ? overlayBikePick() : o.k === "placeset" ? overlayPlaceSet(o.which) : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
+  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "look" ? overlayLook() : o.k === "stats" ? overlayStats() : o.k === "bikepick" ? overlayBikePick() : o.k === "placeset" ? overlayPlaceSet(o.which) : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
 
   // positions de défilement de toutes les zones (listes, fiches, rangées de catégories…), par écran : voir scroll.ts
   const screen = o ? `${t}|${o.k}:${"id" in o ? String(o.id) : ""}` : t;
@@ -120,7 +120,8 @@ function draw(): void {
   // après restoreSlots : les listes chargées à part ont retrouvé leur contenu, donc leur hauteur
   restoreScroll(app, screen);
   void loadDeps();
-  if (o?.k === "line") ensureLineRoute(o.id, render);
+  if (o?.k === "line") { ensureLineRoute(o.id, render); ensureStats(o.id, render); }
+  if (o?.k === "stats") ensureStats("", render);
   syncWidgets();   // n'envoie rien si les données des widgets n'ont pas changé
 }
 hooks.render = draw;
@@ -407,6 +408,7 @@ app.addEventListener("click", e => {
     case "mapBikes": showOnMap(["velhop", "velopark"], true); return;
     case "prefs": S.overlay = { k: "settings" }; break;
     case "look": S.overlay = { k: "look" }; break;
+    case "stats": S.overlay = { k: "stats" }; break;
     case "stopPick": if (S.overlay?.k === "stop") S.overlay.pick = true; break;
     case "stopNow": if (S.overlay?.k === "stop") { delete S.overlay.at; delete S.overlay.pick; } break;
     case "stopAt": {

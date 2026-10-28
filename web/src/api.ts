@@ -257,6 +257,22 @@ export function ensureLineRoute(line: string, done: () => void): void {
     .finally(() => { lineRouteLoading.delete(line); done(); });
 }
 
+/** Ponctualité observée (temps réel comparé aux horaires prévus), sur 30 jours */
+export interface Punct { n: number; avg: number; late: number; early: number; onTime: number }
+export interface NetStats { since: string | null; days: number; lines: (Punct & { line: string })[] }
+export interface LineStats { since: string | null; days: number; line: string; all: Punct; byDay: Record<string, Punct>; byBand: Record<string, Punct> }
+/** clé "" : tout le réseau ; sinon le nom de la ligne */
+export const STATS: Record<string, { at: number; v?: NetStats | LineStats; failed?: boolean }> = {};
+const statsLoading = new Set<string>();
+export function ensureStats(line: string, done: () => void): void {
+  const r = STATS[line];
+  if ((r && Date.now() - r.at < (r.failed ? 30_000 : 300_000)) || statsLoading.has(line)) return;
+  statsLoading.add(line);
+  get<NetStats | LineStats>("/stats" + (line ? "?line=" + encodeURIComponent(line) : ""))
+    .then(v => { STATS[line] = { at: Date.now(), v }; }, () => { STATS[line] = { at: Date.now(), failed: true }; })
+    .finally(() => { statsLoading.delete(line); done(); });
+}
+
 /** Mode de chaque quai (« 319A » → « tram », « bus » ou « bus+tram »), d'après les passages en temps réel */
 /** Lignes de chaque quai (« 527C » → ["B", "C", "F"]), apprises par le serveur au fil des passages */
 export async function loadQuayLines(): Promise<Record<string, string[]>> {

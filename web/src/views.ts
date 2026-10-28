@@ -16,8 +16,8 @@ import { MAPPATHS, mapRoutes } from "./map";
 import { POIS, S, STOPS, USER, mins, stopById } from "./store";
 import type { PlaceKey } from "./store";
 import { commuteTo } from "./commute";
-import { LINE_ROUTES, debug, nextDepartures, quayOf } from "./api";
-import type { LineRoute } from "./api";
+import { LINE_ROUTES, STATS, debug, nextDepartures, quayOf } from "./api";
+import type { LineRoute, LineStats, NetStats, Punct } from "./api";
 import { stopKey } from "./network";
 import { fmtDist, fmtDur, haversine, walkMin } from "./geo";
 import { hm, minutes } from "./transit";
@@ -178,7 +178,7 @@ export function screenHome(): string {
   const favs = favStops.map((s, i) => `<div class="tile tile-stop${favStops.length % 2 && i === favStops.length - 1 ? " w" : ""}" role="button" tabindex="0" data-stop="${esc(s.id)}">
       <h4>${ic("star")}${esc(s.name)}</h4><div id="fav-${esc(s.id)}"></div></div>`).join("");
   const svc: [string, IconName, string][] = [
-    ["Horaires par ligne", "clock", "tab:lines"], ["Parkings relais", "parking", "act:mapParkings"],
+    ["Horaires par ligne", "clock", "tab:lines"], ["Ponctualité", "chart", "act:stats"], ["Parkings relais", "parking", "act:mapParkings"],
     ["Objets perdus", "lost", CTS_OBJETS_TROUVES], ["Aide et contact", "help", "act:help"]
   ];
   return `<div class="pad tiles">
@@ -188,11 +188,12 @@ export function screenHome(): string {
     ${trafficTile()}
     ${bikeTile()}
     <div class="tile w tile-lines"><h4>${ic("tram")}Toutes les lignes</h4><div class="chips">${networkLines().map(chipAlert).join("")}</div></div>
-    ${svc.map(([label, icon, to]) => {
-      const inner = `<span class="si">${ic(icon)}</span><b>${label}</b>`;
-      return to.startsWith("act:") ? `<button class="tile tile-svc" data-act="${to.slice(4)}">${inner}</button>`
-        : to.startsWith("tab:") ? `<button class="tile tile-svc" data-tab="${to.slice(4)}">${inner}</button>`
-        : `<a class="tile tile-svc" href="${to}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
+    ${svc.map(([label, icon, to], i) => {
+      // nombre impair : la dernière tuile prend toute la largeur
+      const inner = `<span class="si">${ic(icon)}</span><b>${label}</b>`, cls = `tile tile-svc${svc.length % 2 && i === svc.length - 1 ? " w" : ""}`;
+      return to.startsWith("act:") ? `<button class="${cls}" data-act="${to.slice(4)}">${inner}</button>`
+        : to.startsWith("tab:") ? `<button class="${cls}" data-tab="${to.slice(4)}">${inner}</button>`
+        : `<a class="${cls}" href="${to}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
     }).join("")}
     <button class="tile-add w" data-act="favs">${ic("plus")}${favStops.length ? "Gérer mes arrêts favoris" : "Ajouter un arrêt favori"}</button>
     <p class="ver w">Kumm v${VERSION}${CONFIG.USE_MOCK ? " · démonstration : données fictives" : ""}</p>
@@ -590,7 +591,54 @@ export function overlayLine(l: string): string {
   return `<div class="overlay" style="--c:${COLORS[l] ?? "#777"}">${bar("Ligne " + l)}
    <main><div class="pad"><div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(l)}<b style="font-size:18px">${esc(title)}</b></div>
    ${messagesFor(l).length ? `<div style="margin:10px 0">${messagesFor(l).map(m => msgCard(m, false)).join("")}</div>` : ""}
-   ${list}</div></main></div>`;
+   ${list}${linePunct(l)}</div></main></div>`;
+}
+
+/* ============ PONCTUALITÉ ============ */
+/** Barre empilée : à l'heure, en retard, en avance */
+const punctBar = (p: Punct): string => `<span class="pbar" aria-hidden="true"><i class="ok" style="width:${p.onTime}%"></i><i class="late" style="width:${p.late}%"></i><i class="early" style="width:${p.early}%"></i></span>`;
+const avgDelay = (sec: number): string => (Math.abs(sec) < 60 ? `${sec >= 0 ? "+" : "−"}${Math.abs(sec)} s` : `${sec >= 0 ? "+" : "−"}${Math.round(Math.abs(sec) / 6) / 10} min`.replace(".", ","));
+const sinceText = (st: { since: string | null; days: number }): string => {
+  if (!st.since) return `${st.days} derniers jours`;
+  const d = new Date(Number(st.since.slice(0, 4)), Number(st.since.slice(4, 6)) - 1, Number(st.since.slice(6, 8)));
+  return Date.now() - d.getTime() > (st.days - 1) * 86_400_000 ? `${st.days} derniers jours` : `depuis le ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`;
+};
+const PUNCT_NOTE = `<p class="src">Mesuré par Kumm : chaque passage en temps réel est comparé à l’horaire prévu de la CTS. À l’heure : de 1 min d’avance à 3 min de retard.</p>`;
+const DAYS: [string, string][] = [["W", "En semaine"], ["S", "Le samedi"], ["D", "Le dimanche"]];
+const BANDS: [string, string][] = [["pm", "Pointe du matin · 6 h - 9 h 30"], ["j", "Journée"], ["ps", "Pointe du soir · 16 h - 19 h 30"], ["s", "Soirée"], ["n", "Nuit et petit matin"]];
+
+/** Page d'une ligne : sa ponctualité sur 30 jours */
+function linePunct(l: string): string {
+  const st = STATS[l]?.v as LineStats | undefined;
+  if (!st || st.all.n < 20) return "";
+  const row = (label: string, p: Punct | undefined): string => !p || p.n < 10 ? "" :
+    `<div class="prow"><span class="pl">${esc(label)}</span>${punctBar(p)}<b>${p.onTime} %</b></div>`;
+  const bands = BANDS.map(([k, label]) => row(label, st.byBand["W|" + k])).join("");
+  return `<section class="punct"><h3>${ic("chart")}Ponctualité <small>${esc(sinceText(st))}</small></h3>
+    <div class="pbig"><b>${st.all.onTime} %</b><span>à l’heure<small>${st.all.late} % en retard · ${st.all.early} % en avance · moyenne <span style="white-space:nowrap">${avgDelay(st.all.avg)}</span></small></span></div>
+    ${punctBar(st.all)}
+    <div class="pgrp">${DAYS.map(([k, label]) => row(label, st.byDay[k])).join("")}</div>
+    ${bands ? `<div class="sub">En semaine, selon l’heure</div><div class="pgrp">${bands}</div>` : ""}
+    ${PUNCT_NOTE}</section>`;
+}
+
+/** Ponctualité de tout le réseau, ligne par ligne */
+export function overlayStats(): string {
+  const r = STATS[""], st = r?.v as NetStats | undefined;
+  let body: string;
+  if (!r) body = `<div class="empty">Chargement…</div>`;
+  else if (!st?.lines.length) body = `<div class="empty">${r.failed ? "Statistiques indisponibles pour le moment." : "Pas encore assez de passages mesurés : revenez dans quelques heures."}</div>`;
+  else {
+    const all = st.lines.reduce((a, x) => ({ n: a.n + x.n, ok: a.ok + (x.onTime * x.n) / 100, late: a.late + (x.late * x.n) / 100 }), { n: 0, ok: 0, late: 0 });
+    const trams = st.lines.filter(x => isTram(x.line)), buses = st.lines.filter(x => !isTram(x.line));
+    const list = (xs: NetStats["lines"]): string => xs.map(x => `<button class="prow pline" data-line="${esc(x.line)}">${lineChip(x.line)}${punctBar(x)}<b>${x.onTime} %</b></button>`).join("");
+    body = `<div class="pbig"><b>${Math.round((all.ok / all.n) * 100)} %</b><span>des passages à l’heure<small>${esc(sinceText(st))} · ${all.n.toLocaleString("fr-FR")} passages mesurés</small></span></div>
+      <div class="plegend"><span><i class="ok"></i>À l’heure</span><span><i class="late"></i>En retard</span><span><i class="early"></i>En avance</span></div>
+      ${trams.length ? `<div class="sub">Trams</div><div class="pgrp">${list(trams)}</div>` : ""}
+      ${buses.length ? `<div class="sub">Bus</div><div class="pgrp">${list(buses)}</div>` : ""}
+      ${PUNCT_NOTE}`;
+  }
+  return `<div class="overlay">${bar("Ponctualité")}<main><div class="pad punct flat">${body}</div></main></div>`;
 }
 
 /** Texte raccourci à un mot entier, avec « … » */

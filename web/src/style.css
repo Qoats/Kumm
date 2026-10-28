@@ -834,3 +834,26 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 /* bandeau « Hors connexion » : en bas, au-dessus de la barre des onglets */
 .offbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + var(--safe-bottom));z-index:4000;display:flex;align-items:center;gap:7px;background:#3A2A0C;color:#FFD58A;border:1px solid #6B4E14;border-radius:20px;padding:7px 14px;font-weight:800;font-size:13.5px;box-shadow:0 8px 22px rgba(0,0,0,.35);white-space:nowrap}
 :root[data-scheme="light"] .offbar{background:#FFF4DC;color:#7A5200;border-color:#F0D49A}
+
+/* Ponctualité */
+.punct{margin-top:22px}
+.punct.flat{margin-top:0}
+.punct h3{display:flex;align-items:center;gap:8px;font-size:16px;margin:0 0 10px}
+.punct h3 small{font-weight:500;color:var(--mute);font-size:13px;margin-left:auto}
+.punct h3 svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.pbig{display:flex;align-items:center;gap:12px;margin:4px 0 10px}
+.pbig>b{white-space:nowrap;flex:none;font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
+.pbig span{display:flex;flex-direction:column;font-weight:600}
+.pbig small{font-weight:400;color:var(--mute);font-size:12.5px;margin-top:2px}
+.pbar{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--line);flex:1;min-width:40px}
+.pbar i,.plegend i{display:block;height:100%}
+.pbar .ok,.plegend .ok{background:#3aa76d}.pbar .late,.plegend .late{background:#e8833a}.pbar .early,.plegend .early{background:#5b8def}
+.pgrp{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:4px 14px;margin:8px 0 14px}
+.prow{display:flex;align-items:center;gap:12px;padding:10px 0;width:100%;font:inherit;color:inherit;background:none;border:0;text-align:left}
+.prow+.prow{border-top:1px solid var(--line)}
+.prow .pl{flex:0 0 46%;font-size:14px}
+.prow>b{flex:none;width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.pline .chip,.pline [class*="chip"]{flex:none}
+.plegend{display:flex;gap:14px;font-size:12.5px;color:var(--mute);margin:12px 0 4px}
+.plegend span{display:flex;align-items:center;gap:6px}
+.plegend i{width:10px;height:10px;border-radius:3px}

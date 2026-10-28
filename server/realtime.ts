@@ -8,6 +8,8 @@ import { describeError, fetchCts } from "./cts.js";
 import { updateStalls } from "./stalls.js";
 import { initRoutes, learnRoutes } from "./routes.js";
 import { initObservations } from "./observations.js";
+import { aimedTimes } from "./schedule.js";
+import { recordPunctuality } from "./punctuality.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,7 +46,7 @@ export interface Course {
   /** « tram » ou « bus », d'après la CTS (Extension.VehicleMode) ; « ter » pour les trains */
   mode: string;
   /** arr, dep : horaires estimés (temps réel) ; aim : horaire prévu (théorique), pour calculer un retard */
-  calls: { code: string; name: string; arr: number; dep: number; aim?: number }[];
+  calls: { code: string; name: string; arr: number; dep: number; aim?: number; /** heure estimée par Kumm (arrêt passé sans heure) */ est?: true }[];
   /** départ prévu (horaire théorique, qui ne bouge pas avec les retards) : sert au code du trajet */
   aimed?: number;
   /** numéro du train (trains TER seulement) */
@@ -179,12 +181,19 @@ export function parseEstimatedTimetable(body: string): { byCode: Map<string, Vis
         // arrêts passés sans heure : une minute d'écart chacun avant le premier arrêt horodaté (le véhicule les a déjà quittés)
         if (passed) {
           if (course.calls.length === passed) course.calls = [];
-          else { const t0 = course.calls[passed].arr; for (let i = 0; i < passed; i++) course.calls[i].arr = course.calls[i].dep = t0 - (passed - i) * 60_000; }
+          else { const t0 = course.calls[passed].arr; for (let i = 0; i < passed; i++) { course.calls[i].arr = course.calls[i].dep = t0 - (passed - i) * 60_000; course.calls[i].est = true; } }
+        }
+        // horaires théoriques de la CTS (schedule.ts) : heure prévue à chaque arrêt (retard) et vrai départ prévu de la course
+        const sch = course.calls.length ? aimedTimes(course.id, course.calls.map(x => x.code), course.calls[course.calls.length - 1].arr) : null;
+        if (sch) {
+          course.calls.forEach((x, i) => { if (x.aim === undefined && sch.aim[i] !== undefined) x.aim = sch.aim[i]; });
+          course.aimed = sch.start;
         }
         // départ prévu au terminus : retenu d'une mise à jour à l'autre (il disparaît quand le premier arrêt est passé)
         seen.add(course.id);
         const known = startOf.get(course.id);
-        if (known !== undefined) course.aimed = known;
+        if (sch) startOf.set(course.id, sch.start);
+        else if (known !== undefined) course.aimed = known;
         else if (!passed && course.calls.length) startOf.set(course.id, course.aimed ??= course.calls[0].dep);
         if (course.calls.length >= 2 && !journeyCancelled) list.push(course);   // course supprimée : pas de véhicule
         calls.forEach((c, i) => {
@@ -223,6 +232,7 @@ async function refresh(): Promise<void> {
     byCode = p.byCode; courses = [...p.list, ...recent]; validUntil = p.validUntil; loadedAt = now; lastError = "";
     updateStalls(p.list, now);
     learnRoutes(p.list, now);
+    recordPunctuality(p.list, now);
     for (const c of p.list) for (const call of c.calls) { if (c.mode) learn(quayModes, call.code, c.mode); if (c.line) learn(quayLines, call.code, c.line); }
     Object.assign(counts, { courses: p.courses, passages: p.passages, quais: p.byCode.size });
     if (counts.chargements++ === 0) console.log(`Passages du réseau chargés : ${p.courses} courses, ${p.byCode.size} quais`);

@@ -24,6 +24,8 @@ import { widgetData } from "./widgets.js";
 import { stallStatus } from "./stalls.js";
 import { lineRoutes, routesStatus } from "./routes.js";
 import { arrivalsStatus, startArrivals, watchArrival } from "./arrivals.js";
+import { scheduleStatus, startSchedule } from "./schedule.js";
+import { punctualityStatus, stats as punctualityStats } from "./punctuality.js";
 import { observationStatus } from "./observations.js";
 import { tripAt, tripById } from "./trips.js";
 import { TER_STATIONS_EMS } from "../shared/ter.js";
@@ -208,6 +210,11 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
     if (!/^[A-Za-z0-9]{1,6}$/.test(line)) return send(res, 400, "text/plain", "Ligne invalide");
     return cached(res, "info:line-route:" + line, 300, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(lineRoutes(line)) }));
   }
+  if (name === "stats") {
+    const line = url.searchParams.get("line");
+    if (line !== null && !/^[A-Za-z0-9]{1,6}$/.test(line)) return send(res, 400, "text/plain", "Ligne invalide");
+    return cached(res, "info:stats:" + (line ?? ""), 300, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(punctualityStats(line)) }));
+  }
   if (name === "vehicles") return cached(res, "info:vehicles", 5, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(vehiclesAt()) }));
   const conf = ALLOWED[name];
   if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
@@ -317,6 +324,8 @@ function health(res: ServerResponse): Promise<void> {
     reseau_en_memoire: { ...realtimeStatus(), arrets_servis_depuis_la_memoire: stats.snapshotServed },
     alertes: alertsStatus(),
     alertes_passage: arrivalsStatus(),
+    horaires_cts: scheduleStatus(),
+    ponctualite: punctualityStatus(),
     apk: updateStatus(),
     trajets_partages: rideStatus(),
     trains_ter: terStatus(),
@@ -435,5 +444,6 @@ server.listen(PORT, () => {
   startTer();
   startAlerts(currentMessages);
   startArrivals();
+  startSchedule();
   setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
 });
