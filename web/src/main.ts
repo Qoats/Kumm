@@ -18,10 +18,11 @@ import { fmtDist, haversine } from "./geo";
 import { STRASBOURG_VILLE } from "../../shared/ter";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
-import { POIS, S, STOPS, USER, hooks, project, render, setBikeStation, stopById, toast, toggleFav } from "./store";
+import { POIS, S, STOPS, USER, hooks, project, render, setBikeStation, setPlace, stopById, toast, toggleFav } from "./store";
+import type { PlaceKey } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayPlaceSet, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -81,7 +82,7 @@ function draw(): void {
   else body = `<main>${screenTrips()}</main>`;
 
   const o = S.overlay;
-  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "look" ? overlayLook() : o.k === "bikepick" ? overlayBikePick() : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
+  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "look" ? overlayLook() : o.k === "bikepick" ? overlayBikePick() : o.k === "placeset" ? overlayPlaceSet(o.which) : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
 
   // positions de défilement de toutes les zones (listes, fiches, rangées de catégories…), par écran : voir scroll.ts
   const screen = o ? `${t}|${o.k}:${"id" in o ? String(o.id) : ""}` : t;
@@ -246,7 +247,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset],[data-bikest]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset],[data-bikest],[data-place],[data-pset]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -254,6 +255,21 @@ app.addEventListener("click", e => {
   if (!b || !app.contains(b)) return;
   const d = b.dataset;
   if (d.onb) { void onboardingAction(d.onb); return; }
+  if (d.place) {
+    const w = d.place as PlaceKey, p = S.places[w];
+    if (p) openTrip(p); else openPlaceSet(w);
+    return;
+  }
+  if (d.pset !== undefined && S.overlay?.k === "placeset") {
+    const w = S.overlay.which;
+    if (d.pset === "del") { setPlace(w, null); toast("Adresse retirée"); }
+    else {
+      const p = d.pset === "me" ? { label: "Position enregistrée", lat: USER.lat, lon: USER.lon } : S.placeSugg[Number(d.pset)];
+      if (!p) return;
+      setPlace(w, p); toast(`${w === "home" ? "Maison" : "Travail"} : ${p.label}`);
+    }
+    S.overlay = null; render(); return;
+  }
   if (d.bikest !== undefined) {
     setBikeStation(d.bikest || null); S.overlay = null;
     toast(d.bikest ? "Station Vélhop enregistrée pour l’accueil" : "La station la plus proche sera affichée"); render(); return;
@@ -544,6 +560,24 @@ function searchAddresses(): void {
   }, 350);
 }
 
+/** Écran de choix de l'adresse Maison / Travail */
+function openPlaceSet(which: PlaceKey): void {
+  S.placeQ = ""; S.placeSugg = []; S.overlay = { k: "placeset", which }; render();
+  setTimeout(() => document.getElementById("pq")?.focus(), 50);
+}
+let placeTimer = 0;
+/** Suggestions de l'écran Maison / Travail : arrêts tout de suite, adresses un instant plus tard */
+function askPlaces(): void {
+  window.clearTimeout(placeTimer);
+  const q = S.placeQ.trim();
+  const stops: Place[] = q.length < 2 ? [] : STOPS.filter(s => fold(s.name).includes(fold(q))).slice(0, 3).map(s => ({ label: s.name, lat: s.lat, lon: s.lon, stop: s }));
+  S.placeSugg = stops; render();
+  if (q.length < 3) return;
+  placeTimer = window.setTimeout(() => {
+    geocode(q).then(addr => { if (S.placeQ.trim() === q) { S.placeSugg = [...addr, ...stops]; render(); } }).catch(() => { /* adresses indisponibles */ });
+  }, 300);
+}
+
 function askSuggestions(field: "from" | "to"): void {
   window.clearTimeout(sgTimer);
   const q = textOf(field).trim();
@@ -562,6 +596,7 @@ function askSuggestions(field: "from" | "to"): void {
 app.addEventListener("input", e => {
   const t = e.target as HTMLInputElement;
   if (t.id === "fq") { S.favQ = t.value; render(); return; }
+  if (t.id === "pq") { S.placeQ = t.value; askPlaces(); return; }
   if (t.id === "wq" && S.wsetup) { S.wsetup.q = t.value; render(); return; }
   if (t.id === "sq") {
     S.q = t.value; render(); searchAddresses();
@@ -613,6 +648,7 @@ app.addEventListener("pointerdown", e => {
     held = true; holdAt = null;
     try { navigator.vibrate?.(25); } catch { /* rien */ }
     if (h.dataset.hold === "bikepick") { S.overlay = { k: "bikepick" }; render(); }
+    else if (h.dataset.hold?.startsWith("place:")) openPlaceSet(h.dataset.hold.slice(6) as PlaceKey);
     // copie : faite au moment où le doigt se lève (Android n'autorise le presse-papiers que pendant un geste)
     else if (h.dataset.hold?.startsWith("copy:")) holdCopy = h.dataset.hold.slice(5);
   }, 550);

@@ -788,3 +788,12 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .ctm.sm{margin:6px 0 0;padding:4px 10px 4px 8px;font-size:12px;background:#1F1A26;color:#E9DDF3;box-shadow:inset 0 0 0 1px #4A2D5E;align-self:flex-start}
 .ctm.sm svg{width:14px;height:14px}
 .modal .dlg p{max-height:60vh;overflow-y:auto}
+
+/* tuiles Maison / Travail */
+.tile-place{min-height:118px;background:color-mix(in srgb,var(--accent) 10%,var(--card))}
+.tile-place h4{color:var(--accent-ink)}
+.tile-place .big{color:var(--ink)}
+.tile-place p{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.tile-place p .ln{flex:none}
+.tile-place.empty{background:transparent;box-shadow:none;border:2px dashed var(--line)}
+.tile-place.empty .big{color:var(--mute)}

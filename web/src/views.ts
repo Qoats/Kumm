@@ -13,6 +13,8 @@ import { marker, markerIcon } from "./markers";
 import { ic, type IconName } from "./icons";
 import { MAPPATHS, mapRoutes } from "./map";
 import { POIS, S, STOPS, USER, mins, stopById } from "./store";
+import type { PlaceKey } from "./store";
+import { commuteTo } from "./commute";
 import { LINE_ROUTES, debug, nextDepartures } from "./api";
 import type { LineRoute } from "./api";
 import { stopKey } from "./network";
@@ -140,6 +142,34 @@ function trafficTile(): string {
     <div class="ls">${m.lines.slice(0, 3).map(l => lineChip(l, true)).join("")}</div><p class="msg">${esc(m.title)}</p></button>`;
 }
 
+/** Tuiles « Maison » et « Travail » : durée du prochain trajet et heure de départ ; à régler d'un toucher si vide.
+    Appui long : changer l'adresse. */
+function placeTile(which: PlaceKey): string {
+  const label = which === "home" ? "Maison" : "Travail", icon: IconName = which === "home" ? "home" : "store";
+  const p = S.places[which];
+  if (!p) return `<button class="tile tile-place empty" data-place="${which}"><h4>${ic(icon)}${label}</h4><div class="big sm">Ajouter</div><p>Votre adresse ${which === "home" ? "de la maison" : "du travail"}</p></button>`;
+  const near = haversine(USER, p) < 250;
+  const c = near ? null : commuteTo(which), j = c?.j;
+  const first = j?.legs.find(l => l.kind !== "walk");
+  const body = near ? `<div class="big sm">Vous y êtes</div><p>${esc(p.label)}</p>`
+    : !c ? `<div class="big sm">…</div><p>Calcul du trajet</p>`
+    : !j ? `<div class="big sm">—</div><p>${c.error ? "Trajet indisponible" : "Aucun trajet trouvé"}</p>`
+    : `<div class="big">${minutes(j.duration)}<small> min</small></div><p>${first ? `${lineChip(first.line ?? "?", true)} ` : ""}<span>${hm(first ? first.start : j.start)} → ${hm(j.end)}</span></p>`;
+  return `<button class="tile tile-place" data-place="${which}" data-hold="place:${which}"><h4>${ic(icon)}${label}</h4>${body}</button>`;
+}
+
+/** Choix de l'adresse « Maison » ou « Travail » */
+export function overlayPlaceSet(which: PlaceKey): string {
+  const label = which === "home" ? "la maison" : "le travail", cur = S.places[which];
+  const items = S.placeSugg.map((p, i) => `<button class="item" data-pset="${i}">${p.stop ? pinIcon() : ic("map", 'width="22" height="22" fill="none" stroke="#7A8087" stroke-width="2"')}<span>${esc(p.label)}</span></button>`).join("");
+  return `<div class="overlay">${bar(which === "home" ? "Adresse de la maison" : "Adresse du travail")}<main><div class="pad">
+    <div class="field" style="margin-top:4px">${ic("search", 'width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"')}<input id="pq" value="${esc(S.placeQ)}" placeholder="Adresse ou arrêt pour ${label}" autocomplete="off"></div>
+    <button class="item" data-pset="me">${ic("target", 'width="22" height="22" fill="none" stroke="var(--accent)" stroke-width="2"')}<span>Ma position actuelle</span></button>
+    ${items || (S.placeQ.trim().length > 1 ? '<div class="empty">Recherche…</div>' : "")}
+    ${cur ? `<p class="src" style="margin:16px 0 8px">Adresse actuelle : ${esc(cur.label)}</p><button class="ghost" data-pset="del">Retirer cette adresse</button>` : ""}
+  </div></main></div>`;
+}
+
 /** Accueil en tuiles : itinéraire, arrêts favoris (prochains passages), info trafic, Vélhop, lignes et services */
 export function screenHome(): string {
   const favStops = S.fav.map(stopById).filter((s): s is Stop => !!s);
@@ -152,6 +182,7 @@ export function screenHome(): string {
   ];
   return `<div class="pad tiles">
     <button class="tile w tile-go" data-tab="search"><h4>${ic("navigate")}Naviguer</h4><div class="big sm">Où allez-vous ?</div><p>Tram, bus, train, vélo ou à pied, guidé jusqu’à destination</p></button>
+    ${placeTile("home")}${placeTile("work")}
     ${favs || `<button class="tile w tile-empty" data-act="favs"><h4>${ic("star")}Vos arrêts</h4><p>Ajoutez vos arrêts favoris : leurs prochains passages s’afficheront ici</p></button>`}
     ${trafficTile()}
     ${bikeTile()}
