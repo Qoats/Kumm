@@ -1,4 +1,5 @@
 import type { Place, Stop, StopDeparture } from "../../shared/types";
+import { CONTREMARQUE_TER, TER_STATIONS_EMS } from "../../shared/ter";
 import type { TrainDeparture } from "../../shared/ter";
 import { CONFIG, VERSION } from "./config";
 import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
@@ -567,6 +568,7 @@ export function overlayStop(id: string): string {
   return `<div class="overlay">${bar(s.name)}
    <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700;flex:1">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap${s.lines.length > 5 ? ";order:3;flex-basis:100%" : ""}">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
    <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div>
+   ${s.sncf && CONTREMARQUE_TER.has(s.sncf) ? ctmBadge() : ""}
    <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button><div id="stopdeps"></div></div></main></div>`;
 }
 
@@ -736,7 +738,24 @@ export function departureBoard(name: string, list: StopDeparture[], max = 16): s
 }
 
 /** Tableau des départs d'une gare, comme sur les écrans en gare : heure prévue, retard ou suppression, destination, numéro du train */
-export function trainBoard(list: TrainDeparture[], max = 15, title = "Trains au départ", sub = "Horaires SNCF", stopId?: string): string {
+/** Explication de la contremarque TER (fenêtre ouverte depuis « Accessible avec Badgéo ») */
+export function contremarqueInfo(): { t: string; p: string; b: string[] } {
+  const gares = TER_STATIONS_EMS.filter(s => CONTREMARQUE_TER.has(s.uic)).map(s => esc(s.name)).join(", ");
+  return {
+    t: "Le TER avec votre carte Badgéo",
+    p: `Avec un abonnement CTS et la <b>contremarque TER</b>, vous voyagez en TER entre les gares de l’Eurométropole sans acheter de billet de train.
+      <br><br><b>Gares concernées :</b> ${gares}.
+      <br><br><b>Pour l’obtenir :</b> gratuite pour les habitants de l’Eurométropole, dans l’espace client CTS (« Voyager sur TER sans surcoût ») ou en agence, avec un justificatif de domicile et votre carte Badgéo. Elle dure autant que votre abonnement.
+      <br><br>* Pas valable vers Kehl ni au-delà de l’Eurométropole. Sans abonnement : ticket Alsa+ 24H EMS. Conditions de la CTS, à vérifier sur son site.`,
+    b: ["OK"]
+  };
+}
+
+/** « Accessible avec Badgéo » : ouvre l'explication de la contremarque TER */
+const ctmBadge = (small = false): string =>
+  `<button class="ctm${small ? " sm" : ""}" data-act="contremarque">${ic("ticket")}Accessible avec Badgéo<sup>*</sup></button>`;
+
+export function trainBoard(list: TrainDeparture[], max = 15, title = "Trains au départ", sub = "Horaires SNCF", stopId?: string, uic?: string): string {
   const now = Date.now();
   const rows = list.filter(t => t.t > now - 60_000).slice(0, max).map(t => {
     const late = !t.cancelled && (t.delay ?? 0) >= 60, m = mins(t.t);
@@ -752,7 +771,7 @@ export function trainBoard(list: TrainDeparture[], max = 15, title = "Trains au 
   if (!rows.length && title === "Trains au départ") return '<div class="empty" style="padding:24px">Aucun train au départ dans les 4 prochaines heures</div>';
   if (!rows.length) rows.push('<div class="lb-r ter"><span class="lb-d"><small>Aucun train dans les 4 prochaines heures</small></span></div>');
   // dans « À proximité » : toucher le nom de la gare ouvre sa fiche
-  return `<div class="lboard"><div class="lb-h"${stopId ? ` data-stop="${esc(stopId)}" role="button"` : ""}><span><small>${esc(sub)}</small><b>${esc(title)}</b></span><span class="lb-clock">${hm(now)}</span></div>${rows.join("")}</div>`;
+  return `<div class="lboard"><div class="lb-h"${stopId ? ` data-stop="${esc(stopId)}" role="button"` : ""}><span><small>${esc(sub)}</small><b>${esc(title)}</b>${uic && CONTREMARQUE_TER.has(uic) ? ctmBadge(true) : ""}</span><span class="lb-clock">${hm(now)}</span></div>${rows.join("")}</div>`;
 }
 
 /** Onglets des départs d'un arrêt desservi par plusieurs modes */

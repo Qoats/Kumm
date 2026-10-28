@@ -21,7 +21,7 @@ import type { Layer } from "./kinds";
 import { POIS, S, STOPS, USER, hooks, project, render, setBikeStation, stopById, toast, toggleFav } from "./store";
 import type { Filter, Tab } from "./store";
 import {
-  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayVehicle, overlayStop, screenHome, favRows, departureBoard,
+  overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayBikePick, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo,
   screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
@@ -173,7 +173,7 @@ async function loadDepsNow(): Promise<void> {
       await fillSlot("nearlist", async () => {
         const res = await Promise.all(gares.map(({ s }) => nextTrains(s.sncf!).catch(() => null)));
         if (res.every(r => r === null)) throw new Error("Serveur Kumm injoignable");
-        return gares.map(({ s, d }, i) => trainBoard(res[i] ?? [], 4, s.sncf === STRASBOURG_VILLE ? "Strasbourg-Ville" : s.name, `Gare · ${fmtDist(d)}`, s.id)).join("");
+        return gares.map(({ s, d }, i) => trainBoard(res[i] ?? [], 4, s.sncf === STRASBOURG_VILLE ? "Strasbourg-Ville" : s.name, `Gare · ${fmtDist(d)}`, s.id, s.sncf)).join("");
       });
     } else if (S.tab === "nearby" && !S.overlay) {
       // les 12 arrêts les plus proches sont interrogés, et les 4 plus proches qui ont encore des passages sont affichés :
@@ -364,6 +364,7 @@ app.addEventListener("click", e => {
     case "mapBikes": showOnMap(["velhop", "velopark"], true); return;
     case "prefs": S.overlay = { k: "settings" }; break;
     case "look": S.overlay = { k: "look" }; break;
+    case "contremarque": S.modal = contremarqueInfo(); break;
     case "checkUpdate": void offerUpdate(true); return;
     case "unfollow": S.follow = null; break;
     case "refollow": if (S.follow) S.follow.paused = false; break;

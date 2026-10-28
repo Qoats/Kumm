@@ -34,6 +34,10 @@ export const TER_STATIONS_EMS: TerStation[] = [
   { uic: "87212464", name: "Lauterbourg", lat: 48.967697, lon: 8.182682 }
 ];
 
+/** Gares où l'on peut voyager en TER avec un abonnement CTS (carte Badgéo) et la contremarque TER :
+    les 13 gares de l'Eurométropole, en tête de la liste ci-dessus (sans la ligne vers Kehl) */
+export const CONTREMARQUE_TER = new Set(TER_STATIONS_EMS.slice(0, 13).map(s => s.uic));
+
 /** Gare de Strasbourg, rattachée à « Gare Centrale » */
 export const STRASBOURG_VILLE = "87212027";
 
