@@ -830,3 +830,7 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .elev span{display:flex;flex-direction:column;gap:2px;min-width:0}
 .elev b{font-size:15.5px}
 .elev small{color:var(--mute);font-size:13px;line-height:1.35}
+
+/* bandeau « Hors connexion » : en bas, au-dessus de la barre des onglets */
+.offbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + var(--safe-bottom));z-index:4000;display:flex;align-items:center;gap:7px;background:#3A2A0C;color:#FFD58A;border:1px solid #6B4E14;border-radius:20px;padding:7px 14px;font-weight:800;font-size:13.5px;box-shadow:0 8px 22px rgba(0,0,0,.35);white-space:nowrap}
+:root[data-scheme="light"] .offbar{background:#FFF4DC;color:#7A5200;border-color:#F0D49A}

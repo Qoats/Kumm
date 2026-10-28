@@ -13,8 +13,9 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, placeOnTramQuays, plannedDepartures } from "./api";
+import { TRAINS, ensureLineRoute, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, OFFLINE, onOfflineChange, placeOnTramQuays, plannedDepartures } from "./api";
 import { fmtDist, haversine } from "./geo";
+import { hm } from "./transit";
 import { STRASBOURG_VILLE } from "../../shared/ter";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
@@ -98,7 +99,9 @@ function draw(): void {
     (S.modal ? `<div class="modal"><div class="dlg"><h4>${S.modal.t}</h4><p>${S.modal.p}</p><div class="bt">${S.modal.b.map((b, i) => `<button data-mb="${i}">${b}</button>`).join("")}</div></div></div>` : "") +
     (S.arrPick ? arrivalPicker(S.arrPick) : "") +
     (S.journey ? "" : rideBanner()) +
-    (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "");
+    (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "") +
+    // hors connexion : on affiche les dernières données reçues, en disant de quand elles datent
+    (OFFLINE.on || !navigator.onLine ? `<div class="offbar">${ic("clock", 'width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"')}Hors connexion${OFFLINE.at ? ` · horaires de ${hm(OFFLINE.at)}` : ""}</div>` : "");
 
   if (act) {
     const el = document.getElementById(act) as HTMLInputElement | null;
@@ -837,6 +840,8 @@ if (!CONFIG.USE_MOCK && CAN_UPDATE) {
 /* Perte et retour de la connexion du téléphone */
 window.addEventListener("offline", () => toast("Vous êtes hors ligne"));
 window.addEventListener("online", () => { toast("Connexion rétablie"); void loadDeps(); });
+window.addEventListener("offline", () => render());
+onOfflineChange(() => render());
 
 /* Android : le bouton « retour » ferme d'abord le guidage, une fenêtre ou une fiche, puis revient à l'accueil, puis quitte */
 if (Capacitor.isNativePlatform()) {

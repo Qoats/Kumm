@@ -20,7 +20,50 @@ class HttpError extends Error {
 /** Serveur qui a répondu « trop de requêtes » (429) : plus aucun appel avant cette heure, pour ne pas aggraver la situation */
 let pausedUntil = 0;
 
+/* ---------- hors connexion : dernière réponse de chaque demande gardée sur le téléphone ----------
+   Arrêts, lignes, infos trafic, et passages des 40 derniers arrêts consultés : sans réseau (tunnel, sous-sol), l'application
+   affiche ces données, avec un bandeau qui dit de quand elles datent. */
+export const OFFLINE: { on: boolean; at: number } = { on: false, at: 0 };
+let offlineChanged: () => void = () => {};
+export const onOfflineChange = (fn: () => void): void => { offlineChanged = fn; };
+const PER_STOP = /^\/(stop-monitoring|trains)\?/;
+function remember(path: string, data: unknown): void {
+  try {
+    localStorage.setItem("off:" + path, JSON.stringify({ t: Date.now(), d: data }));
+    if (PER_STOP.test(path)) {
+      // au plus 40 arrêts gardés : les plus anciens sont oubliés
+      const idx = (JSON.parse(localStorage.getItem("off:idx") ?? "[]") as string[]).filter(p => p !== path);
+      idx.push(path);
+      for (const old of idx.splice(0, Math.max(0, idx.length - 40))) localStorage.removeItem("off:" + old);
+      localStorage.setItem("off:idx", JSON.stringify(idx));
+    }
+  } catch { /* stockage plein ou indisponible : pas de copie hors connexion */ }
+}
+function recall<T>(path: string): { t: number; d: T } | null {
+  try { const v = localStorage.getItem("off:" + path); return v ? JSON.parse(v) as { t: number; d: T } : null; } catch { return null; }
+}
+function setOffline(on: boolean, at = 0): void {
+  if (OFFLINE.on === on && (!on || OFFLINE.at === at)) return;
+  OFFLINE.on = on; OFFLINE.at = on ? Math.min(at, OFFLINE.at || at) : 0;
+  offlineChanged();
+}
+
 async function get<T>(path: string): Promise<T> {
+  try {
+    const d = await getOnline<T>(path);
+    remember(path, d); setOffline(false);
+    return d;
+  } catch (e) {
+    // réseau absent ou serveur injoignable (pas une demande refusée) : dernière réponse connue, s'il y en a une
+    if (e instanceof HttpError && e.status < 500) throw e;
+    const c = recall<T>(path);
+    if (!c) throw e;
+    setOffline(true, c.t);
+    return c.d;
+  }
+}
+
+async function getOnline<T>(path: string): Promise<T> {
   if (Date.now() < pausedUntil) throw new HttpError(429, "Trop de requêtes : nouvel essai dans quelques secondes");
   let err: unknown;
   for (let i = 0; i < 2; i++) {            // 2 essais, 9 s maximum chacun
