@@ -39,7 +39,14 @@ jobs:
           if [ -n "${{ vars.KUMM_API_BASE }}" ]; then
             echo "VITE_API_BASE=${{ vars.KUMM_API_BASE }}" > web/.env.android
           fi
-          cat web/.env.android
+          # clé d'application (secret KUMM_APP_KEY, identique à APP_KEY sur le serveur) : exigée par le serveur pour l'API de l'APK
+          if [ -n "${{ secrets.KUMM_APP_KEY }}" ]; then
+            sed -i "/^VITE_APP_KEY=/d" web/.env.android
+            echo "VITE_APP_KEY=${{ secrets.KUMM_APP_KEY }}" >> web/.env.android
+          else
+            echo "::warning::Pas de secret KUMM_APP_KEY : l'API du serveur n'est protégée que par la limite de requêtes."
+          fi
+          grep -v "^VITE_APP_KEY=" web/.env.android
           if grep -q "votre-serveur.example" web/.env.android; then
             echo "::error::Renseignez l'adresse de votre serveur : variable KUMM_API_BASE, ou fichier web/.env.android."
             exit 1
@@ -101,6 +108,23 @@ jobs:
           V=$(node -p "require('./package.json').version")
           sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"$V\"/" android/app/build.gradle
           grep -E "versionCode|versionName" android/app/build.gradle
+
+      # Durcissement de l'APK de production (sans effet sur l'APK de test) :
+      # - R8 : réduit et obscurcit le code Java (noms de classes et méthodes illisibles, code mort supprimé) ; ressources inutiles retirées ;
+      # - sauvegarde Android désactivée : les données de l'application ne sortent pas du téléphone par adb backup ni par la sauvegarde cloud ;
+      # - le code web de l'application est déjà minifié par Vite, sans fichier de correspondance (sourcemap) publié.
+      # Aucun obscurcissement ne rend un APK réellement illisible : ne mettez jamais de secret dans l'application (le jeton CTS reste sur le serveur).
+      - name: Durcir l'APK
+        run: |
+          G=android/app/build.gradle
+          sed -i "s/minifyEnabled false/minifyEnabled true/" "$G"
+          sed -i "s/minifyEnabled true/minifyEnabled true\n            shrinkResources true/" "$G"
+          grep -n -E "minifyEnabled|shrinkResources" "$G"
+          grep -q "shrinkResources true" "$G" || { echo "::error::Impossible d'activer R8 dans build.gradle"; exit 1; }
+          cat android-src/proguard-kumm.pro >> android/app/proguard-rules.pro
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          sed -i 's|android:allowBackup="true"|android:allowBackup="false"|' "$MANIFEST"
+          grep -n "allowBackup" "$MANIFEST"
 
       # Signature : avec la clé de l'application (secrets KUMM_KEYSTORE_B64 et KUMM_KEYSTORE_PASSWORD, voir README),
       # chaque nouvelle version s'installe par-dessus l'ancienne. Sans ces secrets : APK de test (debug), à désinstaller avant mise à jour.
