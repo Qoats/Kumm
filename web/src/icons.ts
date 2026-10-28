@@ -33,6 +33,7 @@ export const I = {
   train:'<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l2-4M15 21l-2-4"/><circle cx="9" cy="14" r=".7"/><circle cx="15" cy="14" r=".7"/>',
   kumm:'<g fill="none" stroke-width="2.300" stroke-linecap="round"><path d="M7.500 12l9-7.500" stroke="#F2A900"/><path d="M7.500 12l9 7.500" stroke="#1F9DF0"/><path d="M7.500 4.500v15" stroke="var(--accent-deep)"/></g><g stroke="none"><circle cx="7.500" cy="4.500" r="2.100" fill="var(--accent-deep)"/><circle cx="7.500" cy="19.500" r="2.100" fill="var(--accent-deep)"/><circle cx="16.500" cy="4.500" r="2.100" fill="#F2A900"/><circle cx="16.500" cy="19.500" r="2.100" fill="#1F9DF0"/></g><g fill="#fff" stroke="none"><circle cx="7.500" cy="4.500" r=".8"/><circle cx="7.500" cy="19.500" r=".8"/><circle cx="16.500" cy="4.500" r=".8"/><circle cx="16.500" cy="19.500" r=".8"/></g>',
   ticket:'<path d="M3 8V6.500A1.500 1.500 0 0 1 4.500 5h15A1.500 1.500 0 0 1 21 6.500V8a2.200 2.200 0 0 0 0 4.400v5.100A1.500 1.500 0 0 1 19.500 19h-15A1.500 1.500 0 0 1 3 17.500V12.400A2.200 2.200 0 0 0 3 8z"/><path d="M14.500 5.500v13" stroke-dasharray="1.600 2.400"/>',
+  access:'<circle cx="11" cy="4.5" r="2"/><path d="M11 7.5v6h5l2.5 5"/><path d="M11 10.5h4.5"/><path d="M8.5 11.2A5.5 5.5 0 1 0 15 18.5"/>',
   bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.700 21a2 2 0 0 1-3.400 0"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>'
 } as const;

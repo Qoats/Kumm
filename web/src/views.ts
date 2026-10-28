@@ -3,7 +3,7 @@ import { CONTREMARQUE_TER, TER_STATIONS_EMS } from "../../shared/ter";
 import type { PlannedDeparture } from "./api";
 import type { TrainDeparture } from "../../shared/ter";
 import { CONFIG, VERSION } from "./config";
-import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, hasAlert, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
+import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, hasAlert, isElevatorMsg, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, ACCENT_TOKENS, THEMES, THEME_TOKENS, UIS } from "./themes";
@@ -593,6 +593,14 @@ export function overlayLine(l: string): string {
    ${list}</div></main></div>`;
 }
 
+/** Texte raccourci à un mot entier, avec « … » */
+const cut = (t: string, n: number): string => (t.length <= n ? t : t.slice(0, t.lastIndexOf(" ", n)) + "…");
+
+/** Ascenseur ou escalier mécanique indisponible à cet arrêt (d'après les infos trafic de la CTS) */
+function elevatorNotice(name: string): string {
+  return messagesForStop(name).filter(isElevatorMsg).map(m => `<button class="elev" data-act="msgs">${ic("access")}<span><b>${esc(m.title)}</b><small>${esc(cut(m.text.split(/(?<=\.)\s/)[0], 240))}</small></span></button>`).join("");
+}
+
 /** Fiche d'un arrêt : passer des passages en direct aux horaires prévus d'un autre jour ou d'une autre heure */
 function whenControl(s: Stop): string {
   const o = S.overlay?.k === "stop" ? S.overlay : null;
@@ -630,15 +638,18 @@ export function overlayStop(id: string): string {
   return `<div class="overlay">${bar(s.name)}
    <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700;flex:1">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap${s.lines.length > 5 ? ";order:3;flex-basis:100%" : ""}">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
    <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div>
+   ${elevatorNotice(s.name)}
    ${s.sncf && CONTREMARQUE_TER.has(s.sncf) ? ctmBadge() : ""}
    <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button>${whenControl(s)}<div id="stopdeps"></div></div></main></div>`;
 }
 
 export function overlayMsgs(): string {
-  const dis = MESSAGES.filter(m => m.channel === "disruption"), works = MESSAGES.filter(m => m.channel === "works");
+  const elev = MESSAGES.filter(isElevatorMsg);
+  const dis = MESSAGES.filter(m => m.channel === "disruption" && !isElevatorMsg(m)), works = MESSAGES.filter(m => m.channel === "works" && !isElevatorMsg(m));
   const empty = MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Infos trafic indisponibles pour le moment." : "Aucune perturbation signalée.";
   return `<div class="overlay">${bar("Infos trafic")}<main><div class="pad">
-    ${dis.length ? `<div class="sub" style="margin-top:4px">Incidents en cours</div>${dis.map(m => msgCard(m)).join("")}` : ""}
+    ${elev.length ? `<div class="sub" style="margin-top:4px">${ic("access", 'width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="vertical-align:-3px;margin-right:4px"')}Ascenseurs et escaliers mécaniques</div>${elev.map(m => msgCard(m)).join("")}` : ""}
+    ${dis.length ? `<div class="sub"${elev.length ? "" : ' style="margin-top:4px"'}>Incidents en cours</div>${dis.map(m => msgCard(m)).join("")}` : ""}
     ${works.length ? `<div class="sub">Travaux et changements</div>${works.map(m => msgCard(m)).join("")}` : ""}
     ${MESSAGES.length ? "" : `<div class="empty">${empty}</div>`}
     <button class="go" data-act="prefs" style="margin:6px 0 12px">🔔 ${S.alerts.enabled ? "Gérer mes alertes" : "Recevoir une alerte en cas de perturbation"}</button>
@@ -863,7 +874,7 @@ export function stopTabs(modes: readonly ("tram" | "bus" | "ter")[], cur: "tram"
 /** Fiche d'un arrêt : infos trafic qui le concernent (un arrêt sans passage est souvent un arrêt non desservi) */
 export function stopNotice(s: { name: string; lines: string[]; sncf?: string }, noDeparture = false): string {
   if (s.sncf && !isHub(s)) return "";   // gare SNCF seule : les infos trafic de la CTS ne la concernent pas
-  let list = messagesForStop(s.name);
+  let list = messagesForStop(s.name).filter(m => !isElevatorMsg(m));   // ascenseurs : bandeau à part en haut de la fiche
   if (noDeparture) {
     // aucun passage : on montre aussi les infos trafic des lignes de l'arrêt (ex. réseau tram interrompu), qui ne citent pas
     // forcément son nom ; incidents comme changements prévus (la CTS classe « réseau tram interrompu » dans les seconds).

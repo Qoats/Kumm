@@ -109,6 +109,8 @@ export function messagesForStop(name: string): TrafficMsg[] {
   const re = new RegExp(`(^|[^a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}($|[^a-z0-9])`);
   return MESSAGES.filter(m => re.test(fold(m.title + " " + m.text)));
 }
+/** Ascenseur ou escalier mécanique hors service (la CTS l'annonce dans ses infos trafic : « Ascenseur Gare Centrale indisponible ») */
+export const isElevatorMsg = (m: TrafficMsg): boolean => /ascenseur|escalator|escalier m[ée]canique/i.test(m.title);
 /** Ligne touchée par un incident ou des travaux en cours */
 export const hasAlert = (l: string): boolean => MESSAGES.some(m => m.lines.some(r => sameLine(r, l)));
 
