@@ -216,7 +216,40 @@ public final class WidgetCore {
     }
 
     /** Construit l'affichage d'un widget (appelé hors du fil principal : peut télécharger) */
+    /* ---------- thème : celui choisi dans l'application (Réglages › Apparence), transmis par KummWidgets.sync ---------- */
+    static final java.util.Set<String> PALETTES = new java.util.HashSet<>(java.util.Arrays.asList("light", "sand", "dark", "ocean", "night", "contrast"));
+    /** Textes de chaque widget : couleur principale, puis secondaire */
+    static String[][] themedTexts(String type) {
+        switch (type) {
+            case "stop": case "nearby": return new String[][] {
+                { "w_title", "dest0", "dest1", "dest2", "dest3", "ta0", "ta1", "ta2", "ta3" }, { "w_sub", "w_msg", "tb0", "tb1", "tb2", "tb3" } };
+            case "trip": return new String[][] { { "w_dest", "w_time" }, { "w_next", "w_from" } };
+            case "tripmini": return new String[][] { { "w_time", "w_dest" }, {} };
+            case "traffic": return new String[][] { { "w_title" }, { "w_sub" } };
+            case "poi": return new String[][] { { "w_title", "w_big" }, { "w_sub" } };
+            default: return new String[][] { {}, {} };
+        }
+    }
+
+    /** Fond (un fond prêt par thème : coins arrondis sur tous les Android) et couleurs des textes ; sans thème reçu : jour / nuit d'Android */
+    static RemoteViews themed(Context c, String type, RemoteViews v) {
+        JSONObject sh = shared(c), t = sh != null ? sh.optJSONObject("theme") : null;
+        if (v == null || t == null || !PALETTES.contains(t.optString("palette"))) return v;
+        String p = t.optString("palette");
+        v.setInt(id(c, "w_root"), "setBackgroundResource", res(c, "drawable", "w_bg_" + p));
+        if (type.equals("stop") || type.equals("nearby")) v.setInt(id(c, "w_refresh"), "setBackgroundResource", res(c, "drawable", "w_btn_" + p));
+        String[][] ids = themedTexts(type);
+        int ink = color(t.optString("ink"), Color.BLACK), mute = color(t.optString("mute"), Color.GRAY);
+        for (String n : ids[0]) v.setTextColor(id(c, n), ink);
+        for (String n : ids[1]) v.setTextColor(id(c, n), mute);
+        return v;
+    }
+
     static RemoteViews build(Context c, String type, int widgetId, Class<?> provider) {
+        return themed(c, type, buildRaw(c, type, widgetId, provider));
+    }
+
+    static RemoteViews buildRaw(Context c, String type, int widgetId, Class<?> provider) {
         JSONObject cfg = config(c, widgetId);
         String pkg = c.getPackageName();
         switch (type) {

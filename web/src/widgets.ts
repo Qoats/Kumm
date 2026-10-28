@@ -9,6 +9,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { PluginListenerHandle } from "@capacitor/core";
 import { API_BASE, APP_KEY } from "./config";
 import { COLORS, TEXT_COLORS } from "./data";
+import { THEME_TOKENS } from "./themes";
 import { S, STOPS, USER, render, stopById } from "./store";
 
 interface KummWidgetsPlugin {
@@ -29,6 +30,13 @@ export interface WidgetSetup {
   sel?: number[];
 }
 
+/** Thème des widgets : celui de l'application (« automatique » : clair ou sombre selon le téléphone, au moment de l'envoi) */
+function widgetTheme(): { palette: string; ink: string; mute: string } {
+  const th = S.prefs.theme === "auto" ? (document.documentElement.dataset["scheme"] === "dark" ? "dark" : "light") : S.prefs.theme;
+  const t = THEME_TOKENS[th];
+  return { palette: th, ink: t.ink, mute: t.mute };
+}
+
 let last = "";
 let timer = 0;
 /** Données transmises aux widgets ; envoyées seulement si elles ont changé (chaque envoi les fait se mettre à jour) */
@@ -40,7 +48,7 @@ export function syncWidgets(): void {
     const favLines = [...new Set(S.fav.flatMap(id => stopById(id)?.lines ?? []))].filter(l => l !== "TER");
     const lines = S.alerts.lines.length ? S.alerts.lines : favLines;
     const data: Record<string, unknown> = {
-      base: API_BASE, key: APP_KEY, colors: COLORS, text: TEXT_COLORS, lines,
+      base: API_BASE, key: APP_KEY, colors: COLORS, text: TEXT_COLORS, lines, theme: widgetTheme(),
       ...(S.locOn ? { pos: { lat: Math.round(USER.lat * 1e3) / 1e3, lon: Math.round(USER.lon * 1e3) / 1e3 } } : {})
     };
     const key = JSON.stringify(data);
