@@ -329,6 +329,20 @@ export async function loadPois(): Promise<Poi[]> {
   return out;
 }
 
+/** Prévision d'une station Vélhop : maintenant, puis toutes les 30 min pendant 4 h */
+export interface BikePoint { t: number; bikes: number; docks: number; empty: number; sure: boolean }
+export const FORECASTS: Record<string, { at: number; points?: BikePoint[]; failed?: boolean }> = {};
+const forecastLoading = new Set<string>();
+export function ensureForecast(id: string, done: () => void): void {
+  const r = FORECASTS[id];
+  if ((r && Date.now() - r.at < (r.failed ? 60_000 : 300_000)) || forecastLoading.has(id)) return;
+  forecastLoading.add(id);
+  fetch(url("/poi/velhop-forecast?id=" + encodeURIComponent(id)), { headers: appHeaders() })
+    .then(async r => { if (!r.ok) throw new Error("HTTP " + r.status); FORECASTS[id] = { at: Date.now(), points: ((await r.json()) as { points: BikePoint[] }).points }; })
+    .catch(() => { FORECASTS[id] = { at: Date.now(), failed: true }; })
+    .finally(() => { forecastLoading.delete(id); done(); });
+}
+
 /* ---------- données de démonstration ---------- */
 function seed(str: string): number {
   let h = 0;

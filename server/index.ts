@@ -25,6 +25,7 @@ import { stallStatus } from "./stalls.js";
 import { lineRoutes, routesStatus } from "./routes.js";
 import { arrivalsStatus, startArrivals, watchArrival } from "./arrivals.js";
 import { scheduleStatus, startSchedule } from "./schedule.js";
+import { bikeForecast, bikesStatus, startBikes } from "./bikes.js";
 import { punctualityStatus, stats as punctualityStats } from "./punctuality.js";
 import { observationStatus } from "./observations.js";
 import { tripAt, tripById } from "./trips.js";
@@ -326,6 +327,7 @@ function health(res: ServerResponse): Promise<void> {
     alertes_passage: arrivalsStatus(),
     horaires_cts: scheduleStatus(),
     ponctualite: punctualityStatus(),
+    prevision_velhop: bikesStatus(),
     apk: updateStatus(),
     trajets_partages: rideStatus(),
     trains_ter: terStatus(),
@@ -400,6 +402,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (p.startsWith("/api/")) return api(res, url);
   if (p.startsWith("/geo/")) return geo(res, url);
   if (p === "/poi/velhop") return cached(res, "poi:velhop", 60, 600, async () => poiResult(await velhop()));
+  if (p === "/poi/velhop-forecast") {
+    const id = (url.searchParams.get("id") ?? "").slice(0, 60);
+    if (!/^(velhop-)?[\w-]+$/.test(id)) return send(res, 400, "text/plain", "Station inconnue");
+    const f = bikeForecast(id);
+    return f ? send(res, 200, "application/json; charset=utf-8", JSON.stringify(f)) : send(res, 404, "text/plain", "Station inconnue");
+  }
   if (p === "/poi/pr") return cached(res, "poi:pr", 120, 3600, async () => poiResult(await parkingsRelais()));
   if (isTile) {
     if (!tileRefererAllowed(req)) { res.writeHead(403, { "Content-Type": "text/plain" }); return void res.end("Tuiles réservées à l'application"); }
@@ -445,5 +453,6 @@ server.listen(PORT, () => {
   startAlerts(currentMessages);
   startArrivals();
   startSchedule();
+  startBikes();
   setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
 });

@@ -16,7 +16,7 @@ import { MAPPATHS, mapRoutes } from "./map";
 import { POIS, S, STOPS, USER, mins, stopById } from "./store";
 import type { PlaceKey } from "./store";
 import { commuteTo } from "./commute";
-import { LINE_ROUTES, STATS, debug, nextDepartures, quayOf } from "./api";
+import { FORECASTS, LINE_ROUTES, STATS, debug, nextDepartures, quayOf } from "./api";
 import type { LineRoute, LineStats, NetStats, Punct } from "./api";
 import { stopKey } from "./network";
 import { fmtDist, fmtDur, haversine, walkMin } from "./geo";
@@ -353,8 +353,23 @@ export function overlayPoi(id: string): string {
   return `<div class="overlay">${bar(p.name)}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">${markerIcon(p.kind, 44)}<b style="font-size:19px">${KINDS[p.kind].label}</b></div>
     ${p.info ? `<div class="box" style="margin-bottom:14px"><span>${esc(p.info)}</span></div>` : ""}
+    ${p.kind === "velhop" ? bikeForecastHtml(p.id) : ""}
     <button class="go" data-poitrip="${esc(p.id)}">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button>
   </div></main></div>`;
+}
+
+/** Vélos attendus dans les 4 prochaines heures, d'après l'habitude de la station à chaque heure */
+function bikeForecastHtml(id: string): string {
+  const f = FORECASTS[id], pts = f?.points?.filter(x => x.t > Date.now() + 60_000) ?? [];
+  if (!f || f.failed || !pts.length) return "";
+  if (!pts.some(x => x.sure)) return `<div class="bfc"><h3>${ic("chart")}Prévision</h3><p class="src">Kumm apprend encore les habitudes de cette station : la prévision sera disponible d’ici quelques jours.</p></div>`;
+  const max = Math.max(4, ...pts.map(x => x.bikes + x.docks), ...pts.map(x => x.bikes));
+  const soon = pts.find(x => x.t >= Date.now() + 50 * 60_000) ?? pts[0];
+  const bars = pts.map(x => `<span class="bb${x.sure ? "" : " unsure"}${x.bikes === 0 ? " zero" : ""}"><em>${x.bikes}</em><i style="height:${Math.max(4, Math.round((x.bikes / max) * 100))}%"></i><small>${hm(x.t)}</small></span>`).join("");
+  return `<div class="bfc"><h3>${ic("chart")}Prévision</h3>
+    <p class="bsum">Vers ${hm(soon.t)} : <b>environ ${soon.bikes} vélo${soon.bikes > 1 ? "s" : ""}</b>${soon.empty >= 0.3 ? ` · souvent vide à cette heure (${Math.round(soon.empty * 100)} % du temps)` : ""}</p>
+    <div class="bbars">${bars}</div>
+    <p class="src">Estimation d’après les relevés des dernières semaines à la même heure. Les vélos peuvent partir à tout moment.</p></div>`;
 }
 
 /* ---------- itinéraires ---------- */

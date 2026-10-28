@@ -13,7 +13,7 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { TRAINS, ensureLineRoute, ensureStats, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, OFFLINE, onOfflineChange, placeOnTramQuays, plannedDepartures } from "./api";
+import { TRAINS, ensureForecast, ensureLineRoute, ensureStats, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, OFFLINE, onOfflineChange, placeOnTramQuays, plannedDepartures } from "./api";
 import { fmtDist, haversine } from "./geo";
 import { hm } from "./transit";
 import { STRASBOURG_VILLE } from "../../shared/ter";
@@ -122,6 +122,7 @@ function draw(): void {
   void loadDeps();
   if (o?.k === "line") { ensureLineRoute(o.id, render); ensureStats(o.id, render); }
   if (o?.k === "stats") ensureStats("", render);
+  if (o?.k === "poi" && o.id.startsWith("velhop-")) ensureForecast(o.id, render);
   syncWidgets();   // n'envoie rien si les données des widgets n'ont pas changé
 }
 hooks.render = draw;
