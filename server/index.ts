@@ -25,6 +25,7 @@ import { lineRoutes, routesStatus } from "./routes.js";
 import { arrivalsStatus, startArrivals, watchArrival } from "./arrivals.js";
 import { scheduleStatus, startSchedule } from "./schedule.js";
 import { bikeForecast, bikesStatus, startBikes } from "./bikes.js";
+import { earlyStatus } from "./early.js";
 import { punctualityStatus, stats as punctualityStats } from "./punctuality.js";
 import { observationStatus } from "./observations.js";
 import { tripAt, tripById } from "./trips.js";
@@ -320,6 +321,7 @@ function health(res: ServerResponse): Promise<void> {
     horaires_cts: scheduleStatus(),
     ponctualite: punctualityStatus(),
     prevision_velhop: bikesStatus(),
+    departs_en_avance: earlyStatus(),
     apk: updateStatus(),
     trajets_partages: rideStatus(),
     trains_ter: terStatus(),

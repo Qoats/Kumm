@@ -10,6 +10,7 @@ import { initRoutes, learnRoutes } from "./routes.js";
 import { initObservations } from "./observations.js";
 import { aimedTimes } from "./schedule.js";
 import { recordPunctuality } from "./punctuality.js";
+import { recordEarly } from "./early.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -233,6 +234,7 @@ async function refresh(): Promise<void> {
     updateStalls(p.list, now);
     learnRoutes(p.list, now);
     recordPunctuality(p.list, now);
+    recordEarly(p.list, now);
     for (const c of p.list) for (const call of c.calls) { if (c.mode) learn(quayModes, call.code, c.mode); if (c.line) learn(quayLines, call.code, c.line); }
     Object.assign(counts, { courses: p.courses, passages: p.passages, quais: p.byCode.size });
     if (counts.chargements++ === 0) console.log(`Passages du réseau chargés : ${p.courses} courses, ${p.byCode.size} quais`);
