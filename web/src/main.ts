@@ -77,14 +77,17 @@ function draw(): void {
   const t = S.tab;
   let body: string;
   if (t === "home") body = header() + `<main>${screenHome()}</main>`;
-  else if (t === "search") body = `<main>${screenSearch()}</main>`;
-  else if (t === "lines") body = `<main>${screenLines()}</main>`;
-  else if (t === "nearby") body = `<main>${screenNearby()}</main>`;
-  else body = `<main>${screenTrips()}</main>`;
+  else if (t === "search") body = `<main><h1 class="sr">Recherche</h1>${screenSearch()}</main>`;
+  else if (t === "lines") body = `<main><h1 class="sr">Toutes les lignes</h1>${screenLines()}</main>`;
+  else if (t === "nearby") body = `<main><h1 class="sr">Carte et arrêts à proximité</h1>${screenNearby()}</main>`;
+  else body = `<main><h1 class="sr">Itinéraire</h1>${screenTrips()}</main>`;
 
   const o = S.overlay;
-  const ov = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "look" ? overlayLook() : o.k === "stats" ? overlayStats() : o.k === "noel" ? overlayNoel() : o.k === "bikepick" ? overlayBikePick() : o.k === "placeset" ? overlayPlaceSet(o.which) : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
+  const ov0 = !o ? "" : o.k === "line" ? overlayLine(o.id) : o.k === "stop" ? overlayStop(o.id) : o.k === "poi" ? overlayPoi(o.id) : o.k === "veh" ? overlayVehicle(o.id) : o.k === "settings" ? overlaySettings() : o.k === "look" ? overlayLook() : o.k === "stats" ? overlayStats() : o.k === "noel" ? overlayNoel() : o.k === "bikepick" ? overlayBikePick() : o.k === "placeset" ? overlayPlaceSet(o.which) : o.k === "msgs" ? overlayMsgs() : o.k === "account" ? overlayAccount() : o.k === "help" ? overlayHelp() : o.k === "widget" ? overlayWidget() : overlayFavs();
 
+  // fiche ouverte : c'est une fenêtre (lecteur d'écran) ; l'écran en dessous est mis de côté
+  const ov = ov0.replace('<div class="overlay"', '<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="ovtitle"');
+  if (o) body = body.replace(/<(main|header)\b/g, '<$1 inert aria-hidden="true"');
   // positions de défilement de toutes les zones (listes, fiches, rangées de catégories…), par écran : voir scroll.ts
   const screen = o ? `${t}|${o.k}:${"id" in o ? String(o.id) : ""}` : t;
   saveScroll(app, lastScreen);
@@ -369,6 +372,7 @@ app.addEventListener("click", e => {
     else if (a) openTrip(a);
     return;
   }
+  if (d.stepfree) { S.prefs.stepFree = !S.prefs.stepFree; savePrefs(S.prefs); render(); return; }
   if (d.themePick || d.accentPick || d.uiPick || d.darkmap || d.reset) {
     if (d.themePick) S.prefs.theme = d.themePick as Theme;
     if (d.uiPick) S.prefs.ui = d.uiPick as Ui;
@@ -720,7 +724,7 @@ async function copyText(t: string): Promise<void> {
 
 /* glisser le panneau « À proximité » vers le haut ou le bas */
 let y0: number | null = null;
-app.addEventListener("pointerdown", e => { y0 = (e.target as HTMLElement).closest(".sheet .grab,.sheet h3") ? e.clientY : null; });
+app.addEventListener("pointerdown", e => { y0 = (e.target as HTMLElement).closest(".sheet .grab,.sheet h3,.sheet .shead") ? e.clientY : null; });
 app.addEventListener("pointerup", e => {
   if (y0 === null) return;
   const dy = e.clientY - y0;

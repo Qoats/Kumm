@@ -27,6 +27,10 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         getWindow().setBackgroundDrawable(new ColorDrawable(0xFF136342));
         if (bridge == null) { webReady = true; return; }
+        // taille du texte choisie dans les réglages d'Android (accessibilité) : la WebView ne la suit pas d'elle-même ;
+        // plafonnée à 140 % pour que les tuiles et les tableaux de départs restent lisibles
+        float fontScale = getResources().getConfiguration().fontScale;
+        bridge.getWebView().getSettings().setTextZoom(Math.max(100, Math.min(140, Math.round(fontScale * 100))));
         bridge.addWebViewListener(new WebViewListener() {
             @Override
             public void onPageCommitVisible(WebView view, String url) {

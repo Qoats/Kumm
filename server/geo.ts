@@ -37,6 +37,8 @@ export function geoUpstream(url: URL): GeoUpstream | null {
     u.searchParams.set("detailedTransfers", "false");
     if (time) u.searchParams.set("time", time);
     if (arrive) u.searchParams.set("arriveBy", "true");
+    // sans escaliers : correspondances et accès aux quais par ascenseurs et rampes (profil fauteuil roulant de MOTIS)
+    if (url.searchParams.get("stepfree") === "1") u.searchParams.set("pedestrianProfile", "WHEELCHAIR");
     return { url: u.toString(), ttl: 60, stale: 120 };
   }
 /** Météo (Open-Meteo, CC BY 4.0) : température, pluie et code du temps maintenant, pluie par quart d'heure sur 2 h */

@@ -113,7 +113,7 @@ function wxLine(): string {
 }
 
 export function bar(title: string, back?: string): string {
-  return `<div class="bar"><button data-act="${back ?? "closeOverlay"}" aria-label="Retour">${ic("back")}</button><span>${esc(title)}</span></div>`;
+  return `<div class="bar"><button data-act="${back ?? "closeOverlay"}" aria-label="Retour">${ic("back")}</button><h1 class="bt" id="ovtitle">${esc(title)}</h1></div>`;
 }
 
 /* ============ ÉCRANS ============ */
@@ -123,7 +123,7 @@ function bikeTile(): string {
   const st = chosen ? { p: chosen, d: haversine(USER, chosen) }
     : POIS.filter(p => p.kind === "velhop").map(p => ({ p, d: haversine(USER, p) })).sort((a, b) => a.d - b.d)[0];
   const n = st?.p.info?.match(/(\d+)\s*vélo/i)?.[1];
-  return `<button class="tile tile-bike" data-act="mapBikes" data-hold="bikepick"><h4>${ic("bike")}Vélhop${chosen ? ` ${ic("star")}` : ""}</h4>${n !== undefined
+  return `<button class="tile tile-bike" data-act="mapBikes" data-hold="bikepick"><h2>${ic("bike")}Vélhop${chosen ? ` ${ic("star")}` : ""}</h2>${n !== undefined
     ? `<div class="big">${n}<small> vélo${n === "1" ? "" : "s"}</small></div><p>${esc(st!.p.name.replace(/^Vélhop\s*/i, ""))} · ${fmtDist(st!.d)}</p>${rainNote()}`
     : `<div class="big sm">Stations</div><p>${st ? esc(st.p.name.replace(/^Vélhop\s*/i, "")) : "Vélos en libre-service"}</p>`}</button>`;
 }
@@ -151,10 +151,10 @@ export function overlayBikePick(): string {
 function trafficTile(): string {
   if (!MESSAGES.length) {
     const t = MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Indisponibles pour le moment" : "Aucune perturbation signalée";
-    return `<button class="tile tile-ok" data-act="msgs"><h4>${ic("bell")}Info trafic</h4><p class="msg">${t}</p></button>`;
+    return `<button class="tile tile-ok" data-act="msgs"><h2>${ic("bell")}Info trafic</h2><p class="msg">${t}</p></button>`;
   }
   const m = MESSAGES[0], n = MESSAGES.length;
-  return `<button class="tile tile-alert" data-act="msgs"><h4>${ic("bell")}Info trafic · ${n}</h4>
+  return `<button class="tile tile-alert" data-act="msgs"><h2>${ic("bell")}Info trafic · ${n}</h2>
     <div class="ls">${m.lines.slice(0, 3).map(l => lineChip(l, true)).join("")}</div><p class="msg">${esc(m.title)}</p></button>`;
 }
 
@@ -163,7 +163,7 @@ function trafficTile(): string {
 function placeTile(which: PlaceKey): string {
   const label = which === "home" ? "Maison" : "Travail", icon: IconName = which === "home" ? "home" : "store";
   const p = S.places[which];
-  if (!p) return `<button class="tile tile-place empty" data-place="${which}"><h4>${ic(icon)}${label}</h4><div class="big sm">Ajouter</div><p>Votre adresse ${which === "home" ? "de la maison" : "du travail"}</p></button>`;
+  if (!p) return `<button class="tile tile-place empty" data-place="${which}"><h2>${ic(icon)}${label}</h2><div class="big sm">Ajouter</div><p>Votre adresse ${which === "home" ? "de la maison" : "du travail"}</p></button>`;
   const near = haversine(USER, p) < 250;
   const c = near ? null : commuteTo(which), j = c?.j;
   const first = j?.legs.find(l => l.kind !== "walk");
@@ -171,7 +171,7 @@ function placeTile(which: PlaceKey): string {
     : !c ? `<div class="big sm">…</div><p>Calcul du trajet</p>`
     : !j ? `<div class="big sm">—</div><p>${c.error ? "Trajet indisponible" : "Aucun trajet trouvé"}</p>`
     : `<div class="big">${minutes(j.duration)}<small> min</small></div><p>${first ? `${lineChip(first.line ?? "?", true)} ` : ""}<span>${hm(first ? first.start : j.start)} → ${hm(j.end)}</span></p>${tripPunct(j)}`;
-  return `<button class="tile tile-place" data-place="${which}" data-hold="place:${which}"><h4>${ic(icon)}${label}</h4>${body}</button>`;
+  return `<button class="tile tile-place" data-place="${which}" data-hold="place:${which}"><h2>${ic(icon)}${label}</h2>${body}</button>`;
 }
 
 /** Ponctualité des lignes du trajet, à ce type de jour et cette heure (30 derniers jours) : la moins ponctuelle compte */
@@ -216,7 +216,7 @@ const NOEL_STOPS = ["Homme de Fer", "Broglie", "Langstross Grand'Rue", "Porte de
 function noelTile(): string {
   if (!noelSeason()) return "";
   const n = MESSAGES.filter(isNoelMsg).length;
-  return `<button class="tile w tile-noel" data-act="noel"><h4>${ic("star")}Marché de Noël</h4><div class="big sm">Venir en tram</div>
+  return `<button class="tile w tile-noel" data-act="noel"><h2>${ic("star")}Marché de Noël</h2><div class="big sm">Venir en tram</div>
     <p>${n ? `${n} info${n > 1 ? "s" : ""} trafic liée${n > 1 ? "s" : ""} au marché` : "Parkings relais, arrêts proches et infos trafic"}</p></button>`;
 }
 
@@ -246,19 +246,19 @@ export function screenHome(): string {
   const favStops = S.fav.map(stopById).filter((s): s is Stop => !!s);
   // un seul favori, ou le dernier d'un nombre impair : tuile pleine largeur
   const favs = favStops.map((s, i) => `<div class="tile tile-stop${favStops.length % 2 && i === favStops.length - 1 ? " w" : ""}" role="button" tabindex="0" data-stop="${esc(s.id)}">
-      <h4>${ic("star")}${esc(s.name)}</h4><div id="fav-${esc(s.id)}"></div></div>`).join("");
+      <h2>${ic("star")}${esc(s.name)}</h2><div id="fav-${esc(s.id)}"></div></div>`).join("");
   const svc: [string, IconName, string][] = [
     ["Horaires par ligne", "clock", "tab:lines"], ["Ponctualité", "chart", "act:stats"], ["Parkings relais", "parking", "act:mapParkings"],
     ["Objets perdus", "lost", CTS_OBJETS_TROUVES], ["Aide et contact", "help", "act:help"]
   ];
   return `<div class="pad tiles">
-    <button class="tile w tile-go" data-tab="search"><h4>${ic("navigate")}Naviguer</h4><div class="big sm">Où allez-vous ?</div><p>Tram, bus, train, vélo ou à pied, guidé jusqu’à destination</p></button>
+    <button class="tile w tile-go" data-tab="search"><h2>${ic("navigate")}Naviguer</h2><div class="big sm">Où allez-vous ?</div><p>Tram, bus, train, vélo ou à pied, guidé jusqu’à destination</p></button>
     ${noelTile()}
     ${placeTile("home")}${placeTile("work")}
-    ${favs || `<button class="tile w tile-empty" data-act="favs"><h4>${ic("star")}Vos arrêts</h4><p>Ajoutez vos arrêts favoris : leurs prochains passages s’afficheront ici</p></button>`}
+    ${favs || `<button class="tile w tile-empty" data-act="favs"><h2>${ic("star")}Vos arrêts</h2><p>Ajoutez vos arrêts favoris : leurs prochains passages s’afficheront ici</p></button>`}
     ${trafficTile()}
     ${bikeTile()}
-    <div class="tile w tile-lines"><h4>${ic("tram")}Toutes les lignes</h4><div class="chips">${networkLines().map(chipAlert).join("")}</div></div>
+    <div class="tile w tile-lines"><h2>${ic("tram")}Toutes les lignes</h2><div class="chips">${networkLines().map(chipAlert).join("")}</div></div>
     ${svc.map(([label, icon, to], i) => {
       // nombre impair : la dernière tuile prend toute la largeur
       const inner = `<span class="si">${ic(icon)}</span><b>${label}</b>`, cls = `tile tile-svc${svc.length % 2 && i === svc.length - 1 ? " w" : ""}`;
@@ -350,7 +350,7 @@ export function screenNearby(): string {
     ${CONFIG.USE_MOCK ? "" : `<div class="tools zoom"><button data-act="zoomIn" aria-label="Zoomer">${ic("plus", 'stroke="currentColor"')}</button><button data-act="zoomOut" aria-label="Dézoomer">${ic("minus", 'stroke="currentColor"')}</button></div>`}</div>
     <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
       <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
-      ${S.follow ? followPanel(S.follow) : `<h3 class="shead"${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h3>
+      ${S.follow ? followPanel(S.follow) : `<h2 class="shead"${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h2>
       <div class="seg pills">
         <button data-f="all" class="${S.filter === "all" ? "on" : ""}">Tout</button>
         <button data-f="tram" class="${S.filter === "tram" ? "on" : ""}">${ic("tram")}Tram</button>
@@ -437,12 +437,12 @@ function bikeForecastHtml(id: string, park = false): string {
   const f = FORECASTS[id], pts = f?.points?.filter(x => x.t > Date.now() + 60_000) ?? [];
   if (!f || f.failed || !pts.length) return "";
   const where = park ? "ce parking" : "cette station";
-  if (!pts.some(x => x.sure)) return `<div class="bfc"><h3>${ic("chart")}Prévision</h3><p class="src">Kumm apprend encore les habitudes de ${where} : la prévision sera disponible d’ici quelques jours.</p></div>`;
+  if (!pts.some(x => x.sure)) return `<div class="bfc"><h2>${ic("chart")}Prévision</h2><p class="src">Kumm apprend encore les habitudes de ${where} : la prévision sera disponible d’ici quelques jours.</p></div>`;
   const max = Math.max(4, ...pts.map(x => x.bikes + x.docks), ...pts.map(x => x.bikes));
   const soon = pts.find(x => x.t >= Date.now() + 50 * 60_000) ?? pts[0];
   const unit = park ? `place${soon.bikes > 1 ? "s" : ""} libre${soon.bikes > 1 ? "s" : ""}` : `vélo${soon.bikes > 1 ? "s" : ""}`;
   const bars = pts.map(x => `<span class="bb${x.sure ? "" : " unsure"}${x.bikes === 0 ? " zero" : ""}"><em>${x.bikes}</em><i style="height:${Math.max(4, Math.round((x.bikes / max) * 100))}%"></i><small>${hm(x.t)}</small></span>`).join("");
-  return `<div class="bfc"><h3>${ic("chart")}Prévision</h3>
+  return `<div class="bfc"><h2>${ic("chart")}Prévision</h2>
     <p class="bsum">Vers ${hm(soon.t)} : <b>${soon.bikes === 0 && park ? "complet" : `environ ${soon.bikes} ${unit}`}</b>${soon.empty >= 0.3 ? ` · souvent ${park ? "complet" : "vide"} à cette heure (${Math.round(soon.empty * 100)} % du temps)` : ""}</p>
     <div class="bbars${park ? " park" : ""}">${bars}</div>
     <p class="src">Estimation d’après les relevés des dernières semaines à la même heure.${park ? "" : " Les vélos peuvent partir à tout moment."}</p></div>`;
@@ -713,7 +713,7 @@ function linePunct(l: string): string {
   const row = (label: string, p: Punct | undefined): string => !p || p.n < 10 ? "" :
     `<div class="prow"><span class="pl">${esc(label)}</span>${punctBar(p)}<b>${p.onTime} %</b></div>`;
   const bands = BANDS.map(([k, label]) => row(label, st.byBand["W|" + k])).join("");
-  return `<section class="punct"><h3>${ic("chart")}Ponctualité <small>${esc(sinceText(st))}</small></h3>
+  return `<section class="punct"><h2>${ic("chart")}Ponctualité <small>${esc(sinceText(st))}</small></h2>
     <div class="pbig"><b>${st.all.onTime} %</b><span>à l’heure<small>${st.all.late} % en retard · ${st.all.early} % en avance · moyenne <span style="white-space:nowrap">${avgDelay(st.all.avg)}</span></small></span></div>
     ${punctBar(st.all)}
     <div class="pgrp">${DAYS.map(([k, label]) => row(label, st.byDay[k])).join("")}</div>
@@ -774,7 +774,7 @@ export function plannedBoard(name: string, list: PlannedDeparture[], at: number)
     (rows.get(k) ?? rows.set(k, { line: d.line, dest: d.dest, t: [] }).get(k)!).t.push(d.t);
   }
   if (!rows.size) return '<div class="empty" style="padding:24px">Aucun passage prévu à cette heure</div>';
-  const body = [...rows.values()].map(r => `<div class="lb-r" role="button" tabindex="0" data-line="${esc(r.line)}">${lineChip(r.line, true)}<span class="lb-d"><b>${esc(r.dest)}</b><small>${r.t.slice(1, 5).map(hm).join(" · ")}</small></span><span class="lb-m">${hm(r.t[0])}</span></div>`).join("");
+  const body = [...rows.values()].map(r => `<div class="lb-r" role="button" tabindex="0" data-line="${esc(r.line)}" aria-label="Ligne ${esc(r.line)} vers ${esc(r.dest)}">${lineChip(r.line, true)}<span class="lb-d"><b>${esc(r.dest)}</b><small>${r.t.slice(1, 5).map(hm).join(" · ")}</small></span><span class="lb-m">${hm(r.t[0])}</span></div>`).join("");
   return `<div class="lboard"><div class="lb-h"><span><small>Horaires prévus · CTS</small><b>${esc(name)}</b></span></div>${body}</div>`;
 }
 
@@ -926,8 +926,10 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
       ? `<div class="dirs${dests.length > 2 ? " many" : ""}" role="group" aria-label="Direction" data-scroll="dirs-${esc(k)}">${dests.map(x =>
           `<button data-dirk="${esc(k)}" data-dirv="${esc(x)}" class="${x === dest ? "on" : ""}" aria-pressed="${x === dest}">${esc(x)}</button>`).join("")}</div>`
       : "";
-    return `<div class="dep" role="button" tabindex="0" style="--lc:${c};--lt:${lineText(COLORS[g.line] ? g.line : lineLabel(g.line))}" data-stop="${esc(g.stop.id)}">
-      <div class="h">${lineChip(g.line, true, hasAlert(g.line))}<b>${esc(g.stop.name)}</b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
+    // toute la carte ouvre l'arrêt au toucher ; pour le clavier et le lecteur d'écran, c'est le nom de l'arrêt (un vrai bouton,
+    // les sélecteurs de direction ne peuvent pas être dans un autre bouton)
+    return `<div class="dep" style="--lc:${c};--lt:${lineText(COLORS[g.line] ? g.line : lineLabel(g.line))}" data-stop="${esc(g.stop.id)}">
+      <div class="h">${lineChip(g.line, true, hasAlert(g.line))}<b><button class="dlink" data-stop="${esc(g.stop.id)}">${esc(g.stop.name)}</button></b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
       ${picker}
       ${g.cx.get(dest)?.length ? `<div class="cxl">Supprimé : ${g.cx.get(dest)!.slice(0, 3).map(x => hm(x)).join(", ")}</div>` : ""}
       ${picker && t.length < 2 ? "" : `<div class="f">${picker
@@ -969,7 +971,7 @@ export function departureBoard(name: string, list: StopDeparture[], max = 16, st
     // cloche : « prévenez-moi avant ce passage » (délai au choix) ; allumée si une alerte est en cours
     const on = stopId && arrivals().some(a => arrivalKey(a) === `${stopId}|${r.line}|${r.dest}`);
     const bell = stopId ? `<button class="lb-bell${on ? " on" : ""}" data-arr="${esc(`${r.line}|${r.dest}|${r.t.slice(0, 3).join(",")}`)}" aria-label="Me prévenir avant le passage">${ic("bell")}</button>` : "";
-    return `<div class="lb-r" role="button" tabindex="0" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b>${esc(r.dest)}</b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}${bell}</div>`;
+    return `<div class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b><button class="dlink" data-line="${esc(r.line)}">${esc(r.dest)}</button></b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}${bell}</div>`;
   }).join("");
   return `<div class="lboard"><div class="lb-h"><span><small>Prochains départs</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
 }
@@ -1073,7 +1075,7 @@ function miniApp(theme: Theme, accent: Accent, ui: Ui, tiny = false): string {
     const [ha, hb] = t.head ?? [a[1], a[2]];
     const vars = `--m-bg:${t.bg};--m-card:${t.card};--m-ink:${t.ink};--m-mute:${t.mute};--m-line:${t.line};--m-chip:${t.chip};--m-a:${a[0]};--m-ha:${ha};--m-hb:${hb};--m-soft:${a[3]}`;
     const chip = (l: string): string => `<span class="mc" style="background:${COLORS[l]};color:${lineText(l)}">${l}</span>`;
-    return `<div class="mini ui-${ui}${th === "contrast" ? " hc" : ""}" style="${vars}">
+    return `<div class="mini ui-${ui}${th === "contrast" ? " hc" : ""}" style="${vars}" aria-hidden="true">
       <div class="m-head"><span><small>Mardi 28 octobre</small><b>Bonsoir</b></span><i></i><i></i></div>
       <div class="m-go"><small>NAVIGUER</small><b>Où allez-vous ?</b></div>
       <div class="m-row"><div class="m-tile"><b>★ Homme de Fer</b><p>${chip("A")}<span>Illkirch</span><em>2′</em></p><p>${chip("D")}<span>Kehl</span><em>5′</em></p></div>
@@ -1105,7 +1107,7 @@ export function overlayLook(): string {
     <div class="sub">Forme de l’interface</div>
     <div class="look-row" data-scroll="look-uis">${uis}</div>
     <div class="sub">Carte</div>
-    <button class="row-switch" data-darkmap="1"><span>Carte sombre avec les thèmes sombres</span><span class="switch ${p.darkMap ? "on" : ""}"></span></button>
+    <button class="row-switch" data-darkmap="1" role="switch" aria-checked="${p.darkMap}"><span>Carte sombre avec les thèmes sombres</span><span class="switch ${p.darkMap ? "on" : ""}"></span></button>
   </div></main></div>`;
 }
 
@@ -1115,6 +1117,8 @@ export function overlaySettings(): string {
   return `<div class="overlay">${bar("Réglages")}<main><div class="pad">
     <div class="sub" style="margin-top:4px">Apparence</div>
     <button class="look-link" data-act="look">${miniApp(p.theme, p.accent, p.ui, true)}<span><b>Thème, couleur et forme</b><small>${esc(t?.label ?? "")} · ${esc(c?.label ?? "")} · ${esc(u?.label ?? "")}</small></span>${ic("chev", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"')}</button>
+    <div class="sub">Accessibilité</div>
+    <button class="row-switch" data-stepfree="1" role="switch" aria-checked="${!!p.stepFree}"><span>Itinéraires sans escaliers<br><small style="color:var(--mute)">Ascenseurs et rampes pour les correspondances ; les ascenseurs en panne sont signalés sur la fiche des stations</small></span><span class="switch ${p.stepFree ? "on" : ""}"></span></button>
     <div class="sub">Alertes trafic</div>
     <button class="row-switch" data-alerts="toggle"><span>Me prévenir des perturbations<br><small style="color:var(--mute)">${NATIVE && !PUSH_READY ? "Indisponible dans cette version de l'application" : "Une notification pour chaque nouvel incident sur les lignes suivies"}</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
     ${S.alerts.enabled ? alertSettings() : ""}

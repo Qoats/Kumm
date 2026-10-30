@@ -4,7 +4,7 @@ export type Accent = "green" | "teal" | "blue" | "purple" | "red";
 /** Forme de l'interface : arrondis, ombres, densité, en-têtes (voir style.css, data-ui) */
 export type Ui = "kumm" | "epure" | "bulles" | "compact";
 
-export interface Prefs { theme: Theme; accent: Accent; ui: Ui; darkMap: boolean; v?: number }
+export interface Prefs { theme: Theme; accent: Accent; ui: Ui; darkMap: boolean; /** itinéraires sans escaliers (ascenseurs, rampes) */ stepFree?: boolean; v?: number }
 export const DEFAULT_PREFS: Prefs = { theme: "auto", accent: "green", ui: "kumm", darkMap: true };
 
 /** Thèmes proposés dans les réglages (couleurs de l'aperçu) */
@@ -20,7 +20,7 @@ export const THEMES: { id: Theme; label: string; hint: string; bg: string; bar: 
 
 /** Couleurs principales proposées */
 export const ACCENTS: { id: Accent; label: string; color: string }[] = [
-  { id: "green",  label: "Vert",      color: "#1C8A5A" },
+  { id: "green",  label: "Vert",      color: "#1A8455" },
   { id: "teal",   label: "Turquoise", color: "#0C8C95" },
   { id: "blue",   label: "Bleu",      color: "#2563C9" },
   { id: "purple", label: "Violet",    color: "#7B47C8" },
@@ -81,7 +81,7 @@ export const THEME_TOKENS: Record<Exclude<Theme, "auto">, Tokens> = {
 };
 /** [couleur, en-tête début, en-tête fin, fond doux] en clair puis en sombre */
 export const ACCENT_TOKENS: Record<Accent, { light: [string, string, string, string]; dark: [string, string, string, string] }> = {
-  green:  { light: ["#1C8A5A", "#136A45", "#1C8A5A", "#DDF2E8"], dark: ["#4ED39B", "#0E3A2A", "#17382B", "#17382B"] },
+  green:  { light: ["#1A8455", "#136A45", "#1C8A5A", "#DDF2E8"], dark: ["#4ED39B", "#0E3A2A", "#17382B", "#17382B"] },
   teal:   { light: ["#0C8C95", "#096A71", "#0C8C95", "#D7F0F2"], dark: ["#3DD0D8", "#0B3A3E", "#143A3D", "#143A3D"] },
   blue:   { light: ["#2563C9", "#1B4A9C", "#2563C9", "#DFE9FB"], dark: ["#74A6FF", "#13305F", "#172C4F", "#172C4F"] },
   purple: { light: ["#7B47C8", "#5C33A2", "#7B47C8", "#EBE0F8"], dark: ["#B791FF", "#35205F", "#2A2046", "#2A2046"] },

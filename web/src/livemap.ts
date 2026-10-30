@@ -96,7 +96,7 @@ function create(): void {
   map.on("zoomend", () => { zooming = false; freezeGlide(); syncVehicles(); });
   me = L.marker([USER.lat, USER.lon], {
     icon: L.divIcon({ html: '<div class="me-dot"></div>', className: "lm-icon", iconSize: [22, 22], iconAnchor: [11, 11] }),
-    interactive: false, zIndexOffset: 1000
+    interactive: false, keyboard: false, zIndexOffset: 1000, title: "Votre position"
   }).addTo(map);
   map.on("moveend", sync);
   // pour inspecter la carte dans la console du navigateur (comme __kumm.STOPS)
