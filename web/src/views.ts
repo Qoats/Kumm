@@ -658,7 +658,14 @@ function orderParts(parts: LineRoute[]): LineRoute[] {
 
 export function overlayLine(l: string): string {
   const r = LINE_ROUTES[l];
-  const route = r?.main[Math.min(S.lineDir, r.main.length - 1)];
+  // un onglet par terminus : les parcours principaux de chaque sens, puis les embranchements fréquents vers un autre terminus
+  // (ligne 74 : ÉcoParc Rhénan et Vendenheim Artisans, dans le même sens pour la CTS). Un passage qui s'arrête en route
+  // (terminus partiel sur le parcours principal) reste mentionné sous la liste.
+  const onMain = (name: string): boolean => !!r?.main.some(m => m.names.includes(name));
+  const branches = r ? r.other.filter((o, i, a) => !r.main.some(m => m.dest === o.dest) && !onMain(o.names[o.names.length - 1])
+    && a.findIndex(x => x.dest === o.dest) === i) : [];
+  const tabsList = r ? [...r.main, ...branches] : [];
+  const route = tabsList[Math.min(S.lineDir, tabsList.length - 1)];
   const row = (id: string | undefined, name: string): string => id
     ? `<button class="stopline" style="width:100%;text-align:left" data-stop="${esc(id)}"><span class="d"></span><span class="r">${esc(name)}</span></button>`
     : `<div class="stopline"><span class="d"></span><span class="r">${esc(name)}</span></div>`;
@@ -674,8 +681,8 @@ export function overlayLine(l: string): string {
     };
     const lastDest = (m: LineRoute): string => orderParts([m, ...(m.extra ?? [])]).at(-1)!.dest;
     title = `${parts[0].from} ⇄ ${lastDest(route)}`;
-    const others = r.other.filter(o => !r.main.some(m => m.from === o.from && m.dest === o.dest));
-    list = (r.main.length > 1 ? `<div class="ldirs" role="group" aria-label="Sens">${r.main.map((m, i) =>
+    const others = r.other.filter(o => !branches.includes(o) && !tabsList.some(m => m.from === o.from && m.dest === o.dest));
+    list = (tabsList.length > 1 ? `<div class="ldirs${tabsList.length > 2 ? " many" : ""}" role="group" aria-label="Sens">${tabsList.map((m, i) =>
       `<button data-ldir="${i}" class="${m === route ? "on" : ""}">vers ${esc(lastDest(m))}</button>`).join("")}</div>` : "") +
       (parts.length > 1 ? `<p class="src" style="margin-top:12px">La ligne circule en ${parts.length} tronçons séparés (travaux ou perturbation).</p>` : "") +
       parts.map((p, i) => (i ? `<div class="sub" style="margin-top:16px">Tronçon ${i + 1} : ${esc(p.from)} → ${esc(p.dest)}</div>` : parts.length > 1 ? `<div class="sub" style="margin-top:12px">Tronçon 1 : ${esc(p.from)} → ${esc(p.dest)}</div>` : "") + rail(p)).join("") +
