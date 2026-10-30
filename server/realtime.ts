@@ -11,6 +11,7 @@ import { initObservations } from "./observations.js";
 import { aimedTimes } from "./schedule.js";
 import { recordPunctuality } from "./punctuality.js";
 import { recordEarly } from "./early.js";
+import { learnDrift } from "./drift.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,15 +59,16 @@ export interface Course {
 
 /** Dernière actualisation des horaires de chaque course par la CTS : certaines courses gardent les mêmes heures pendant
     plusieurs minutes, puis sont recalées d'un coup (souvent de 30 s à 1 min, en avance comme en retard) */
-const updated = new Map<string, { key: string; at: number }>();
+const updated = new Map<string, { key: string; at: number; times: number[] }>();
 export const lastUpdateOf = (id: string): number | undefined => updated.get(id)?.at;
 function trackUpdates(list: Course[], now: number): void {
   const seen = new Set<string>();
   for (const c of list) {
     seen.add(c.id);
-    const key = c.calls.map(x => x.arr).join(",");
+    const times = c.calls.map(x => x.arr), key = times.join(",");
     const u = updated.get(c.id);
-    if (!u || u.key !== key) updated.set(c.id, { key, at: now });
+    if (u && u.key !== key && c.mode !== "ter" && times[0] < now) learnDrift(c.line, u.times, times, now - u.at, now);
+    if (!u || u.key !== key) updated.set(c.id, { key, at: now, times });
   }
   for (const id of updated.keys()) if (!seen.has(id)) updated.delete(id);
 }

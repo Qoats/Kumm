@@ -4,6 +4,7 @@
  * les deux selon l'heure. Ce n'est pas un GPS : un véhicule bloqué entre deux arrêts n'est recalé qu'à la mise à jour suivante.
  */
 import { lastUpdateOf, snapshot } from "./realtime.js";
+import { driftOf } from "./drift.js";
 import type { Course } from "./realtime.js";
 import type { StopPos } from "./ride.js";
 import { pathBetween } from "./shapes.js";
@@ -244,13 +245,16 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       continue;
     }
     const upd = c.mode === "ter" ? undefined : lastUpdateOf(c.id), stale = upd ? Math.floor((now - upd) / 60_000) : 0;
-    for (let i = 0; i < calls.length; i++) {
-      const s = calls[i], n = calls[i + 1];
+    // horaires figés : décalage appris des recalages de la CTS sur cette ligne à cette heure (drift.ts), s'il est net
+    const drift = upd && stale >= 2 ? driftOf(c.line, now - upd, now) : 0;
+    const run = drift ? calls.map(k => ({ ...k, arr: k.arr - drift * 1000, dep: k.dep - drift * 1000 })) : calls;
+    for (let i = 0; i < run.length; i++) {
+      const s = run[i], n = run[i + 1];
       let a: At | null = null, b: At | null = null, nextFrom = i + 1, h = 0;
       if (now >= s.arr && now <= s.dep) {
         // à quai
         a = b = [s.p.lat, s.p.lon, s.dep];
-        h = n ? heading(s.p, n.p) : (i > 0 ? heading(calls[i - 1].p, s.p) : 0);
+        h = n ? heading(s.p, n.p) : (i > 0 ? heading(run[i - 1].p, s.p) : 0);
       } else if (n && now > s.dep && now < n.arr) {
         a = [s.p.lat, s.p.lon, s.dep];
         b = [n.p.lat, n.p.lon, n.arr];
@@ -258,12 +262,12 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       }
       if (!a || !b) continue;
       const p = a !== b && n ? segmentPath(c.mode, c.line, `${s.code}>${n.code}`, [s.p.lat, s.p.lon], [n.p.lat, n.p.lon]) : null;
-      const sp = a !== b ? speedNow(c.line, c.mode, calls, i) : { s: 0 };
+      const sp = a !== b ? speedNow(c.line, c.mode, run, i) : { s: 0 };
       const learned = a !== b && n && c.mode !== "ter" ? cruiseOf(s.code, n.code, now) : null;
       const dwell = a !== b && n && c.mode !== "ter" ? dwellOf(s.code, now) : null;
       out.push({
         id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp ?? {}), ...(learned ? { c: learned } : {}), ...(dwell !== null ? { q: dwell } : {}),
-        next: calls.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr]),
+        next: run.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr]),
         ...(p ? { p } : {}), ...(vno ? { n: vno } : {}), ...(stale >= 3 ? { u: stale } : {})
       });
       break;
