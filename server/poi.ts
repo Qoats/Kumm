@@ -47,9 +47,9 @@ export async function velhop(): Promise<PoiItem[]> {
 }
 
 /* ---------- Parkings relais : liste fixe + occupation en direct ---------- */
-/** Associe les enregistrements d'occupation (open data de l'Eurométropole) aux P+R par leur nom */
-export function applyOccupation(records: unknown): Map<string, string> {
-  const out = new Map<string, string>();
+/** Associe les enregistrements d'occupation (open data de l'Eurométropole) aux P+R par leur nom : places libres et total */
+export function occupationOf(records: unknown): Map<string, { free: number; total: number }> {
+  const out = new Map<string, { free: number; total: number }>();
   const list = isObj(records) && Array.isArray(records["results"]) ? (records["results"] as unknown[]) : Array.isArray(records) ? records : [];
   for (const r of list) {
     if (!isObj(r)) continue;
@@ -60,12 +60,19 @@ export function applyOccupation(records: unknown): Map<string, string> {
     if (!name || free === null) continue;
     for (const p of PR_SITES) {
       const pn = norm(p.name);
-      if (name.includes(pn) || (pn.length > 5 && pn.includes(name) && name.length > 4)) {
-        out.set(p.id, `${free} places libres sur ${total ?? p.capacity}`);
-      }
+      if (name.includes(pn) || (pn.length > 5 && pn.includes(name) && name.length > 4)) out.set(p.id, { free, total: total ?? p.capacity });
     }
   }
   return out;
+}
+
+export function applyOccupation(records: unknown): Map<string, string> {
+  return new Map([...occupationOf(records)].map(([id, o]) => [id, `${o.free} places libres sur ${o.total}`]));
+}
+
+/** Places libres de chaque P+R, en direct */
+export async function prOccupancy(): Promise<Map<string, { free: number; total: number }>> {
+  return occupationOf(json(await fetchRetry(OCCUPATION, HEADERS)));
 }
 
 export async function parkingsRelais(): Promise<PoiItem[]> {

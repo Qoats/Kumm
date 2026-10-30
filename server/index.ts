@@ -26,6 +26,7 @@ import { arrivalsStatus, startArrivals, watchArrival } from "./arrivals.js";
 import { scheduleStatus, startSchedule } from "./schedule.js";
 import { bikeForecast, bikesStatus, startBikes } from "./bikes.js";
 import { earlyStatus } from "./early.js";
+import { parkForecast, parksStatus, startParks } from "./parks.js";
 import { punctualityStatus, stats as punctualityStats } from "./punctuality.js";
 import { observationStatus } from "./observations.js";
 import { tripAt, tripById } from "./trips.js";
@@ -322,6 +323,7 @@ function health(res: ServerResponse): Promise<void> {
     ponctualite: punctualityStatus(),
     prevision_velhop: bikesStatus(),
     departs_en_avance: earlyStatus(),
+    prevision_pr: parksStatus(),
     apk: updateStatus(),
     trajets_partages: rideStatus(),
     trains_ter: terStatus(),
@@ -402,6 +404,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const f = bikeForecast(id);
     return f ? send(res, 200, "application/json; charset=utf-8", JSON.stringify(f)) : send(res, 404, "text/plain", "Station inconnue");
   }
+  if (p === "/poi/pr-forecast") {
+    const f = parkForecast((url.searchParams.get("id") ?? "").slice(0, 40));
+    return f ? send(res, 200, "application/json; charset=utf-8", JSON.stringify(f)) : send(res, 404, "text/plain", "Parking inconnu");
+  }
   if (p === "/poi/pr") return cached(res, "poi:pr", 120, 3600, async () => poiResult(await parkingsRelais()));
   if (isTile) {
     if (!tileRefererAllowed(req)) { res.writeHead(403, { "Content-Type": "text/plain" }); return void res.end("Tuiles réservées à l'application"); }
@@ -448,5 +454,6 @@ server.listen(PORT, () => {
   startArrivals();
   startSchedule();
   startBikes();
+  startParks();
   setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
 });

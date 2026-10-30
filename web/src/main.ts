@@ -122,7 +122,7 @@ function draw(): void {
   void loadDeps();
   if (o?.k === "line") { ensureLineRoute(o.id, render); ensureStats(o.id, render); }
   if (o?.k === "stats") ensureStats("", render);
-  if (o?.k === "poi" && o.id.startsWith("velhop-")) ensureForecast(o.id, render);
+  if (o?.k === "poi" && (o.id.startsWith("velhop-") || o.id.startsWith("pr-"))) ensureForecast(o.id, render);
   syncWidgets();   // n'envoie rien si les données des widgets n'ont pas changé
 }
 hooks.render = draw;
