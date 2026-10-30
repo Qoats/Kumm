@@ -1,4 +1,4 @@
-import type { Place, Stop, StopDeparture } from "../../shared/types";
+import type { Place, Poi, Stop, StopDeparture } from "../../shared/types";
 import { CONTREMARQUE_TER, TER_STATIONS_EMS } from "../../shared/ter";
 import type { PlannedDeparture } from "./api";
 import type { TrainDeparture } from "../../shared/ter";
@@ -203,6 +203,44 @@ export function overlayPlaceSet(which: PlaceKey): string {
   </div></main></div>`;
 }
 
+/* ============ MARCHÉ DE NOËL ============ */
+/** Période du marché (chaque année, de fin novembre au 24 décembre ; la tuile apparaît une semaine avant) */
+export function noelSeason(d = new Date()): boolean {
+  const m = d.getMonth(), day = d.getDate();
+  return (m === 10 && day >= 20) || (m === 11 && day <= 24);
+}
+const isNoelMsg = (m: TrafficMsg): boolean => /no[eë]l|christkindel|grande[- ]?[iî]le|pi[eé]tonn/i.test(m.title + " " + m.text);
+/** Arrêts proches du marché (s'ils sont ouverts : à vérifier dans l'info trafic) */
+const NOEL_STOPS = ["Homme de Fer", "Broglie", "Langstross Grand'Rue", "Porte de l'Hôpital", "République", "Alt Winmärik-Vieux Marché aux Vins"];
+
+function noelTile(): string {
+  if (!noelSeason()) return "";
+  const n = MESSAGES.filter(isNoelMsg).length;
+  return `<button class="tile w tile-noel" data-act="noel"><h4>${ic("star")}Marché de Noël</h4><div class="big sm">Venir en tram</div>
+    <p>${n ? `${n} info${n > 1 ? "s" : ""} trafic liée${n > 1 ? "s" : ""} au marché` : "Parkings relais, arrêts proches et infos trafic"}</p></button>`;
+}
+
+export function overlayNoel(): string {
+  const msgs = MESSAGES.filter(isNoelMsg);
+  const prs = POIS.filter(p => p.kind === "pr").map(p => ({ p, free: Number(p.info?.match(/^(\d+)\s*places libres/)?.[1] ?? NaN) }))
+    .sort((a, b) => (Number.isNaN(b.free) ? -1 : b.free) - (Number.isNaN(a.free) ? -1 : a.free));
+  const prRow = ({ p, free }: { p: Poi; free: number }): string => {
+    const f = FORECASTS[p.id]?.points?.find(x => x.t >= Date.now() + 50 * 60_000 && x.sure);
+    return `<button class="item" data-poi="${esc(p.id)}">${markerIcon("pr", 28)}<span>${esc(p.name.replace(/^P\+R\s*/, ""))}<br><small style="color:var(--mute)">${Number.isNaN(free) ? "Places libres inconnues" : `${free} places libres`}${f ? ` · vers ${hm(f.t)} : ${f.bikes === 0 ? "complet" : `≈ ${f.bikes}`}` : ""}</small></span></button>`;
+  };
+  const stops = NOEL_STOPS.map(n => STOPS.find(s => s.name === n)).filter((s): s is Stop => !!s);
+  return `<div class="overlay">${bar("Marché de Noël")}<main><div class="pad">
+    <div class="noelhead"><b>Le centre-ville se rejoint en tram</b><small>Pendant le marché, la Grande Île est en grande partie piétonne en journée et le stationnement y est interdit. Garez-vous dans un parking relais : le ticket P+R comprend l’aller-retour en tram pour tous les passagers de la voiture.</small></div>
+    <div class="sub">Info trafic liée au marché</div>
+    ${msgs.length ? msgs.map(m => msgCard(m)).join("") : `<p class="src" style="margin:4px 0 12px">${MSG_STATE.status === "loading" ? "Chargement…" : "Aucune perturbation liée au marché annoncée par la CTS pour le moment."}</p>`}
+    <div class="sub">Parkings relais</div>
+    <div class="pgrp">${prs.map(prRow).join("")}</div>
+    <div class="sub">Arrêts proches du marché</div>
+    <p class="src" style="margin:0 0 8px">Certains peuvent être fermés en journée pendant le marché : vérifiez l’info trafic ci-dessus.</p>
+    <div class="pgrp">${stops.map(s => `<button class="item" data-stop="${esc(s.id)}">${pinIcon()}<span>${esc(s.name)}</span><span class="ml">${s.lines.slice(0, 4).map(l => lineChip(l, true)).join("")}</span></button>`).join("")}</div>
+  </div></main></div>`;
+}
+
 /** Accueil en tuiles : itinéraire, arrêts favoris (prochains passages), info trafic, Vélhop, lignes et services */
 export function screenHome(): string {
   const favStops = S.fav.map(stopById).filter((s): s is Stop => !!s);
@@ -215,6 +253,7 @@ export function screenHome(): string {
   ];
   return `<div class="pad tiles">
     <button class="tile w tile-go" data-tab="search"><h4>${ic("navigate")}Naviguer</h4><div class="big sm">Où allez-vous ?</div><p>Tram, bus, train, vélo ou à pied, guidé jusqu’à destination</p></button>
+    ${noelTile()}
     ${placeTile("home")}${placeTile("work")}
     ${favs || `<button class="tile w tile-empty" data-act="favs"><h4>${ic("star")}Vos arrêts</h4><p>Ajoutez vos arrêts favoris : leurs prochains passages s’afficheront ici</p></button>`}
     ${trafficTile()}
