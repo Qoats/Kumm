@@ -870,3 +870,10 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .bb.zero em{color:#e8833a}
 .bb em{font-style:normal;font-size:12px;font-weight:700;margin-bottom:3px;font-variant-numeric:tabular-nums}
 .bb small{font-size:10px;color:var(--mute);margin-top:4px;white-space:nowrap}
+
+/* Horaires figés par la CTS : position approximative */
+.vapprox .veh{opacity:.6}
+.vapprox .veh .vb{outline:2px dashed #E8833A;outline-offset:2px}
+.fapprox{margin:0 14px 10px;padding:10px 12px;border-radius:14px;background:rgba(232,131,58,.12);border:1px solid rgba(232,131,58,.45)}
+.overlay .fapprox{margin:0 0 12px}
+.fapprox b{display:block;color:#B85C1A}.fapprox small{display:block;color:var(--mute);margin-top:2px}

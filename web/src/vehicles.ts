@@ -30,6 +30,8 @@ export interface Vehicle {
   c?: number;
   /** tram ou bus : temps à quai observé à l'arrêt de départ (s), appris des trajets partagés */
   q?: number;
+  /** horaires non actualisés par la CTS depuis ce nombre de minutes : position approximative */
+  u?: number;
   /** position partagée par un voyageur à bord */
   g?: boolean;
   /** retard sur l'horaire prévu, en secondes (négatif : en avance), d'après la position partagée */

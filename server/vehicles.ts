@@ -3,7 +3,7 @@
  * Chaque véhicule est situé entre l'arrêt qu'il vient de quitter et le suivant (ou à quai) ; l'application l'anime entre
  * les deux selon l'heure. Ce n'est pas un GPS : un véhicule bloqué entre deux arrêts n'est recalé qu'à la mise à jour suivante.
  */
-import { snapshot } from "./realtime.js";
+import { lastUpdateOf, snapshot } from "./realtime.js";
 import type { Course } from "./realtime.js";
 import type { StopPos } from "./ride.js";
 import { pathBetween } from "./shapes.js";
@@ -45,6 +45,8 @@ export interface Vehicle {
   c?: number;
   /** tram ou bus : temps à quai observé à l'arrêt de départ du tronçon (s), appris des trajets partagés */
   q?: number;
+  /** horaires de la course non actualisés par la CTS depuis ce nombre de minutes (3 et plus) : position approximative */
+  u?: number;
   /** position partagée par un voyageur à bord (moins de 45 s) : a = b = cette position */
   g?: boolean;
   /** retard sur l'horaire annoncé par la CTS, en secondes (négatif : en avance), d'après la position partagée */
@@ -241,6 +243,7 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       });
       continue;
     }
+    const upd = c.mode === "ter" ? undefined : lastUpdateOf(c.id), stale = upd ? Math.floor((now - upd) / 60_000) : 0;
     for (let i = 0; i < calls.length; i++) {
       const s = calls[i], n = calls[i + 1];
       let a: At | null = null, b: At | null = null, nextFrom = i + 1, h = 0;
@@ -261,7 +264,7 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
       out.push({
         id: c.id, line: c.line, dest: c.dest, rt: c.realTime, m: c.mode, a, b, h, ...(sp ?? {}), ...(learned ? { c: learned } : {}), ...(dwell !== null ? { q: dwell } : {}),
         next: calls.slice(nextFrom, nextFrom + 6).map(k => [k.name, k.arr]),
-        ...(p ? { p } : {}), ...(vno ? { n: vno } : {})
+        ...(p ? { p } : {}), ...(vno ? { n: vno } : {}), ...(stale >= 3 ? { u: stale } : {})
       });
       break;
     }

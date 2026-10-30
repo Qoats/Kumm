@@ -56,6 +56,21 @@ export interface Course {
   dir?: string;
 }
 
+/** Dernière actualisation des horaires de chaque course par la CTS : certaines courses gardent les mêmes heures pendant
+    plusieurs minutes, puis sont recalées d'un coup (souvent de 30 s à 1 min, en avance comme en retard) */
+const updated = new Map<string, { key: string; at: number }>();
+export const lastUpdateOf = (id: string): number | undefined => updated.get(id)?.at;
+function trackUpdates(list: Course[], now: number): void {
+  const seen = new Set<string>();
+  for (const c of list) {
+    seen.add(c.id);
+    const key = c.calls.map(x => x.arr).join(",");
+    const u = updated.get(c.id);
+    if (!u || u.key !== key) updated.set(c.id, { key, at: now });
+  }
+  for (const id of updated.keys()) if (!seen.has(id)) updated.delete(id);
+}
+
 /** Passages à venir, par code de quai CTS (« 412D ») */
 let byCode = new Map<string, Visit[]>();
 let courses: Course[] = [];
@@ -235,6 +250,7 @@ async function refresh(): Promise<void> {
     learnRoutes(p.list, now);
     recordPunctuality(p.list, now);
     recordEarly(p.list, now);
+    trackUpdates(p.list, now);
     for (const c of p.list) for (const call of c.calls) { if (c.mode) learn(quayModes, call.code, c.mode); if (c.line) learn(quayLines, call.code, c.line); }
     Object.assign(counts, { courses: p.courses, passages: p.passages, quais: p.byCode.size });
     if (counts.chargements++ === 0) console.log(`Passages du réseau chargés : ${p.courses} courses, ${p.byCode.size} quais`);

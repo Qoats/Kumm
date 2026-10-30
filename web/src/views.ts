@@ -299,6 +299,9 @@ export function followStops(next: [string, number][]): string {
     : '<div class="empty">Arrivée au terminus.</div>';
 }
 
+/** Horaires de la course figés par la CTS : le véhicule peut être jusqu'à 1 à 2 min en avance ou en retard sur la carte */
+const approxNote = (u: number, m?: string): string => `<div class="fapprox"><b>Position approximative</b><small>La CTS n’a pas actualisé ses horaires depuis ${u} min : le ${m === "bus" ? "bus" : "tram"} peut être en avance ou en retard d’une à deux minutes sur la carte.</small></div>`;
+
 /** Écart avec l'horaire prévu, d'après la position partagée par un voyageur */
 export const delayText = (sec: number): string => {
   const m = Math.round(sec / 60);
@@ -314,7 +317,7 @@ function followPanel(f: { id: string; paused: boolean }): string {
   return `<div class="fhead">${lineChip(v.line)}<div class="ft"><b>vers ${esc(v.dest)}</b>${v.n ? `<small class="fcode" data-hold="copy:${esc(v.n)}">Trajet ${esc(v.n)}</small>` : ""}</div>
       <button class="fclose" data-act="unfollow" aria-label="Arrêter de suivre"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     ${v.g ? `<div class="fshared"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
-    ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : ""}
+    ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : v.u && v.rt ? approxNote(v.u, v.m) : ""}
     <div class="fstats">
       <div><b id="fv-next">${first ? (first[1] < 1 ? "< 1 min" : first[1] + " min") : "—"}</b><small id="fv-nextname">${first ? esc(first[0]) : "terminus"}</small></div>
       <div class="fstate"><b id="fv-state">${esc(info.state)}</b></div>
@@ -337,7 +340,7 @@ export function overlayVehicle(id: string): string {
   return `<div class="overlay">${bar(v.m === "ter" ? "Train TER" : "Ligne " + lineLabel(v.line))}<main><div class="pad">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${lineChip(v.line)}<b style="font-size:18px">vers ${esc(v.dest)}</b></div>
     ${v.g ? `<div class="fshared" style="margin:0 0 10px"><span class="ride-dot"></span>Position partagée par un voyageur à bord${v.d !== undefined ? ` · ${delayText(v.d)}` : ""}</div>` : ""}
-    ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : ""}
+    ${v.x ? `<div class="fstall"><b>Immobilisé depuis ${Math.max(1, Math.round((serverNow() - v.x) / 60000))} min</b><small>La CTS repousse sans cesse son arrivée au prochain arrêt : panne, accident ou bouchon. Position estimée au moment où il s’est arrêté.</small></div>` : v.u && v.rt ? approxNote(v.u, v.m) : ""}
     ${wait !== null ? `<div class="box vwait"><b>Au terminus</b><span>Départ ${wait < 1 ? "imminent" : `dans ${wait} min`}</span></div>` : ""}
     ${v.n ? `<div class="vno" data-hold="copy:${esc(v.n)}">Trajet <b>${esc(v.n)}</b><small>${v.m === "ter" ? "TER d’Alsace (Elsàss en alsacien) et numéro du train." : "Terminus de départ, ligne, date et heure de départ prévue."}</small></div>` : ""}
     <small class="src" style="display:block;margin-bottom:14px">Position estimée d'après les horaires ${v.rt ? "en temps réel" : "théoriques (pas de suivi en direct pour ce véhicule)"} ${v.m === "ter" ? "de la SNCF" : "de la CTS"} : ce n'est pas un GPS.</small>
