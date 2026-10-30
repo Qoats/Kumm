@@ -877,3 +877,10 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .fapprox{margin:0 14px 10px;padding:10px 12px;border-radius:14px;background:rgba(232,131,58,.12);border:1px solid rgba(232,131,58,.45)}
 .overlay .fapprox{margin:0 0 12px}
 .fapprox b{display:block;color:#B85C1A}.fapprox small{display:block;color:var(--mute);margin-top:2px}
+
+/* Météo */
+.wxr{color:var(--accent-ink);font-weight:600}
+.wxnote{margin-top:4px!important;font-weight:600;color:#3D6FB4!important;font-size:12.5px}
+.wxbar{display:flex;align-items:center;gap:10px;justify-content:space-between;background:color-mix(in srgb,#5b8def 14%,var(--card));border-radius:var(--r);padding:10px 12px;margin:0 0 12px;font-size:13.5px}
+.wxbar .pill{flex:none}
+.pq{margin-top:4px!important;font-size:12px;color:var(--mute)!important;font-weight:600}

@@ -39,6 +39,9 @@ export function geoUpstream(url: URL): GeoUpstream | null {
     if (arrive) u.searchParams.set("arriveBy", "true");
     return { url: u.toString(), ttl: 60, stale: 120 };
   }
+/** Météo (Open-Meteo, CC BY 4.0) : température, pluie et code du temps maintenant, pluie par quart d'heure sur 2 h */
+const WEATHER = process.env.WEATHER_URL ?? "https://api.open-meteo.com/v1/forecast?latitude=48.58&longitude=7.75&current=temperature_2m,precipitation,weather_code&minutely_15=precipitation,precipitation_probability&forecast_minutely_15=8&timezone=Europe%2FParis";
+
 /** Horaires théoriques d'un arrêt CTS à une date et une heure données (Transitous : données ouvertes GTFS de la CTS) */
 const CTS_FEED = "fr-donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts_";
 const QUAY = /^[A-Z0-9]{2,12}_[0-9A-Z]{1,4}$/i;
@@ -59,6 +62,8 @@ function osrm(base: string, from: string, to: string, alternatives: boolean): st
 }
 
   if (url.pathname === "/geo/stoptimes") return stopTimes(url);
+  // météo du centre de Strasbourg (aucune position de l'utilisateur n'est transmise) : maintenant et les 2 prochaines heures
+  if (url.pathname === "/geo/weather") return { url: WEATHER, ttl: 600, stale: 3600 };
   if (url.pathname === "/geo/walk") {
     const from = url.searchParams.get("from") ?? "", to = url.searchParams.get("to") ?? "";
     if (!LATLON.test(from) || !LATLON.test(to)) return null;

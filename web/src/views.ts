@@ -13,10 +13,11 @@ import type { Layer } from "./kinds";
 import { marker, markerIcon } from "./markers";
 import { ic, type IconName } from "./icons";
 import { MAPPATHS, mapRoutes } from "./map";
-import { POIS, S, STOPS, USER, mins, stopById } from "./store";
+import { POIS, S, STOPS, USER, mins, render, stopById } from "./store";
 import type { PlaceKey } from "./store";
 import { commuteTo } from "./commute";
-import { FORECASTS, LINE_ROUTES, STATS, debug, nextDepartures, quayOf } from "./api";
+import { rainText, weather } from "./weather";
+import { FORECASTS, LINE_ROUTES, STATS, debug, ensureStats, nextDepartures, quayOf } from "./api";
 import type { LineRoute, LineStats, NetStats, Punct } from "./api";
 import { stopKey } from "./network";
 import { fmtDist, fmtDur, haversine, walkMin } from "./geo";
@@ -97,10 +98,18 @@ export function header(): string {
   const date = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
   return `<header class="thead">
     <div class="top">
-      <div><small>${esc(date.charAt(0).toUpperCase() + date.slice(1))}</small><h1>${hello}</h1></div>
+      <div><small>${esc(date.charAt(0).toUpperCase() + date.slice(1))}${wxLine()}</small><h1>${hello}</h1></div>
       <span class="ic"><button data-act="msgs" aria-label="Messages">${ic("mail")}</button><button data-act="prefs" aria-label="Réglages">${ic("sliders")}</button><button data-act="account" aria-label="Compte">${ic("user")}</button></span>
     </div>
   </header>`;
+}
+
+/** « · 12° · Pluie vers 15:30 » dans l'en-tête de l'accueil */
+function wxLine(): string {
+  const w = weather(() => { if (S.tab === "home" && !S.overlay) render(); });
+  if (!w) return "";
+  const r = rainText(w);
+  return ` · ${w.temp}°${r ? ` · <span class="wxr">${esc(r)}</span>` : ""}`;
 }
 
 export function bar(title: string, back?: string): string {
@@ -115,8 +124,14 @@ function bikeTile(): string {
     : POIS.filter(p => p.kind === "velhop").map(p => ({ p, d: haversine(USER, p) })).sort((a, b) => a.d - b.d)[0];
   const n = st?.p.info?.match(/(\d+)\s*vélo/i)?.[1];
   return `<button class="tile tile-bike" data-act="mapBikes" data-hold="bikepick"><h4>${ic("bike")}Vélhop${chosen ? ` ${ic("star")}` : ""}</h4>${n !== undefined
-    ? `<div class="big">${n}<small> vélo${n === "1" ? "" : "s"}</small></div><p>${esc(st!.p.name.replace(/^Vélhop\s*/i, ""))} · ${fmtDist(st!.d)}</p>`
+    ? `<div class="big">${n}<small> vélo${n === "1" ? "" : "s"}</small></div><p>${esc(st!.p.name.replace(/^Vélhop\s*/i, ""))} · ${fmtDist(st!.d)}</p>${rainNote()}`
     : `<div class="big sm">Stations</div><p>${st ? esc(st.p.name.replace(/^Vélhop\s*/i, "")) : "Vélos en libre-service"}</p>`}</button>`;
+}
+
+/** Pluie maintenant ou bientôt : le tram plutôt que le vélo */
+function rainNote(): string {
+  const r = rainText(weather(() => render()));
+  return r ? `<p class="wxnote">${esc(r)} : pensez au tram</p>` : "";
 }
 
 /** Choix de la station Vélhop de l'accueil : la plus proche (par défaut), ou une station précise */
@@ -155,8 +170,25 @@ function placeTile(which: PlaceKey): string {
   const body = near ? `<div class="big sm">Vous y êtes</div><p>${esc(p.label)}</p>`
     : !c ? `<div class="big sm">…</div><p>Calcul du trajet</p>`
     : !j ? `<div class="big sm">—</div><p>${c.error ? "Trajet indisponible" : "Aucun trajet trouvé"}</p>`
-    : `<div class="big">${minutes(j.duration)}<small> min</small></div><p>${first ? `${lineChip(first.line ?? "?", true)} ` : ""}<span>${hm(first ? first.start : j.start)} → ${hm(j.end)}</span></p>`;
+    : `<div class="big">${minutes(j.duration)}<small> min</small></div><p>${first ? `${lineChip(first.line ?? "?", true)} ` : ""}<span>${hm(first ? first.start : j.start)} → ${hm(j.end)}</span></p>${tripPunct(j)}`;
   return `<button class="tile tile-place" data-place="${which}" data-hold="place:${which}"><h4>${ic(icon)}${label}</h4>${body}</button>`;
+}
+
+/** Ponctualité des lignes du trajet, à ce type de jour et cette heure (30 derniers jours) : la moins ponctuelle compte */
+function tripPunct(j: Journey): string {
+  let worst: Punct | null = null;
+  for (const l of j.legs) {
+    if (l.kind === "walk" || l.kind === "ter" || !l.line) continue;
+    ensureStats(l.line, () => { if (S.tab === "home" && !S.overlay) render(); });
+    const st = STATS[l.line]?.v as LineStats | undefined;
+    if (!st?.byBand) continue;
+    const d = new Date(l.start), dow = d.getDay(), slot = d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0);
+    const p = st.byBand[`${dow === 0 ? "D" : dow === 6 ? "S" : "W"}|${slot < 12 ? "n" : slot < 19 ? "pm" : slot < 32 ? "j" : slot < 39 ? "ps" : "s"}`];
+    if (p && p.n >= 15 && (!worst || p.onTime < worst.onTime)) worst = p;
+  }
+  if (!worst) return "";
+  const margin = worst.late >= 25 ? 5 : worst.late >= 15 ? 3 : 0;
+  return `<p class="pq">À l’heure ${worst.onTime} %${margin ? ` · ${margin} min de marge` : ""}</p>`;
 }
 
 /** Choix de l'adresse « Maison » ou « Travail » */
@@ -457,7 +489,15 @@ function modeDuration(mode: "transit" | "walk" | "bike"): string {
 const calculating = '<div class="empty" style="padding:24px">Calcul de l’itinéraire…</div>';
 
 /** Liste sous la carte, pour le mode choisi */
+/** Itinéraire à vélo, ou à pied de plus de 10 min, quand il pleut : rappel que les transports gardent au sec */
 function tripList(): string {
+  const t = TRIP, r = S.trip.mode === "transit" ? null : rainText(weather(() => render()));
+  const wx = r && t && (S.trip.mode === "bike" || (t.walk.data?.duration ?? 0) > 600)
+    ? `<div class="wxbar">${esc(r)} à Strasbourg : les transports vous gardent au sec.<button class="pill" data-mode="transit">Voir les transports</button></div>` : "";
+  return wx + tripResults();
+}
+
+function tripResults(): string {
   const t = TRIP;
   if (!t) return calculating;
   if (S.trip.mode === "walk") {
@@ -1041,7 +1081,7 @@ export function overlaySettings(): string {
     ${S.alerts.enabled ? alertSettings() : ""}
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
-      <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires, temps réel) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
+      <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires, temps réel) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
       <div class="src" style="margin-top:10px"><a href="https://kumm.fr/mentions-legales.html" target="_blank" rel="noopener">Mentions légales</a> · <a href="https://kumm.fr/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></div></div>
     <button class="ghost" data-act="replayOnb">Revoir la présentation</button>
     ${CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher une mise à jour</button>` : ""}
