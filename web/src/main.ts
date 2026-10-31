@@ -36,7 +36,7 @@ import type { Place, Poi, StopDeparture } from "../../shared/types";
 import { buildVeloparks } from "./places";
 import { geocode } from "./walk";
 import { launchNav } from "./flow";
-import { BIKE_ROUTES, PLAN, ensurePlanned } from "./trip";
+import { BIKE_ROUTES, PLAN, ensurePlanned, replan } from "./trip";
 import { mountTripMap } from "./tripmap";
 import { startNav } from "./nav";
 import { refreshVehicles } from "./vehicles";
@@ -324,7 +324,7 @@ app.addEventListener("click", e => {
       if (p && field === "from") { S.trip.from = p; S.trip.fromIsMe = false; S.trip.fromText = p.label; }
       else if (p) { S.trip.dest = p; S.trip.toText = p.label; }
     }
-    S.trip.sugg = null; render(); return;
+    S.trip.sugg = null; replan(); render(); return;
   }
   if (d.nav) { void launchNav(d.nav); return; }
   if (d.bikenav) {
@@ -401,6 +401,7 @@ app.addEventListener("click", e => {
     case "swap": swapTrip(); break;
     case "when": S.trip.whenDraft = { ...S.trip.when, at: S.trip.when.at || Math.ceil(Date.now() / 300_000) * 300_000 }; break;
     case "whenClose": S.trip.whenDraft = null; break;
+    case "replan": replan(); break;
     case "whenOk": if (S.trip.whenDraft) S.trip.when = S.trip.whenDraft; S.trip.whenDraft = null; S.trip.sel = 0; break;
     case "sheet": if (S.swiped) return; S.sheet = S.sheet === 0 ? 1 : S.sheet === 2 ? 1 : 0; break;
     case "msgs": S.overlay = { k: "msgs" }; break;
@@ -534,6 +535,8 @@ function locateIfAllowed(): void {
 }
 // « Êtes-vous dans ce bus ? » : seulement application ouverte (aucun suivi en arrière-plan)
 document.addEventListener("visibilitychange", () => {
+  // retour dans l'application : l'itinéraire affiché est recalculé s'il date (ou si l'heure choisie est passée)
+  if (!document.hidden && S.tab === "trips" && !S.overlay) render();
   if (document.hidden) stopRideDetection();
   else if (S.locOn && onboardingDone() && !CONFIG.USE_MOCK) startRideDetection();
 });

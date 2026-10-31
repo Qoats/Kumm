@@ -23,7 +23,7 @@ import { stopKey } from "./network";
 import { fmtDist, fmtDur, haversine, walkMin } from "./geo";
 import { hm, minutes } from "./transit";
 import type { JLeg, Journey } from "./transit";
-import { TRIP, tripReady } from "./trip";
+import { TRIP, tripReady, whenResetAt } from "./trip";
 import type { PlanCtx } from "./trip";
 import type { LL } from "./geo";
 import { esc, fold } from "./util";
@@ -555,7 +555,9 @@ function tripResults(): string {
   }
   const list = t.transit.data ?? [];
   if (list.length) {
-    return list.map(journeyRow).join("") + `<small class="src">Horaires du réseau et temps réel : Transitous (données ouvertes).${t.transit.status === "error" ? " Mise à jour impossible : derniers trajets connus." : ""}</small>`;
+    const reset = Date.now() - whenResetAt < 90_000 ? `<p class="src treset">L’heure choisie était passée : voici les horaires pour maintenant.</p>` : "";
+    const fresh = `<div class="trefresh"><span>${t.transit.status === "loading" ? "Mise à jour des horaires…" : `Horaires de ${hm(t.at)}`}</span><button class="pill" data-act="replan">Actualiser</button></div>`;
+    return reset + fresh + list.map(journeyRow).join("") + `<small class="src">Horaires du réseau et temps réel : Transitous (données ouvertes).${t.transit.status === "error" ? " Mise à jour impossible : derniers trajets connus." : ""}</small>`;
   }
   if (t.transit.status === "loading") return calculating;
   const why = t.transit.status === "error"

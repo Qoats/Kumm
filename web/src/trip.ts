@@ -50,18 +50,31 @@ const TRANSIT_MAX_AGE = 120_000;
 const tripTime = (): TripTime | undefined => (S.trip.when.kind === "now" ? undefined : { at: S.trip.when.at, arrive: S.trip.when.kind === "arrive" });
 const whenKeyOf = (w?: TripTime): string => (w ? `${w.arrive ? "arrive" : "depart"}:${w.at}` : "now");
 
-/** Lance le calcul si le départ, la destination ou l'heure ont changé ; chaque mode s'affiche dès qu'il arrive */
+/** Une heure choisie est aussi recalculée de temps en temps (temps réel, travaux annoncés entre-temps) */
+const CHOSEN_MAX_AGE = 600_000;
+/** Heure choisie déjà passée (recherche faite la veille pour le lendemain matin, par exemple) : on repasse à « maintenant » */
+const PAST_GRACE = 10 * 60_000;
+let forced = false;
+/** Moment où une heure choisie, déjà passée, a été remplacée par « maintenant » (message affiché quelques instants) */
+export let whenResetAt = 0;
+/** Nouveau calcul demandé (bouton Actualiser, destination choisie de nouveau) : même trajet, horaires rechargés */
+export const replan = (): void => { forced = true; };
+
+/** Lance le calcul si le départ, la destination ou l'heure ont changé, ou si les horaires datent ; chaque mode s'affiche
+    dès qu'il arrive */
 export function ensurePlanned(): void {
   if (!tripReady()) return;
+  if (S.trip.when.kind !== "now" && S.trip.when.at < Date.now() - PAST_GRACE) { S.trip.when = { kind: "now", at: 0 }; whenResetAt = Date.now(); }
   const origin = originPlace(), dest = S.trip.dest as Place;
   const key = keyOf(origin, dest), when = tripTime(), whenKey = whenKeyOf(when);
-  // « maintenant » : horaires recalculés après 2 minutes ; une heure choisie, elle, ne change pas
-  if (TRIP && TRIP.key === key && TRIP.whenKey === whenKey && (when || Date.now() - TRIP.at < TRANSIT_MAX_AGE)) return;
+  // « maintenant » : horaires recalculés après 2 minutes ; une heure choisie, après 10 minutes
+  if (!forced && TRIP && TRIP.key === key && TRIP.whenKey === whenKey && Date.now() - TRIP.at < (when ? CHOSEN_MAX_AGE : TRANSIT_MAX_AGE)) return;
+  forced = false;
   const prev = TRIP && TRIP.key === key ? TRIP : null;
   const sameWhen = prev?.whenKey === whenKey;
   const t: TripState = {
     key, whenKey, at: Date.now(), origin, dest,
-    transit: prev && sameWhen ? { ...prev.transit } : { status: "loading" },
+    transit: prev && sameWhen ? { ...prev.transit, status: "loading" } : { status: "loading" },
     walk: prev ? prev.walk : { status: "loading" },
     bike: prev ? prev.bike : { status: "loading" },
     fallback: sameWhen ? prev?.fallback : undefined

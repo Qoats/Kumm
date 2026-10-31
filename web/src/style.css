@@ -896,3 +896,4 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .dlink{font:inherit;color:inherit;background:none;border:0;padding:0;text-align:left;cursor:pointer}
 .sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .ldirs.many{flex-wrap:wrap}.ldirs.many button{flex:1 1 40%;white-space:normal;font-size:13px;line-height:1.25}
+.trefresh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;font-size:13px;color:var(--mute)}.trefresh .pill{margin:0}.treset{margin:0 0 8px!important;color:var(--accent-ink)!important;font-weight:600}
