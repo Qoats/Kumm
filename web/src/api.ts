@@ -349,6 +349,36 @@ export function ensureForecast(id: string, done: () => void): void {
     .finally(() => { forecastLoading.delete(id); done(); });
 }
 
+/* ---------- signalements des voyageurs (server/reports.ts) ---------- */
+export interface Report { kind: string; since: number; n: number; mine: boolean; shown: boolean }
+/** Identifiant de cet appareil, tiré au hasard (aucune donnée personnelle) : un appareil ne compte qu'une fois par signalement */
+function deviceId(): string {
+  try {
+    let d = localStorage.getItem("did");
+    if (!d) { d = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, "0")).join(""); localStorage.setItem("did", d); }
+    return d;
+  } catch { return ""; }
+}
+export const REPORTS: Record<string, { at: number; items: Report[] }> = {};
+const reportsLoading = new Set<string>();
+export function ensureReports(stop: string, done: () => void, force = false): void {
+  const r = REPORTS[stop];
+  if ((!force && r && Date.now() - r.at < 60_000) || reportsLoading.has(stop)) return;
+  reportsLoading.add(stop);
+  fetch(url(`/api/reports?stop=${encodeURIComponent(stop)}&device=${deviceId()}`), { headers: appHeaders(), cache: "no-store" })
+    .then(x => (x.ok ? x.json() : Promise.reject(new Error("HTTP " + x.status))))
+    .then((j: { items?: Report[] }) => { REPORTS[stop] = { at: Date.now(), items: j.items ?? [] }; })
+    .catch(() => { REPORTS[stop] ??= { at: Date.now(), items: [] }; })
+    .finally(() => { reportsLoading.delete(stop); done(); });
+}
+/** Nouveau signalement, ou réponse à un signalement (« toujours vrai » : yes, « c'est réglé » : no) */
+export async function sendReport(stop: string, kind: string, vote?: "yes" | "no"): Promise<string> {
+  const r = await fetch(url("/api/report"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ stop, kind, device: deviceId(), ...(vote ? { vote } : {}) }) });
+  const j = (await r.json().catch(() => ({}))) as { message?: string };
+  if (!r.ok) throw new Error(j.message ?? "Envoi impossible");
+  return j.message ?? "Merci";
+}
+
 /* ---------- données de démonstration ---------- */
 function seed(str: string): number {
   let h = 0;

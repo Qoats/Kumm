@@ -17,7 +17,7 @@ import { POIS, S, STOPS, USER, mins, render, stopById } from "./store";
 import type { PlaceKey } from "./store";
 import { commuteTo } from "./commute";
 import { rainText, weather } from "./weather";
-import { FORECASTS, LINE_ROUTES, STATS, debug, ensureStats, nextDepartures, quayOf } from "./api";
+import { FORECASTS, LINE_ROUTES, REPORTS, STATS, debug, ensureStats, nextDepartures, quayOf } from "./api";
 import type { LineRoute, LineStats, NetStats, Punct } from "./api";
 import { stopKey } from "./network";
 import { fmtDist, fmtDur, haversine, walkMin } from "./geo";
@@ -757,6 +757,27 @@ function elevatorNotice(name: string): string {
   return messagesForStop(name).filter(isElevatorMsg).map(m => `<button class="elev" data-act="msgs">${ic("access")}<span><b>${esc(m.title)}</b><small>${esc(cut(m.text.split(/(?<=\.)\s/)[0], 240))}</small></span></button>`).join("");
 }
 
+/* ---------- signalements des voyageurs ---------- */
+export const REPORT_KINDS: [string, IconName, string][] = [
+  ["lift", "access", "Ascenseur ou escalator en panne"], ["ticket", "ticket", "Distributeur de titres hors service"],
+  ["screen", "clock", "Écran des horaires éteint"], ["crowd", "user", "Tram ou bus bondé"], ["damage", "help", "Arrêt dégradé ou sale"]
+];
+/** Problèmes signalés par les voyageurs à cet arrêt (montrés une fois confirmés par 2 personnes), et bouton pour en signaler */
+function reportsBlock(stopId: string): string {
+  const o = S.overlay?.k === "stop" ? S.overlay : null, items = REPORTS[stopId]?.items ?? [];
+  const ago = (t: number): string => { const m = Math.round((Date.now() - t) / 60_000); return m < 60 ? `depuis ${Math.max(1, m)} min` : `depuis ${Math.round(m / 60)} h`; };
+  const rows = items.map(r => {
+    const k = REPORT_KINDS.find(x => x[0] === r.kind);
+    if (!k) return "";
+    return `<div class="rep${r.shown ? "" : " pending"}">${ic(k[1])}<span><b>${esc(k[2])}</b><small>${r.shown ? `Signalé par ${r.n} voyageurs · ${ago(r.since)}` : "Votre signalement : affiché pour tous dès qu’un autre voyageur le confirme"}</small>
+      <span class="rb"><button class="pill" data-rep="${r.kind}|yes">Toujours vrai</button><button class="pill" data-rep="${r.kind}|no">C’est réglé</button></span></span></div>`;
+  }).join("");
+  const picker = o?.rep ? `<div class="reppick"><b>Quel problème ?</b>${REPORT_KINDS.map(([k, icon, label]) => `<button class="item" data-rep="${k}|new">${ic(icon)}<span>${esc(label)}</span></button>`).join("")}
+    <p class="src">Sans texte ni donnée personnelle. Le signalement s’efface seul (30 min pour un véhicule bondé, 2 jours au plus pour le reste).</p></div>` : "";
+  return `${rows ? `<div class="reps"><div class="sub" style="margin-top:0">Signalé par les voyageurs</div>${rows}</div>` : ""}${picker}
+    ${o?.rep ? "" : `<button class="whenlink" data-act="report">${ic("bell")}Signaler un problème à cet arrêt</button>`}`;
+}
+
 /** Fiche d'un arrêt : passer des passages en direct aux horaires prévus d'un autre jour ou d'une autre heure */
 function whenControl(s: Stop): string {
   const o = S.overlay?.k === "stop" ? S.overlay : null;
@@ -794,7 +815,7 @@ export function overlayStop(id: string): string {
   return `<div class="overlay">${bar(s.name)}
    <main><div class="pad"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:700;flex:1">${markerIcon(kindOfStop(s), 30)}${esc(stopLabel(s))}</span><span style="flex:1;display:flex;gap:6px;flex-wrap:wrap${s.lines.length > 5 ? ";order:3;flex-basis:100%" : ""}">${s.lines.slice(0, 12).map(l => lineChip(l, true)).join("")}</span>
    <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div>
-   ${elevatorNotice(s.name)}
+   ${elevatorNotice(s.name)}${reportsBlock(id)}
    ${s.sncf && CONTREMARQUE_TER.has(s.sncf) ? ctmBadge() : ""}
    <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button>${whenControl(s)}<div id="stopdeps"></div></div></main></div>`;
 }

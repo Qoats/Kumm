@@ -13,7 +13,7 @@ import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
-import { TRAINS, ensureForecast, ensureLineRoute, ensureStats, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, OFFLINE, onOfflineChange, placeOnTramQuays, plannedDepartures } from "./api";
+import { TRAINS, ensureForecast, ensureReports, sendReport, ensureLineRoute, ensureStats, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, OFFLINE, onOfflineChange, placeOnTramQuays, plannedDepartures } from "./api";
 import { fmtDist, haversine } from "./geo";
 import { hm } from "./transit";
 import { STRASBOURG_VILLE } from "../../shared/ter";
@@ -125,6 +125,7 @@ function draw(): void {
   void loadDeps();
   if (o?.k === "line") { ensureLineRoute(o.id, render); ensureStats(o.id, render); }
   if (o?.k === "stats") ensureStats("", render);
+  if (o?.k === "stop") ensureReports(o.id, render);
   if (o?.k === "noel") for (const p of POIS) if (p.kind === "pr") ensureForecast(p.id, render);
   if (o?.k === "poi" && (o.id.startsWith("velhop-") || o.id.startsWith("pr-"))) ensureForecast(o.id, render);
   syncWidgets();   // n'envoie rien si les données des widgets n'ont pas changé
@@ -261,7 +262,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset],[data-bikest],[data-place],[data-pset],[data-arr],[data-arrlead],[data-arrat]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset],[data-bikest],[data-place],[data-pset],[data-arr],[data-arrlead],[data-arrat],[data-rep]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -311,6 +312,14 @@ app.addEventListener("click", e => {
   if (d.jstop) { stopJourney(); toast("Alertes de descente arrêtées"); return; }
   if (d.upd) { updateAction(d.upd); return; }
   if (d.dirk !== undefined && d.dirv !== undefined) { pickDir(d.dirk, d.dirv); render(); return; }   // direction d'une ligne, sans ouvrir l'arrêt
+  if (d.rep && S.overlay?.k === "stop") {
+    const [kind, v] = d.rep.split("|"), stop = S.overlay.id;
+    S.overlay.rep = false; render();
+    sendReport(stop, kind, v === "new" ? undefined : (v as "yes" | "no"))
+      .then(m => toast(v === "no" ? "Merci : noté comme réglé" : m), e => toast(e instanceof Error ? e.message : "Envoi impossible"))
+      .finally(() => ensureReports(stop, render, true));
+    return;
+  }
   if (d.mb !== undefined) { const m = S.modal; S.modal = null; if (d.mb === "1" && m?.go) m.go(); render(); return; }
   if (d.tab) {
     S.tab = d.tab as Tab; S.overlay = null; S.follow = null;
@@ -402,6 +411,7 @@ app.addEventListener("click", e => {
     case "when": S.trip.whenDraft = { ...S.trip.when, at: S.trip.when.at || Math.ceil(Date.now() / 300_000) * 300_000 }; break;
     case "whenClose": S.trip.whenDraft = null; break;
     case "replan": replan(); break;
+    case "report": if (S.overlay?.k === "stop") S.overlay.rep = true; break;
     case "whenOk": if (S.trip.whenDraft) S.trip.when = S.trip.whenDraft; S.trip.whenDraft = null; S.trip.sel = 0; break;
     case "sheet": if (S.swiped) return; S.sheet = S.sheet === 0 ? 1 : S.sheet === 2 ? 1 : 0; break;
     case "msgs": S.overlay = { k: "msgs" }; break;

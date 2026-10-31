@@ -897,3 +897,15 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .ldirs.many{flex-wrap:wrap}.ldirs.many button{flex:1 1 40%;white-space:normal;font-size:13px;line-height:1.25}
 .trefresh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;font-size:13px;color:var(--mute)}.trefresh .pill{margin:0}.treset{margin:0 0 8px!important;color:var(--accent-ink)!important;font-weight:600}
+
+/* Signalements des voyageurs */
+.reps{margin:0 0 12px}
+.rep{display:flex;gap:10px;align-items:flex-start;background:color-mix(in srgb,#e8833a 10%,var(--card));border-radius:var(--r);padding:10px 12px;margin:0 0 8px}
+.rep.pending{background:var(--card);border:1px dashed var(--line)}
+.rep>svg{width:20px;height:20px;flex:none;margin-top:2px;fill:none;stroke:#B85C1A;stroke-width:2;stroke-linecap:round}
+.rep>span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rep small{color:var(--mute)}
+.rep .rb{display:flex;gap:6px;margin-top:6px;flex-direction:row}
+.rep .rb .pill{margin:0;font-size:12.5px;padding:5px 11px}
+.reppick{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 12px 4px;margin:0 0 12px}
+.reppick .item svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}

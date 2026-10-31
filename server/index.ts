@@ -8,7 +8,7 @@ import { ctsCallsLastMinute, ctsPaused, describeError, fetchCts, fetchRetry } fr
 import { diag } from "./diag.js";
 import { GEO_USER_AGENT, geoUpstream } from "./geo.js";
 import { reqOf, securityHeaders, send } from "./http.js";
-import { withinLimit } from "./limit.js";
+import { clientIp, withinLimit } from "./limit.js";
 import { parkingsRelais, poiResult, velhop } from "./poi.js";
 import { recordRequest, stats } from "./stats.js";
 import { serveStatic } from "./static.js";
@@ -26,6 +26,7 @@ import { arrivalsStatus, startArrivals, watchArrival } from "./arrivals.js";
 import { scheduleStatus, startSchedule } from "./schedule.js";
 import { bikeForecast, bikesStatus, startBikes } from "./bikes.js";
 import { earlyStatus } from "./early.js";
+import { receiveReport, reportsFor, reportsStatus } from "./reports.js";
 import { driftStatus } from "./drift.js";
 import { parkForecast, parksStatus, startParks } from "./parks.js";
 import { punctualityStatus, stats as punctualityStats } from "./punctuality.js";
@@ -325,6 +326,7 @@ function health(res: ServerResponse): Promise<void> {
     prevision_velhop: bikesStatus(),
     departs_en_avance: earlyStatus(),
     recalages: driftStatus(),
+    signalements: reportsStatus(),
     prevision_pr: parksStatus(),
     apk: updateStatus(),
     trajets_partages: rideStatus(),
@@ -360,7 +362,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (origin && ORIGINS.includes(origin)) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
   if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-App-Key", "Access-Control-Max-Age": "86400" }); return void res.end(); }
   // seule écriture possible : l'abonnement aux alertes trafic
-  const isPost = req.method === "POST" && (url.pathname === "/api/alerts" || url.pathname === "/api/ride" || url.pathname === "/api/arrival" || url.pathname === "/connexion");
+  const isPost = req.method === "POST" && (url.pathname === "/api/alerts" || url.pathname === "/api/ride" || url.pathname === "/api/arrival" || url.pathname === "/api/report" || url.pathname === "/connexion");
   if (req.method !== "GET" && req.method !== "HEAD" && !isPost) return send(res, 405, "text/plain", "Méthode non autorisée");
 
   const p = url.pathname;
@@ -384,6 +386,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (isPost) {
     let body: unknown;
     try { body = JSON.parse(await readBody(req)); } catch { return send(res, 400, "text/plain", "Requête invalide"); }
+    if (url.pathname === "/api/report") {
+      const r = receiveReport(body, clientIp(req));
+      return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
+    }
     if (url.pathname === "/api/arrival") {
       const r = watchArrival(body);
       return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
@@ -397,6 +403,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const r = subscribe(body);
     return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
   }
+  // signalements d'un arrêt : propres à chaque appareil (les siens, même non confirmés), donc jamais en cache
+  if (p === "/api/reports") return send(res, 200, "application/json; charset=utf-8", JSON.stringify({ items: reportsFor((url.searchParams.get("stop") ?? "").slice(0, 40), (url.searchParams.get("device") ?? "").slice(0, 64)) }));
   if (p.startsWith("/api/")) return api(res, url);
   if (p.startsWith("/geo/")) return geo(res, url);
   if (p === "/poi/velhop") return cached(res, "poi:velhop", 60, 600, async () => poiResult(await velhop()));
