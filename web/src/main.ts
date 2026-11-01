@@ -177,11 +177,16 @@ async function loadDeps(): Promise<void> {
   }
 }
 
+/** Distances au-delà desquelles un arrêt, ou une gare, n'est plus « à proximité » (sauf la gare la plus proche, onglet TER) */
+const STOP_NEAR_M = 2000, GARE_NEAR_M = 1500;
+
 async function loadDepsNow(): Promise<void> {
   try {
     if (S.tab === "nearby" && !S.overlay && S.filter === "ter") {
-      // gares les plus proches (Strasbourg-Ville compris, rattachée à Gare Centrale) et leurs prochains trains
-      const gares = STOPS.filter(s => s.sncf).map(s => ({ s, d: haversine(USER, s) })).sort((a, b) => a.d - b.d).slice(0, 3);
+      // gare la plus proche (Strasbourg-Ville comprise, rattachée à Gare Centrale) et ses prochains trains ; d'autres gares
+      // seulement si elles sont aussi à moins de 1,5 km (à Sarrebourg : Sarrebourg seule, pas Réding ni Lutzelbourg)
+      const gares = STOPS.filter(s => s.sncf).map(s => ({ s, d: haversine(USER, s) })).sort((a, b) => a.d - b.d)
+        .filter((g, i) => i === 0 || g.d < GARE_NEAR_M).slice(0, 3);
       await fillSlot("nearlist", async () => {
         const res = await Promise.all(gares.map(({ s }) => nextTrains(s.sncf!).catch(() => null)));
         if (res.every(r => r === null)) throw new Error("Serveur Kumm injoignable");
@@ -190,10 +195,14 @@ async function loadDepsNow(): Promise<void> {
     } else if (S.tab === "nearby" && !S.overlay) {
       // les 12 arrêts les plus proches sont interrogés, et les 4 plus proches qui ont encore des passages sont affichés :
       // le soir, l'arrêt de bus le plus proche n'a souvent plus rien, alors qu'un tram passe un peu plus loin
-      const near = STOPS.filter(s => matchesFilter(s))
-        .sort((a, b) => Math.hypot(a.x - 170, a.y - 222) - Math.hypot(b.x - 170, b.y - 222)).slice(0, 12);
+      // seulement les arrêts à moins de 2 km, et une gare (sans tram ni bus) à moins de 1,5 km : loin de Strasbourg
+      // (Sarrebourg), la liste se remplissait sinon de gares lointaines et d'arrêts CTS à 70 km
+      const near = STOPS.map(s => ({ s, d: haversine(USER, s) }))
+        .filter(({ s, d }) => matchesFilter(s) && d < STOP_NEAR_M && (!s.sncf || s.lines.some(l => l !== "TER") || d < GARE_NEAR_M))
+        .sort((a, b) => a.d - b.d).slice(0, 12).map(x => x.s);
       const filter = S.filter;
       await fillSlot("nearlist", async () => {
+        if (!near.length) return `<div class="empty" style="padding:24px">Aucun arrêt ${filter === "all" ? "ni gare " : ""}à moins de 2 km.${filter === "all" ? " Les gares plus lointaines sont dans l’onglet TER." : ""}</div>`;
         const res = await Promise.all(near.map(s => nextDepartures(s).then(ds => ds.map(d => ({ stop: s, d }))).catch(() => null)));
         // aucun arrêt n'a pu être interrogé : on garde la liste affichée (voir le catch de loadDeps)
         if (res.every(r => r === null)) throw new Error("Serveur Kumm injoignable");
