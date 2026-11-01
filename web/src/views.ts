@@ -7,7 +7,7 @@ import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, h
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
 import { ACCENTS, ACCENT_TOKENS, THEMES, THEME_TOKENS, UIS } from "./themes";
-import type { Accent, Theme, Ui } from "./themes";
+import type { Accent, Theme, Tokens, Ui } from "./themes";
 import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_OBJETS_TROUVES, KUMM_CONTACT, isIOS } from "./links";
 import type { Layer } from "./kinds";
 import { marker, markerIcon } from "./markers";
@@ -1106,9 +1106,19 @@ function alertSettings(): string {
 const check = (): string => '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>';
 
 /** Aperçu miniature de l'accueil de Kumm dans un thème, une couleur et une forme donnés (couleurs : themes.ts) */
+/** Couleurs de la forme « Papier » avec le thème automatique (mêmes valeurs que style.css) */
+const PAPER_TOKENS: Record<"light" | "dark", Tokens> = {
+  light: { bg: "#F3F0E8", card: "#FBFAF6", ink: "#15201B", mute: "#5E6A63", line: "#D9D4C7", chip: "#E8E3D7", dark: false },
+  dark: { bg: "#141714", card: "#1B1F1B", ink: "#ECE8DD", mute: "#9BA49D", line: "#2C322D", chip: "#232823", dark: true }
+};
+
 function miniApp(theme: Theme, accent: Accent, ui: Ui, tiny = false): string {
   const one = (th: Exclude<Theme, "auto">): string => {
-    const t = THEME_TOKENS[th], a = ACCENT_TOKENS[accent][t.dark ? "dark" : "light"];
+    // forme « Papier » en automatique : ses propres couleurs papier (clair) et encre (sombre), comme dans style.css
+    const paper = ui === "papier" && theme === "auto";
+    const t = paper ? PAPER_TOKENS[th === "dark" ? "dark" : "light"] : THEME_TOKENS[th];
+    const a0 = ACCENT_TOKENS[accent][t.dark ? "dark" : "light"];
+    const a: [string, string, string, string] = paper && accent === "green" ? (t.dark ? ["#7BD8A6", "#141714", "#141714", "#1F2A23"] : ["#1A6B4A", "#F3F0E8", "#F3F0E8", "#E1E8DC"]) : a0;
     const [ha, hb] = t.head ?? [a[1], a[2]];
     const vars = `--m-bg:${t.bg};--m-card:${t.card};--m-ink:${t.ink};--m-mute:${t.mute};--m-line:${t.line};--m-chip:${t.chip};--m-a:${a[0]};--m-ha:${ha};--m-hb:${hb};--m-soft:${a[3]}`;
     const chip = (l: string): string => `<span class="mc" style="background:${COLORS[l]};color:${lineText(l)}">${l}</span>`;

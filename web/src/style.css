@@ -1053,3 +1053,26 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 :root[data-ui="papier"] .lyr{box-shadow:0 0 0 1px var(--line)}
 :root[data-ui="papier"] .lyr.on{box-shadow:0 0 0 1px var(--line);opacity:1}
 :root[data-ui="papier"] .tools{box-shadow:0 0 0 1px var(--line)}
+/* aperçu de la forme « Papier » (écran Apparence) */
+.mini.ui-papier{--mr:0px;font-family:"IBM Plex Sans",system-ui,sans-serif;gap:8px}
+.mini.ui-papier .m-head b{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:32px;letter-spacing:0;line-height:1}
+.mini.ui-papier .m-head small{font-weight:500}
+.mini.ui-papier .m-head i{background:transparent;box-shadow:inset 0 0 0 1.5px var(--m-ink);border-radius:6px;width:22px;height:22px}
+.mini.ui-papier .m-go{background:transparent;color:var(--m-ink);padding:6px 0 10px;border-bottom:1px solid var(--m-line)}
+.mini.ui-papier .m-go small{font-family:"IBM Plex Mono",monospace;color:var(--m-mute);opacity:1}
+.mini.ui-papier .m-go b{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:24px}
+.mini.ui-papier .m-row{gap:0}
+.mini.ui-papier .m-tile{background:transparent;box-shadow:none;border-radius:0;border-bottom:1px solid var(--m-line);padding:6px 10px 8px 0}
+.mini.ui-papier .m-tile+.m-tile{border-left:1px solid var(--m-line);padding-left:10px;padding-right:0}
+.mini.ui-papier .m-tile b{font-weight:700}
+.mini.ui-papier .m-tile em{font-family:"IBM Plex Mono",monospace;font-weight:600}
+.mini.ui-papier .mc{border-radius:3px}
+.mini.ui-papier .m-alert{background:transparent;box-shadow:inset 3px 0 0 #C8321E;padding-left:8px}
+.mini.ui-papier .m-alert b{color:#C8321E;font-family:"IBM Plex Mono",monospace;font-weight:600}
+.mini.ui-papier .m-bike{background:transparent}
+.mini.ui-papier .m-bike b{color:var(--m-mute);font-family:"IBM Plex Mono",monospace;font-weight:600}
+.mini.ui-papier .m-n{color:var(--m-ink);font-family:"IBM Plex Mono",monospace;font-weight:600}
+:root[data-ui="papier"] .look-card{border-radius:6px;background:transparent;border:1px solid var(--line)}
+:root[data-ui="papier"] .look-card.on{border:2px solid var(--ink)}
+:root[data-ui="papier"] .look-card .mini-wrap,:root[data-ui="papier"] .look-link .mini-wrap{border-radius:4px}
+:root[data-ui="papier"] .row-switch,:root[data-ui="papier"] .look-link{background:transparent;border-radius:0;box-shadow:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-left:0;padding-right:0}

@@ -26,6 +26,8 @@ interface Report { kind: string; first: number; last: number; yes: string[]; no:
 let reports: Record<string, Report[]> = {};
 try { reports = JSON.parse(fs.readFileSync(FILE, "utf8")) as typeof reports; } catch { /* premier démarrage */ }
 const sent = new Map<string, number[]>();
+// limites d'envoi : rien n'est gardé plus d'une heure (ni l'adresse IP, ni l'identifiant haché)
+setInterval(() => { const now = Date.now(); for (const [k, v] of sent) if (now - v[v.length - 1] > 3600_000) sent.delete(k); }, 10 * 60_000).unref();
 const stats = { recus: 0, refuses: 0 };
 
 let saveTimer: NodeJS.Timeout | null = null;
@@ -58,7 +60,6 @@ export function receiveReport(body: unknown, ip: string, now = Date.now()): { st
   const times = (sent.get(who) ?? []).filter(t => now - t < 3600_000), ipTimes = (sent.get(byIp) ?? []).filter(t => now - t < 3600_000);
   if (times.length >= PER_HOUR || ipTimes.length >= PER_IP_HOUR) { stats.refuses++; return { status: 429, msg: "Trop de signalements : réessayez plus tard" }; }
   times.push(now); ipTimes.push(now); sent.set(who, times); sent.set(byIp, ipTimes);
-  if (sent.size > 20_000) for (const [k, v] of sent) if (now - v[v.length - 1] > 3600_000) sent.delete(k);
   prune(now);
   if (!reports[stop] && Object.keys(reports).length >= MAX_STOPS) return { status: 503, msg: "Signalements indisponibles" };
   const list = (reports[stop] ??= []);

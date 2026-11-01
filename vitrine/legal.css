@@ -1,21 +1,21 @@
-/* Pages légales de kumm.fr (mentions légales, confidentialité) */
-:root{--bg:#F2F6F3;--card:#fff;--ink:#13201A;--mute:#56665D;--line:#DCE6DF;--accent-ink:#0F5C3E;--mark:#FFF1B8}
-@media (prefers-color-scheme:dark){:root{--bg:#0B1410;--card:#13211A;--ink:#E7F1EC;--mute:#9AB0A4;--line:#22382C;--accent-ink:#7BE5B6;--mark:#4A3F12}}
+/* Pages légales de kumm.fr (mentions légales, confidentialité) : même style « Papier » que l'accueil du site */
+:root{--bg:#F3F0E8;--ink:#15201B;--mute:#5E6A63;--line:#D3CDBF;--accent-ink:#1A6B4A;--mark:#F2E3A6}
+@media (prefers-color-scheme:dark){:root{--bg:#141714;--ink:#ECE8DD;--mute:#9BA49D;--line:#2C322D;--accent-ink:#7BD8A6;--mark:#4A3F12}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 a{color:var(--accent-ink)}
 .wrap{max-width:760px;margin:0 auto;padding:0 20px}
-header{display:flex;align-items:center;gap:12px;padding:24px 0}
-header img{width:40px;height:40px;border-radius:11px}
-header a{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);font-weight:800;font-size:21px}
-main{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:8px 28px 24px;margin-bottom:28px}
-h1{font-size:clamp(28px,5vw,36px);line-height:1.15;margin:22px 0 6px}
+header{display:flex;align-items:center;gap:12px;padding:18px 0;border-bottom:1px solid var(--ink)}
+header img{width:24px;height:24px}
+header a{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font:400 30px "Instrument Serif",Georgia,serif}
+main{padding:8px 0 28px;border-bottom:1px solid var(--line);margin-bottom:24px}
+h1{font:400 clamp(38px,6vw,52px)/1.05 "Instrument Serif",Georgia,serif;margin:32px 0 8px}
 .date{color:var(--mute);margin:0 0 10px;font-size:15px}
-h2{font-size:20px;margin:30px 0 8px}
+h2{font:400 28px/1.15 "Instrument Serif",Georgia,serif;margin:34px 0 8px;padding-top:18px;border-top:1px solid var(--line)}
 p,li{color:var(--ink)}
 ul{padding-left:22px}
 li{margin:4px 0}
 .mute{color:var(--mute)}
-mark{background:var(--mark);color:inherit;padding:0 4px;border-radius:4px}
+mark{background:var(--mark);color:inherit;padding:0 4px;border-radius:2px}
 footer{color:var(--mute);font-size:14px;padding:0 0 40px}
-@media (max-width:560px){main{padding:4px 18px 18px}}

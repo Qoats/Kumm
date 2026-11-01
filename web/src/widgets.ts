@@ -32,7 +32,10 @@ export interface WidgetSetup {
 
 /** Thème des widgets : celui de l'application (« automatique » : clair ou sombre selon le téléphone, au moment de l'envoi) */
 function widgetTheme(): { palette: string; ink: string; mute: string } {
-  const th = S.prefs.theme === "auto" ? (document.documentElement.dataset["scheme"] === "dark" ? "dark" : "light") : S.prefs.theme;
+  const dark = document.documentElement.dataset["scheme"] === "dark";
+  // forme « Papier » en automatique : fonds papier (clair) et encre (sombre), comme dans l'application
+  if (S.prefs.ui === "papier" && S.prefs.theme === "auto") return dark ? { palette: "ink", ink: "#ECE8DD", mute: "#9BA49D" } : { palette: "paper", ink: "#15201B", mute: "#5E6A63" };
+  const th = S.prefs.theme === "auto" ? (dark ? "dark" : "light") : S.prefs.theme;
   const t = THEME_TOKENS[th];
   return { palette: th, ink: t.ink, mute: t.mute };
 }
