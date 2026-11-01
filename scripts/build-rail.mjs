@@ -9,11 +9,13 @@ const OUT = path.join(process.cwd(), "data", "rail.json");
 // Voies ferrées, en plusieurs requêtes (une seule, trop grosse, est refusée par les serveurs) :
 // - autour de Strasbourg (de Molsheim à Kehl, d'Erstein à Brumath, jusqu'à Lauterbourg) : voies principales, voies de gare et
 //   aiguillages, mais pas les voies de garage, de triage ni les embranchements industriels, militaires ou touristiques ;
-// - Alsace, Lorraine, Bâle, Palatinat et Sarre, puis la ligne Paris-Est → Strasbourg (trains TER jusqu'à Paris) : lignes
-//   principales et secondaires seulement. Les lignes à grande vitesse sont exclues (les TER n'y roulent pas, et le plus court
-//   chemin les prendrait entre Strasbourg et Saverne).
+// - Alsace, Lorraine, Bâle, Palatinat et Sarre, puis la ligne Paris-Est → Strasbourg (trains TER jusqu'à Paris) : voies de
+//   ligne seulement (ni voies de gare ni de service), y compris les petites lignes sans catégorie (vallée de la Bruche).
+//   Les lignes à grande vitesse (LGV, 250 km/h et plus) sont exclues : les TER n'y roulent pas, et le plus court chemin les
+//   prendrait entre Strasbourg et Saverne. Pas le marqueur « highspeed » : il est aussi posé sur des lignes classiques
+//   rapides (Strasbourg-Bâle, Saverne-Lutzelbourg) où roulent les TER.
 const LOCAL = '["service"!~"^(yard|siding|spur)$"]["usage"!~"^(industrial|military|tourism|test)$"]';
-const MAIN = '["usage"~"^(main|branch)$"]["service"!~"."]["highspeed"!="yes"]';
+const MAIN = '["service"!~"."]["usage"!~"^(industrial|military|tourism|test)$"]["name"!~"LGV|grande vitesse|Schnellfahrstrecke"]["maxspeed"!~"^(2[5-9]|3[0-9])[0-9]"]';
 const way = (filter, [s, w, n, e]) => `way["railway"="rail"]${filter}(${s},${w},${n},${e});`;
 const QUERIES = [
   [way(LOCAL, [48.38, 7.45, 48.78, 7.95]), way(LOCAL, [48.66, 7.80, 48.99, 8.21])],
