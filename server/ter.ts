@@ -33,8 +33,29 @@ let trips: Trip[] = [];
 let stations = new Map<string, { name: string; lat: number; lon: number }>();
 let loadedFor = "";                          // journée pour laquelle les horaires ont été préparés
 let gtfsDate = 0;
-/** Gares suivies : Eurométropole, ligne de Lauterbourg et ligne Paris-Est – Strasbourg */
+/** Gares suivies : celles de shared/ter.ts (Eurométropole, ligne de Lauterbourg, ligne Paris-Est – Strasbourg) et toutes
+    les gares TER du Grand Est (Alsace, Lorraine, Champagne-Ardenne), ajoutées à la lecture des horaires */
 const EMS = new Set(TER_STATIONS.map(s => s.uic));
+/** Gares suivies, avec leur nom et leur position (servies à l'application : fiches et départs) */
+let followed: { uic: string; name: string; lat: number; lon: number }[] = TER_STATIONS.map(s => ({ ...s }));
+export const followedStations = (): { uic: string; name: string; lat: number; lon: number }[] => followed;
+export const isFollowedStation = (uic: string): boolean => EMS.has(uic);
+
+/** Contour simplifié de la région Grand Est (longitude, latitude), au kilomètre près : suffit à trier les gares */
+const GRAND_EST: [number, number][] = [
+  [4.05, 49.97], [4.85, 50.17], [4.97, 49.80], [5.40, 49.62], [5.82, 49.55], [6.37, 49.47], [6.74, 49.17], [7.05, 49.12],
+  [7.38, 49.17], [7.63, 49.07], [8.23, 48.97], [7.80, 48.55], [7.58, 48.10], [7.52, 47.66], [7.55, 47.55], [7.35, 47.43],
+  [7.13, 47.49], [6.85, 47.82], [6.40, 47.95], [5.90, 47.80], [5.25, 47.58], [4.85, 47.70], [4.30, 47.85], [3.75, 48.10],
+  [3.40, 48.37], [3.48, 48.80], [3.65, 49.05], [3.85, 49.40]
+];
+function inGrandEst(lon: number, lat: number): boolean {
+  let inside = false;
+  for (let i = 0, j = GRAND_EST.length - 1; i < GRAND_EST.length; j = i++) {
+    const [xi, yi] = GRAND_EST[i], [xj, yj] = GRAND_EST[j];
+    if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
 
 /** « STRASBOURG-MULHOUSE » → « Strasbourg-Mulhouse » (certains noms de lignes SNCF sont en capitales) */
 const softCaps = (t: string): string =>
@@ -52,6 +73,8 @@ async function parseGtfs(buf: Buffer, now: number): Promise<void> {
     if (!id.startsWith("StopPoint:OCETrain TER-")) return;
     allStations.set(uicOf(id), { name: r[c["stop_name"]], lat: Number(r[c["stop_lat"]]), lon: Number(r[c["stop_lon"]]) });
   });
+  // toutes les gares TER du Grand Est sont suivies (noms de shared/ter.ts gardés pour les autres)
+  for (const [uic, p] of allStations) if (!EMS.has(uic) && inGrandEst(p.lon, p.lat)) { EMS.add(uic); followed.push({ uic, ...p }); }
   const dates = new Map<string, string[]>();
   await eachRow(buf, entries, "calendar_dates.txt", (r, c) => {
     const d = r[c["date"]];

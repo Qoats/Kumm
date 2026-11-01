@@ -17,7 +17,7 @@ import { WEB_PRIVATE, allowed, keyMatches, loginRoute, logoutRoute } from "./acc
 import { serveTile } from "./tiles.js";
 import { parseGeneralMessages } from "./messages.js";
 import { allCourses, vehiclesAt } from "./vehicles.js";
-import { startTer, terStatus, trainDepartures } from "./ter.js";
+import { followedStations, isFollowedStation, startTer, terStatus, trainDepartures } from "./ter.js";
 import { roadStatus } from "./roads.js";
 import { widgetData } from "./widgets.js";
 import { stallStatus } from "./stalls.js";
@@ -32,7 +32,6 @@ import { parkForecast, parksStatus, startParks } from "./parks.js";
 import { punctualityStatus, stats as punctualityStats } from "./punctuality.js";
 import { observationStatus } from "./observations.js";
 import { tripAt, tripById } from "./trips.js";
-import { TER_STATIONS } from "../shared/ter.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
 import type { TrafficMessage } from "./messages.js";
 import { quayLinesJson, quayModesJson, realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
@@ -183,9 +182,11 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
   if (name === "quay-lines") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(quayLinesJson()), undefined, { cache: "public, max-age=600" });
   if (name === "quay-modes") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(quayModesJson()), undefined, { cache: "public, max-age=600" });
   // départs des trains d'une gare de l'Eurométropole (horaires SNCF recalés en temps réel), recalculés au plus toutes les 20 s
+  // gares TER suivies (Eurométropole, lignes de Lauterbourg et de Paris, tout le Grand Est) : fiches de l'application
+  if (name === "ter-stations") return send(res, 200, "application/json; charset=utf-8", JSON.stringify({ items: followedStations() }), undefined, { cache: "public, max-age=3600" });
   if (name === "trains") {
     const uic = url.searchParams.get("gare") ?? "";
-    if (!TER_STATIONS.some(s => s.uic === uic)) return send(res, 404, "text/plain", "Gare inconnue");
+    if (!isFollowedStation(uic)) return send(res, 404, "text/plain", "Gare inconnue");
     return cached(res, "info:trains:" + uic, 20, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify({ now: Date.now(), trains: trainDepartures(uic) }) }));
   }
   // trajet suivi pendant une navigation : la course d'un véhicule, ou la prochaine qui passe à un arrêt
