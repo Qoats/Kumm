@@ -4,7 +4,7 @@ import type { AnnotatedStopPoint, SiriStopMonitoring, SiriStopPoints } from "../
 import { appHeaders, CONFIG, url } from "./config";
 import { DIRS, isTram, kindOfStop } from "./data";
 import { isHubName, stopKey } from "./network";
-import { STRASBOURG_VILLE, TER_STATIONS_EMS } from "../../shared/ter";
+import { STRASBOURG_VILLE, TER_STATIONS } from "../../shared/ter";
 import type { TrainDeparture } from "../../shared/ter";
 import { parseLineInfo } from "./lines";
 import type { LineInfo } from "./lines";
@@ -205,8 +205,8 @@ export async function loadStops(): Promise<Stop[]> {
   const stops: Stop[] = Object.values(by).map(g => ({
     id: g.id, name: g.name, refs: [...g.codes, ...g.quays], lat: g.lat / g.n, lon: g.lon / g.n, x: 0, y: 0, lines: [...g.lines], quays: g.pos
   }));
-  // gares TER de l'Eurométropole ; Strasbourg-Ville est rattachée à Gare Centrale (une seule fiche : trams, bus et trains)
-  for (const t of TER_STATIONS_EMS) {
+  // gares TER (Eurométropole, lignes de Lauterbourg et de Paris) ; Strasbourg-Ville est rattachée à Gare Centrale (une seule fiche : trams, bus et trains)
+  for (const t of TER_STATIONS) {
     const hub = t.uic === STRASBOURG_VILLE ? stops.find(s => isHubName(s.name)) : undefined;
     if (hub) { hub.sncf = t.uic; hub.lines.push("TER"); continue; }
     stops.push({ id: "SNCF:" + t.uic, name: t.name, refs: [], lat: t.lat, lon: t.lon, x: 0, y: 0, lines: ["TER"], sncf: t.uic });

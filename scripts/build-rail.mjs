@@ -1,4 +1,4 @@
-// Voies ferrées d'Alsace, de Lorraine et de la ligne Paris-Est → Strasbourg depuis OpenStreetMap, pour que les trains TER suivent les rails sur la carte.
+// Voies ferrées du Grand Est (et de la ligne Paris-Est → Strasbourg) depuis OpenStreetMap, pour que les trains TER suivent les rails sur la carte.
 // Utilisation : node scripts/build-rail.mjs                (télécharge via Overpass et écrit data/rail.json)
 //               node scripts/build-rail.mjs fichier.json   (à partir d'une réponse Overpass déjà téléchargée)
 // Relancé chaque nuit avec les tracés des lignes (.github/workflows/shapes.yml) ; un téléchargement incomplet est refusé.
@@ -22,7 +22,11 @@ const QUERIES = [
   // Alsace, Lorraine et alentours : 6 zones
   ...[[47.50, 48.40], [48.40, 49.30]].flatMap(([s, n]) => [[5.80, 6.70], [6.70, 7.55], [7.55, 8.35]].map(([w, e]) => [way(MAIN, [s, w, n, e])])),
   // ligne Paris-Est → Toul (Château-Thierry, Épernay, Châlons-en-Champagne, Vitry-le-François, Bar-le-Duc, Commercy)
-  [way(MAIN, [48.60, 2.30, 49.15, 3.70])], [way(MAIN, [48.60, 3.70, 49.15, 4.80])], [way(MAIN, [48.55, 4.80, 49.00, 5.80])]
+  [way(MAIN, [48.60, 2.30, 49.15, 3.70])], [way(MAIN, [48.60, 3.70, 49.15, 4.80])], [way(MAIN, [48.55, 4.80, 49.00, 5.80])],
+  // trains qui passent par ces gares vers d'autres régions : Reims, Verdun, Longwy, Thionville, Luxembourg (nord) ;
+  // Troyes, Chaumont, Neufchâteau, Dijon (sud)
+  ...[[3.70, 4.80], [4.80, 5.80], [5.80, 6.80]].map(([w, e]) => [way(MAIN, [49.00, w, 49.75, e])]),
+  ...[[2.30, 3.50], [3.50, 4.70], [4.70, 5.80]].map(([w, e]) => [way(MAIN, [47.20, w, 48.60, e])])
 ].map(parts => `[out:json][timeout:180];(${parts.join("")});out geom;`);
 // Serveurs publics d'OpenStreetMap, essayés à tour de rôle. Ils tombent parfois en panne (502, 504) :
 // on refait plusieurs tours espacés, et si aucun ne répond, on garde les tracés de la veille sans faire échouer le travail.

@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { TER_POLL_S } from "./config.js";
 import { DAY, dayBase, daysAround, eachRow, ymd, zipEntries } from "./gtfs.js";
-import { TER_STATIONS_EMS, TER_TRIP_PREFIX } from "../shared/ter.js";
+import { TER_STATIONS, TER_TRIP_PREFIX } from "../shared/ter.js";
 import type { TrainDeparture } from "../shared/ter.js";
 import type { Course } from "./realtime.js";
 
@@ -33,7 +33,8 @@ let trips: Trip[] = [];
 let stations = new Map<string, { name: string; lat: number; lon: number }>();
 let loadedFor = "";                          // journée pour laquelle les horaires ont été préparés
 let gtfsDate = 0;
-const EMS = new Set(TER_STATIONS_EMS.map(s => s.uic));
+/** Gares suivies : Eurométropole, ligne de Lauterbourg et ligne Paris-Est – Strasbourg */
+const EMS = new Set(TER_STATIONS.map(s => s.uic));
 
 /** « STRASBOURG-MULHOUSE » → « Strasbourg-Mulhouse » (certains noms de lignes SNCF sont en capitales) */
 const softCaps = (t: string): string =>
@@ -41,7 +42,7 @@ const softCaps = (t: string): string =>
 const secs = (t: string): number => { const [h, m, s] = t.split(":").map(Number); return h * 3600 + m * 60 + (s || 0); };
 const uicOf = (stopId: string): string => /(\d{8})$/.exec(stopId)?.[1] ?? "";
 
-/** Garde les trains TER qui desservent une gare de l'Eurométropole entre hier et dans une semaine */
+/** Garde les trains TER qui desservent une gare suivie (Eurométropole, lignes de Lauterbourg et de Paris) entre hier et dans une semaine */
 async function parseGtfs(buf: Buffer, now: number): Promise<void> {
   const entries = zipEntries(buf);
   const window = new Set(Array.from({ length: 9 }, (_, i) => ymd(now + (i - 1) * DAY)));
@@ -87,9 +88,9 @@ async function parseGtfs(buf: Buffer, now: number): Promise<void> {
   flush();
   const used = new Map<string, { name: string; lat: number; lon: number }>();
   for (const t of kept) for (const s of t.stops) { const p = allStations.get(s.uic); if (p) used.set(s.uic, p); }
-  for (const s of TER_STATIONS_EMS) used.set(s.uic, { name: s.name, lat: s.lat, lon: s.lon });   // noms affichés dans Kumm
+  for (const s of TER_STATIONS) used.set(s.uic, { name: s.name, lat: s.lat, lon: s.lon });   // noms affichés dans Kumm
   trips = kept; stations = used; loadedFor = ymd(now);
-  console.log(`TER : ${kept.length} trains desservent l'Eurométropole, ${used.size} gares`);
+  console.log(`TER : ${kept.length} trains desservent les gares suivies, ${used.size} gares`);
 }
 
 let lastError = "";

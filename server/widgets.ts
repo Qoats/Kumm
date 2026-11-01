@@ -13,7 +13,7 @@ import type { TrafficMessage } from "./messages.js";
 import { nearestWithDepartures, upcomingFor } from "./realtime.js";
 import type { WidgetVisit } from "./realtime.js";
 import { trainDepartures } from "./ter.js";
-import { TER_STATIONS_EMS } from "../shared/ter.js";
+import { TER_STATIONS } from "../shared/ter.js";
 
 interface Dep { l: string; d: string; t: number[]; rt: boolean; x?: number[] }
 const json = (body: unknown, status = 200): CtsResult => ({ status, type: "application/json; charset=utf-8", body: JSON.stringify(body) });
@@ -32,7 +32,7 @@ function group(visits: WidgetVisit[], max = 6): Dep[] {
 }
 
 function trains(uic: string): Dep[] {
-  if (!TER_STATIONS_EMS.some(s => s.uic === uic)) return [];
+  if (!TER_STATIONS.some(s => s.uic === uic)) return [];
   const by = new Map<string, Dep>();
   for (const t of trainDepartures(uic)) {
     const g = by.get(t.dest) ?? by.set(t.dest, { l: "TER", d: t.dest, t: [], rt: false }).get(t.dest)!;

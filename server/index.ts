@@ -32,7 +32,7 @@ import { parkForecast, parksStatus, startParks } from "./parks.js";
 import { punctualityStatus, stats as punctualityStats } from "./punctuality.js";
 import { observationStatus } from "./observations.js";
 import { tripAt, tripById } from "./trips.js";
-import { TER_STATIONS_EMS } from "../shared/ter.js";
+import { TER_STATIONS } from "../shared/ter.js";
 import { alertsStatus, startAlerts, subscribe } from "./alerts.js";
 import type { TrafficMessage } from "./messages.js";
 import { quayLinesJson, quayModesJson, realtimeStatus, setStopIndex, startRealtime, stopMonitoringFromSnapshot } from "./realtime.js";
@@ -185,7 +185,7 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
   // départs des trains d'une gare de l'Eurométropole (horaires SNCF recalés en temps réel), recalculés au plus toutes les 20 s
   if (name === "trains") {
     const uic = url.searchParams.get("gare") ?? "";
-    if (!TER_STATIONS_EMS.some(s => s.uic === uic)) return send(res, 404, "text/plain", "Gare inconnue");
+    if (!TER_STATIONS.some(s => s.uic === uic)) return send(res, 404, "text/plain", "Gare inconnue");
     return cached(res, "info:trains:" + uic, 20, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify({ now: Date.now(), trains: trainDepartures(uic) }) }));
   }
   // trajet suivi pendant une navigation : la course d'un véhicule, ou la prochaine qui passe à un arrêt
