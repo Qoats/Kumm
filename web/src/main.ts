@@ -9,6 +9,14 @@ import "@fontsource/plus-jakarta-sans/latin-700.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-700.css";
 import "@fontsource/plus-jakarta-sans/latin-800.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-800.css";
+// forme « Papier » : jeux complets (chaque fichier ne se charge que pour les caractères présents à l'écran)
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-sans/700.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/ibm-plex-mono/600.css";
 import "./style.css";
 import { CONFIG, VERSION, url } from "./config";
 import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
@@ -120,6 +128,11 @@ function draw(): void {
   const tslot = document.getElementById("tripmap-slot");
   if (tslot) mountTripMap(tslot);
   restoreSlots();
+  // accueil : les tuiles de la colonne de droite sont marquées (forme « Papier » : trait vertical entre les deux colonnes)
+  app.querySelectorAll<HTMLElement>(".tiles").forEach(g => {
+    const mid = g.getBoundingClientRect().left + g.clientWidth / 2;
+    g.querySelectorAll<HTMLElement>(":scope > .tile").forEach(t => t.classList.toggle("col2", !t.classList.contains("w") && t.getBoundingClientRect().left > mid));
+  });
   // après restoreSlots : les listes chargées à part ont retrouvé leur contenu, donc leur hauteur
   restoreScroll(app, screen);
   void loadDeps();

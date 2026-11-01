@@ -774,8 +774,14 @@ function reportsBlock(stopId: string): string {
   }).join("");
   const picker = o?.rep ? `<div class="reppick"><b>Quel problème ?</b>${REPORT_KINDS.map(([k, icon, label]) => `<button class="item" data-rep="${k}|new">${ic(icon)}<span>${esc(label)}</span></button>`).join("")}
     <p class="src">Sans texte ni donnée personnelle. Le signalement s’efface seul (30 min pour un véhicule bondé, 2 jours au plus pour le reste).</p></div>` : "";
-  return `${rows ? `<div class="reps"><div class="sub" style="margin-top:0">Signalé par les voyageurs</div>${rows}</div>` : ""}${picker}
-    ${o?.rep ? "" : `<button class="whenlink" data-act="report">${ic("bell")}Signaler un problème à cet arrêt</button>`}`;
+  return `${rows ? `<div class="reps"><div class="sub" style="margin-top:0">Signalé par les voyageurs</div>${rows}</div>` : ""}${picker}`;
+}
+
+/** Fiche d'un arrêt : une seule barre d'actions (y aller, horaires d'un autre moment) au lieu de liens empilés */
+function stopActions(s: Stop): string {
+  const o = S.overlay?.k === "stop" ? S.overlay : null;
+  const other = quayOf(s) && o && !o.pick && !o.at;
+  return `<div class="sacts${other ? "" : " one"}"><button class="go" data-goto="stop:${esc(s.id)}">${ic("navigate")}Y aller</button>${other ? `<button class="sact2" data-act="stopPick">${ic("clock")}Autre horaire</button>` : ""}</div>`;
 }
 
 /** Fiche d'un arrêt : passer des passages en direct aux horaires prévus d'un autre jour ou d'une autre heure */
@@ -793,7 +799,7 @@ function whenControl(s: Stop): string {
     return `<div class="whenbox on">${ic("clock")}<span><b>Horaires prévus</b><small>${esc(day)} à partir de ${hm(o.at)}</small></span>
       <span class="wb"><button class="pill" data-act="stopPick">Changer</button><button class="pill" data-act="stopNow">Direct</button></span></div>`;
   }
-  return `<button class="whenlink" data-act="stopPick">${ic("clock")}Horaires d’un autre jour ou d’une autre heure</button>`;
+  return "";   // le bouton « Autre horaire » est dans la barre d'actions de la fiche
 }
 
 /** Horaires prévus d'un arrêt : une ligne par ligne et direction, avec les heures de passage */
@@ -817,7 +823,8 @@ export function overlayStop(id: string): string {
    <button class="star ${fav ? "on" : ""}" data-fav="${esc(id)}" aria-label="Favori">${ic("heart")}</button></div>
    ${elevatorNotice(s.name)}${reportsBlock(id)}
    ${s.sncf && CONTREMARQUE_TER.has(s.sncf) ? ctmBadge() : ""}
-   <button class="go" data-goto="stop:${esc(id)}" style="margin:0 0 14px">${ic("navigate", 'width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"')}Naviguer</button>${whenControl(s)}<div id="stopdeps"></div></div></main></div>`;
+   ${stopActions(s)}${whenControl(s)}<div id="stopdeps"></div>
+   ${S.overlay?.k === "stop" && S.overlay.rep ? "" : `<button class="whenlink sreport" data-act="report">${ic("bell")}Signaler un problème à cet arrêt</button>`}</div></main></div>`;
 }
 
 export function overlayMsgs(): string {

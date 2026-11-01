@@ -604,7 +604,7 @@ header.thead svg{stroke:var(--ink)}
 .tile{display:flex;flex-direction:column;align-items:stretch;text-align:left;background:var(--card);border-radius:24px;padding:14px 15px;box-shadow:var(--sh);color:var(--ink);min-width:0;position:relative;overflow:hidden;text-decoration:none;border:1px solid transparent}
 .tile:active,.tile-add:active{transform:scale(.98);transition:transform .08s}
 .tiles .w{grid-column:span 2}
-.tile h2{margin:0 0 8px;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile h2{margin:0 0 8px;display:flex;align-items:center;justify-content:flex-start;gap:6px;font-size:12.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile h2 svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .tile .big{font-size:38px;font-weight:800;letter-spacing:-1px;line-height:1}
 .tile .big.sm{font-size:24px;letter-spacing:-.4px}
@@ -838,7 +838,7 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 /* Ponctualité */
 .punct{margin-top:22px}
 .punct.flat{margin-top:0}
-.punct h2{display:flex;align-items:center;gap:8px;font-size:16px;margin:0 0 10px}
+.punct h2{display:flex;align-items:center;justify-content:flex-start;gap:8px;font-size:16px;margin:0 0 10px}
 .punct h2 small{font-weight:500;color:var(--mute);font-size:13px;margin-left:auto}
 .punct h2 svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .pbig{display:flex;align-items:center;gap:12px;margin:4px 0 10px}
@@ -860,7 +860,7 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 
 /* Prévision Vélhop */
 .bfc{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:14px;margin:0 0 14px}
-.bfc h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0 0 6px}
+.bfc h2{display:flex;align-items:center;justify-content:flex-start;gap:8px;font-size:15px;margin:0 0 6px}
 .bfc h2 svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .bsum{margin:0 0 10px;font-size:14px}
 .bbars{display:flex;align-items:flex-end;gap:4px;height:110px;margin-bottom:6px}
@@ -909,3 +909,147 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .rep .rb .pill{margin:0;font-size:12.5px;padding:5px 11px}
 .reppick{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 12px 4px;margin:0 0 12px}
 .reppick .item svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+
+/* ================================================================================================================
+   Forme « Papier » (par défaut) : fond papier, encre, filets fins au lieu des cartes et des ombres, coins droits,
+   titres en Instrument Serif, horaires en IBM Plex Mono. Couleurs propres quand le thème est « Automatique »
+   (clair le jour, sombre le soir) ; avec un autre thème, ses couleurs sont gardées.
+   ================================================================================================================ */
+:root[data-ui="papier"]{--font:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;--serif:"Instrument Serif",Georgia,serif;--mono:"IBM Plex Mono",ui-monospace,monospace;--r:6px;--sh:none}
+:root[data-ui="papier"][data-palette=""][data-scheme="light"]{
+  --bg:#F3F0E8;--card:#FBFAF6;--ink:#15201B;--mute:#5E6A63;--line:#D9D4C7;--chip:#E8E3D7;--nav:#F3F0E8;
+  --search-bg:#FBFAF6;--search-ink:#15201B;--map:#EAE6DC}
+:root[data-ui="papier"][data-palette=""][data-scheme="dark"]{
+  --bg:#141714;--card:#1B1F1B;--ink:#ECE8DD;--mute:#9BA49D;--line:#2C322D;--chip:#232823;--nav:#141714;
+  --search-bg:#1B1F1B;--search-ink:#ECE8DD;--map:#1A1E1A}
+:root[data-ui="papier"][data-palette=""][data-scheme="light"][data-accent="green"]{--accent:#1A6B4A;--accent-deep:#14523A;--accent-soft:#E1E8DC;--accent-ink:#1A6B4A;--on-accent:#fff}
+:root[data-ui="papier"][data-palette=""][data-scheme="dark"][data-accent="green"]{--accent:#7BD8A6;--accent-deep:#1F2A23;--accent-soft:#1F2A23;--accent-ink:#7BD8A6;--on-accent:#141714}
+:root[data-ui="papier"][data-palette=""]{--head-a:var(--bg);--head-b:var(--bg)}
+
+/* en-têtes et barres : à plat, filet en dessous */
+:root[data-ui="papier"] .hwrap{box-shadow:none;border-radius:0;padding-bottom:0}
+:root[data-ui="papier"] header,:root[data-ui="papier"] .bar,:root[data-ui="papier"] .nv-top,:root[data-ui="papier"] .nt-top{background:var(--bg);color:var(--ink);border-radius:0;box-shadow:none;border-bottom:1px solid var(--line)}
+:root[data-ui="papier"] header.thead{border-bottom:0}
+:root[data-ui="papier"] header svg,:root[data-ui="papier"] .bar svg{stroke:var(--ink)}
+:root[data-ui="papier"] header .top button,:root[data-ui="papier"] .bar button,:root[data-ui="papier"] .thead .top button{background:transparent;box-shadow:none;border-radius:6px}
+:root[data-ui="papier"] .bar .bt{font-family:var(--serif);font-weight:400;font-size:27px;letter-spacing:0}
+:root[data-ui="papier"] .thead h1{font-family:var(--serif);font-weight:400;font-size:40px;letter-spacing:0;line-height:1}
+:root[data-ui="papier"] .thead small{font-weight:500}
+:root[data-ui="papier"] .search{background:transparent;border-radius:0;box-shadow:none;border-bottom:1.5px solid var(--ink);padding-left:2px}
+:root[data-ui="papier"] .search:focus-within{box-shadow:0 2px 0 var(--accent)}
+:root[data-ui="papier"] .search .go{border-radius:6px}
+:root[data-ui="papier"] .msearch{border-radius:0;box-shadow:none;border:1px solid var(--ink);background:var(--bg)}
+
+/* barre du bas : souligné en haut au lieu de pastilles */
+:root[data-ui="papier"] nav{box-shadow:none;background:var(--bg)}
+:root[data-ui="papier"] nav button.on{color:var(--ink);box-shadow:inset 0 2px 0 var(--ink);font-weight:700}
+:root[data-ui="papier"] nav button.on .ni{background:none}
+
+/* accueil : sections séparées par des filets, sans tuiles ni couleurs de fond */
+:root[data-ui="papier"] .tiles{gap:0 20px}
+:root[data-ui="papier"] .tile{background:transparent;border-radius:0;box-shadow:none;border-bottom:1px solid var(--line);padding:14px 0}
+:root[data-ui="papier"] .tile h2{font-family:var(--mono);font-weight:600;font-size:11.5px;letter-spacing:.4px}
+:root[data-ui="papier"] .tile .big{font-family:var(--mono);font-weight:600;letter-spacing:-1.5px}
+:root[data-ui="papier"] .tile .big.sm{font-family:var(--serif);font-weight:400;font-size:28px;letter-spacing:0}
+:root[data-ui="papier"] .tile-go{background:transparent;color:var(--ink)}
+:root[data-ui="papier"] .tile-go h2,:root[data-ui="papier"] .tile-go p{color:var(--mute)}
+:root[data-ui="papier"] .tile-go::after{display:none}
+:root[data-ui="papier"] .tile-alert,:root[data-ui="papier"] .tile-ok,:root[data-ui="papier"] .tile-bike,:root[data-ui="papier"] .tile-place,:root[data-ui="papier"] .tile-noel{background:transparent;min-height:0}
+:root[data-ui="papier"] .tile-alert{box-shadow:inset 3px 0 0 #C8321E;padding-left:12px}
+:root[data-ui="papier"] .tile-noel{box-shadow:inset 3px 0 0 #B3261E;padding-left:12px;color:var(--ink)}
+:root[data-ui="papier"] .tile-noel h2,:root[data-ui="papier"] .tile-noel p,:root[data-ui="papier"] .tile-noel .big{color:var(--ink)!important}
+:root[data-ui="papier"] .tile-noel h2{color:#B3261E!important}
+:root[data-ui="papier"] .tile-alert h2{color:#C8321E}
+:root[data-ui="papier"] .tile-ok h2,:root[data-ui="papier"] .tile-bike h2,:root[data-ui="papier"] .tile-place h2{color:var(--mute)}
+:root[data-ui="papier"] .tile-bike .big{color:var(--ink)}
+:root[data-ui="papier"] .tile-place.empty,:root[data-ui="papier"] .tile-empty{border:0;border-bottom:1px solid var(--line)}
+:root[data-ui="papier"] .tile-stop h2 svg{color:var(--ink);fill:none}
+:root[data-ui="papier"] .tile-svc{padding:12px 0}
+:root[data-ui="papier"] .tile-svc .si{background:transparent;border:1px solid var(--line);border-radius:6px}
+:root[data-ui="papier"] .tile-add{border:1px solid var(--line);border-radius:6px}
+:root[data-ui="papier"] .tile:active,:root[data-ui="papier"] .tile-add:active{transform:none;opacity:.7}
+
+/* pastilles de ligne : coins presque droits */
+:root[data-ui="papier"] .ln{border-radius:5px;font-family:var(--font);font-weight:700}
+:root[data-ui="papier"] .ln.sm{border-radius:4px}
+
+/* listes de passages (À proximité, favoris) : lignes séparées, sans cartes */
+:root[data-ui="papier"] .box,:root[data-ui="papier"] .dep,:root[data-ui="papier"] .trip{background:transparent;border-radius:0;box-shadow:none;border:0;border-bottom:1px solid var(--line)}
+:root[data-ui="papier"] .dep{padding:12px 0;margin:0}
+:root[data-ui="papier"] .dep::before{display:none}
+:root[data-ui="papier"] .dep .t,:root[data-ui="papier"] .dep .f .n{font-family:var(--mono);font-weight:600;letter-spacing:-.5px}
+:root[data-ui="papier"] .dep .t.soon{color:var(--accent)}
+:root[data-ui="papier"] .dep .dirs{border-radius:6px;background:transparent;border:1px solid var(--line);padding:2px}
+:root[data-ui="papier"] .dep .dirs button{border-radius:4px}
+:root[data-ui="papier"] .box:active,:root[data-ui="papier"] .dep:active,:root[data-ui="papier"] .item:active{transform:none;opacity:.7}
+
+/* tableau des départs : grille horaire imprimée, traits épais en haut et en bas */
+:root[data-ui="papier"] .lboard{background:transparent;color:var(--ink);border-radius:0;box-shadow:none;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink)}
+:root[data-ui="papier"] .lb-h{border-bottom:1px solid var(--ink);padding:12px 0 10px}
+:root[data-ui="papier"] .lb-h small{color:var(--mute);font-family:var(--mono);font-weight:600;font-size:11px}
+:root[data-ui="papier"] .lb-h b{color:var(--ink);font-family:var(--serif);font-weight:400;font-size:26px}
+:root[data-ui="papier"] .lb-clock{color:var(--ink);font-family:var(--mono);font-weight:600}
+:root[data-ui="papier"] .lb-r{border-top:1px solid var(--line);padding:11px 0}
+:root[data-ui="papier"] .lb-r:first-of-type{border-top:0}
+:root[data-ui="papier"] .lb-r:active{background-color:transparent;opacity:.7}
+:root[data-ui="papier"] .lb-r .ln{border-radius:5px}
+:root[data-ui="papier"] .lb-d b{color:var(--ink);font-weight:600}
+:root[data-ui="papier"] .lb-d small{color:var(--mute);font-family:var(--mono);font-weight:500}
+:root[data-ui="papier"] .lb-d small.lb-x{color:#C8321E}
+:root[data-ui="papier"] .lb-m{color:var(--ink);font-family:var(--mono);font-weight:600;letter-spacing:-1px}
+:root[data-ui="papier"] .lb-m small{color:var(--mute);letter-spacing:0}
+:root[data-ui="papier"] .lb-m.q{color:var(--accent);font-family:var(--mono);letter-spacing:.3px}
+:root[data-ui="papier"] .lb-r.ter em.ok{color:var(--accent)}
+:root[data-ui="papier"] .lb-r.ter em.late{color:#B5600E}
+:root[data-ui="papier"] .lb-r.ter em.x{color:#C8321E}
+:root[data-ui="papier"] .lb-r.ter.off .lb-d b{color:var(--mute)}
+:root[data-ui="papier"] .lb-bell{color:var(--mute)}
+:root[data-ui="papier"] .lb-bell.on{color:var(--accent);background:var(--accent-soft)}
+:root[data-ui="papier"] .lb-bell.on svg{fill:none}
+
+/* panneau « À proximité », filtres, outils de la carte */
+:root[data-ui="papier"] .sheet{border-radius:0;box-shadow:none;border-top:1px solid var(--ink);background:var(--bg)}
+:root[data-ui="papier"] .sheet .grab svg{stroke:var(--ink);stroke-width:3}
+:root[data-ui="papier"] .sheet h3,:root[data-ui="papier"] .sheet .shead{font-family:var(--serif);font-weight:400;font-size:30px;letter-spacing:0;text-align:left;padding:0 18px}
+:root[data-ui="papier"] .seg button{border-radius:6px;background:transparent;border:1px solid var(--line)}
+:root[data-ui="papier"] .seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+:root[data-ui="papier"] .seg.pills button{border-radius:6px}
+:root[data-ui="papier"] .lyr{border-radius:6px;box-shadow:0 0 0 1px var(--line);background:var(--bg)}
+:root[data-ui="papier"] .lyr.on{box-shadow:0 0 0 1.5px var(--ink)}
+:root[data-ui="papier"] .tools{border-radius:6px;box-shadow:0 0 0 1px var(--ink);background:var(--bg)}
+
+/* boutons, pastilles, cadres */
+:root[data-ui="papier"] .go{border-radius:6px;font-weight:600}
+:root[data-ui="papier"] .pill{border-radius:6px;font-weight:600;background:transparent;border:1px solid var(--line);color:var(--ink)}
+:root[data-ui="papier"] .overlay{background:var(--bg)}
+:root[data-ui="papier"] .pgrp,:root[data-ui="papier"] .bfc,:root[data-ui="papier"] .reppick,:root[data-ui="papier"] .whenbox,:root[data-ui="papier"] .noelhead{background:transparent;box-shadow:none;border-radius:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-left:0;padding-right:0}
+:root[data-ui="papier"] .rep{border-radius:0;background:transparent;box-shadow:inset 3px 0 0 #E8833A}
+:root[data-ui="papier"] .fapprox,:root[data-ui="papier"] .fstall{border-radius:0;border-width:0 0 0 3px}
+:root[data-ui="papier"] .modal .dlg{border-radius:6px}
+:root[data-ui="papier"] .sub{font-family:var(--mono);font-weight:600;font-size:12px;letter-spacing:.4px;text-transform:uppercase}
+
+/* véhicules sur la carte : pastille carrée, fin contour encre, sans ombre */
+:root[data-ui="papier"] .veh .vb{border-radius:4px;border:1.5px solid var(--ink);box-shadow:none}
+:root[data-ui="papier"] .veh .va::before{border-bottom-color:var(--ink)}
+/* carte claire un peu adoucie, pour s'accorder au papier */
+:root[data-ui="papier"][data-palette=""][data-scheme="light"] .leaflet-tile-pane{filter:sepia(.12) saturate(.85) brightness(.99)}
+/* fiche d'un arrêt : barre d'actions (y aller, autre horaire) */
+.sacts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}
+.sacts.one{grid-template-columns:1fr}
+.sacts .go,.sact2{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 10px;font-size:15px;margin:0}
+.sacts svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sact2{border:1px solid var(--line);border-radius:22px;color:var(--ink);font-weight:700;background:var(--card)}
+:root[data-ui="papier"] .sact2{border-radius:6px;background:transparent;border-color:var(--ink);font-weight:600}
+.sreport{margin-top:14px}
+:root[data-ui="papier"] .tile-stop h2{font-family:var(--font);font-size:15px;font-weight:700;letter-spacing:0}
+:root[data-ui="papier"] .tiles{gap:0}
+:root[data-ui="papier"] .tile:not(.w){padding-right:14px}
+:root[data-ui="papier"] .tile.col2{padding-left:16px;padding-right:0;box-shadow:inset 1px 0 0 var(--line)}
+:root[data-ui="papier"] .tile-alert.col2{box-shadow:inset 1px 0 0 var(--line),inset 4px 0 0 #C8321E}
+:root[data-ui="papier"] .tile-alert:not(.col2){box-shadow:inset 3px 0 0 #C8321E}
+/* onglet Carte : pas de traits encre (blancs en sombre) sur la carte et le panneau, seulement des filets discrets */
+:root[data-ui="papier"] .sheet{border-top:0;box-shadow:0 -1px 0 var(--line),0 -10px 24px -18px rgba(0,0,0,.35)}
+:root[data-ui="papier"] .msearch{border-color:var(--line);box-shadow:0 6px 18px -10px rgba(0,0,0,.35)}
+:root[data-ui="papier"] .lyr{box-shadow:0 0 0 1px var(--line)}
+:root[data-ui="papier"] .lyr.on{box-shadow:0 0 0 1px var(--line);opacity:1}
+:root[data-ui="papier"] .tools{box-shadow:0 0 0 1px var(--line)}
