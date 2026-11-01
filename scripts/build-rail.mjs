@@ -1,4 +1,4 @@
-// Voies ferrées autour de Strasbourg depuis OpenStreetMap, pour que les trains TER suivent les rails sur la carte.
+// Voies ferrées d'Alsace, de Lorraine et de la ligne Paris-Est → Strasbourg depuis OpenStreetMap, pour que les trains TER suivent les rails sur la carte.
 // Utilisation : node scripts/build-rail.mjs                (télécharge via Overpass et écrit data/rail.json)
 //               node scripts/build-rail.mjs fichier.json   (à partir d'une réponse Overpass déjà téléchargée)
 // Relancé chaque nuit avec les tracés des lignes (.github/workflows/shapes.yml) ; un téléchargement incomplet est refusé.
@@ -6,9 +6,22 @@ import fs from "node:fs";
 import path from "node:path";
 
 const OUT = path.join(process.cwd(), "data", "rail.json");
-// voies ferrées de Molsheim à Kehl, d'Erstein à Brumath, et jusqu'à Lauterbourg : voies principales, voies de gare et aiguillages (sans « usage » dans OSM),
-// mais pas les voies de garage, de triage ni les embranchements industriels, militaires ou touristiques
-const QUERY = '[out:json][timeout:180];(way["railway"="rail"]["service"!~"^(yard|siding|spur)$"]["usage"!~"^(industrial|military|tourism|test)$"](48.38,7.45,48.78,7.95);way["railway"="rail"]["service"!~"^(yard|siding|spur)$"]["usage"!~"^(industrial|military|tourism|test)$"](48.66,7.80,48.99,8.21););out geom;';
+// Voies ferrées, en plusieurs requêtes (une seule, trop grosse, est refusée par les serveurs) :
+// - autour de Strasbourg (de Molsheim à Kehl, d'Erstein à Brumath, jusqu'à Lauterbourg) : voies principales, voies de gare et
+//   aiguillages, mais pas les voies de garage, de triage ni les embranchements industriels, militaires ou touristiques ;
+// - Alsace, Lorraine, Bâle, Palatinat et Sarre, puis la ligne Paris-Est → Strasbourg (trains TER jusqu'à Paris) : lignes
+//   principales et secondaires seulement. Les lignes à grande vitesse sont exclues (les TER n'y roulent pas, et le plus court
+//   chemin les prendrait entre Strasbourg et Saverne).
+const LOCAL = '["service"!~"^(yard|siding|spur)$"]["usage"!~"^(industrial|military|tourism|test)$"]';
+const MAIN = '["usage"~"^(main|branch)$"]["service"!~"."]["highspeed"!="yes"]';
+const way = (filter, [s, w, n, e]) => `way["railway"="rail"]${filter}(${s},${w},${n},${e});`;
+const QUERIES = [
+  [way(LOCAL, [48.38, 7.45, 48.78, 7.95]), way(LOCAL, [48.66, 7.80, 48.99, 8.21])],
+  // Alsace, Lorraine et alentours : 6 zones
+  ...[[47.50, 48.40], [48.40, 49.30]].flatMap(([s, n]) => [[5.80, 6.70], [6.70, 7.55], [7.55, 8.35]].map(([w, e]) => [way(MAIN, [s, w, n, e])])),
+  // ligne Paris-Est → Toul (Château-Thierry, Épernay, Châlons-en-Champagne, Vitry-le-François, Bar-le-Duc, Commercy)
+  [way(MAIN, [48.60, 2.30, 49.15, 3.70])], [way(MAIN, [48.60, 3.70, 49.15, 4.80])], [way(MAIN, [48.55, 4.80, 49.00, 5.80])]
+].map(parts => `[out:json][timeout:180];(${parts.join("")});out geom;`);
 // Serveurs publics d'OpenStreetMap, essayés à tour de rôle. Ils tombent parfois en panne (502, 504) :
 // on refait plusieurs tours espacés, et si aucun ne répond, on garde les tracés de la veille sans faire échouer le travail.
 const SERVERS = [
@@ -20,19 +33,33 @@ const SERVERS = [
 const PAUSES_S = [0, 60, 180];
 const TOLERANCE_M = 4;
 
-async function download() {
+async function fetchOne(query) {
   for (const [round, pause] of PAUSES_S.entries()) {
     if (pause) { console.warn(`nouvel essai dans ${pause} s (tour ${round + 1}/${PAUSES_S.length})`); await new Promise((r) => setTimeout(r, pause * 1000)); }
     for (const url of SERVERS) {
       try {
-        const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: QUERY }), headers: { "User-Agent": "Kumm (build-rail)" }, signal: AbortSignal.timeout(240_000) });
+        const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: query }), headers: { "User-Agent": "Kumm (build-rail)" }, signal: AbortSignal.timeout(240_000) });
         if (r.ok) return await r.json();
         console.warn(`${url} : HTTP ${r.status}`);
       } catch (e) { console.warn(`${url} : ${e.message}`); }
     }
   }
-  console.log("::warning::Aucun serveur OpenStreetMap (Overpass) n'a répondu : les tracés actuels sont gardés, nouvel essai la nuit prochaine.");
-  process.exit(0);
+  return null;
+}
+
+/** Toutes les zones, réunies (une voie présente dans deux zones n'est gardée qu'une fois) ; une zone manquante : rien n'est changé */
+async function download() {
+  const byId = new Map();
+  for (const [i, q] of QUERIES.entries()) {
+    const j = await fetchOne(q);
+    if (!j) {
+      console.log(`::warning::Aucun serveur OpenStreetMap (Overpass) n'a répondu pour la zone ${i + 1}/${QUERIES.length} : les tracés actuels sont gardés, nouvel essai la nuit prochaine.`);
+      process.exit(0);
+    }
+    for (const e of j.elements ?? []) if (e.type === "way") byId.set(e.id, e);
+    console.log(`zone ${i + 1}/${QUERIES.length} : ${byId.size} voies au total`);
+  }
+  return { elements: [...byId.values()] };
 }
 
 const R = 6371000, rad = d => (d * Math.PI) / 180;
