@@ -2,10 +2,10 @@ export type Theme = "auto" | "light" | "sand" | "dark" | "ocean" | "night" | "co
 export type Accent = "green" | "teal" | "blue" | "purple" | "red";
 
 /** Forme de l'interface : arrondis, ombres, densité, en-têtes (voir style.css, data-ui) */
-export type Ui = "papier" | "kumm" | "epure" | "bulles" | "compact";
+export type Ui = "ios" | "papier" | "kumm" | "epure" | "bulles" | "compact";
 
 export interface Prefs { theme: Theme; accent: Accent; ui: Ui; darkMap: boolean; /** itinéraires sans escaliers (ascenseurs, rampes) */ stepFree?: boolean; v?: number }
-export const DEFAULT_PREFS: Prefs = { theme: "auto", accent: "green", ui: "papier", darkMap: true };
+export const DEFAULT_PREFS: Prefs = { theme: "auto", accent: "green", ui: "ios", darkMap: true };
 
 /** Thèmes proposés dans les réglages (couleurs de l'aperçu) */
 export const THEMES: { id: Theme; label: string; hint: string; bg: string; bar: string }[] = [
@@ -29,6 +29,7 @@ export const ACCENTS: { id: Accent; label: string; color: string }[] = [
 
 /** Formes d'interface proposées */
 export const UIS: { id: Ui; label: string; hint: string }[] = [
+  { id: "ios",     label: "Plans",   hint: "listes claires, comme sur iPhone" },
   { id: "papier",  label: "Papier",  hint: "sobre, comme une fiche horaire" },
   { id: "kumm",    label: "Kumm",    hint: "l’ancienne interface" },
   { id: "epure",   label: "Épuré",   hint: "sobre, sans couleur en haut" },
@@ -45,15 +46,15 @@ export function loadPrefs(): Prefs {
     return {
       theme: THEMES.some(t => t.id === p.theme) ? (p.theme as Theme) : DEFAULT_PREFS.theme,
       accent: ACCENTS.some(a => a.id === p.accent) ? (p.accent as Accent) : DEFAULT_PREFS.accent,
-      // réglages d'avant la forme « Papier » (v < 3) : on passe une fois à la nouvelle interface, le reste est gardé
-      ui: (p.v ?? 0) >= 3 && UIS.some(u => u.id === p.ui) ? (p.ui as Ui) : DEFAULT_PREFS.ui,
+      // réglages d'avant la forme « Plans » (v < 4) : on passe une fois à la nouvelle interface, le reste est gardé
+      ui: (p.v ?? 0) >= 4 && UIS.some(u => u.id === p.ui) ? (p.ui as Ui) : DEFAULT_PREFS.ui,
       darkMap: (p.v ?? 0) >= 2 && typeof p.darkMap === "boolean" ? p.darkMap : DEFAULT_PREFS.darkMap
     };
   } catch { return { ...DEFAULT_PREFS }; }
 }
 
 export function savePrefs(p: Prefs): void {
-  try { localStorage.setItem("prefs", JSON.stringify({ ...p, v: 3 })); } catch { /* stockage indisponible */ }
+  try { localStorage.setItem("prefs", JSON.stringify({ ...p, v: 4 })); } catch { /* stockage indisponible */ }
 }
 
 const dark = (): boolean => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;

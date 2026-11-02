@@ -217,7 +217,7 @@ public final class WidgetCore {
 
     /** Construit l'affichage d'un widget (appelé hors du fil principal : peut télécharger) */
     /* ---------- thème : celui choisi dans l'application (Réglages › Apparence), transmis par KummWidgets.sync ---------- */
-    static final java.util.Set<String> PALETTES = new java.util.HashSet<>(java.util.Arrays.asList("light", "sand", "dark", "ocean", "night", "contrast", "paper", "ink"));
+    static final java.util.Set<String> PALETTES = new java.util.HashSet<>(java.util.Arrays.asList("light", "sand", "dark", "ocean", "night", "contrast", "paper", "ink", "sys", "sysdark"));
     /** Textes de chaque widget : couleur principale, puis secondaire */
     static String[][] themedTexts(String type) {
         switch (type) {

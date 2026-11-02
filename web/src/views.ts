@@ -1112,13 +1112,20 @@ const PAPER_TOKENS: Record<"light" | "dark", Tokens> = {
   dark: { bg: "#141714", card: "#1B1F1B", ink: "#ECE8DD", mute: "#9BA49D", line: "#2C322D", chip: "#232823", dark: true }
 };
 
+/** Couleurs de la forme « Plans » avec le thème automatique (mêmes valeurs que style.css) */
+const PLANS_TOKENS: Record<"light" | "dark", Tokens> = {
+  light: { bg: "#F2F2F7", card: "#FFFFFF", ink: "#111114", mute: "#6C6C70", line: "#E2E2E7", chip: "#E9E9EE", dark: false },
+  dark: { bg: "#000000", card: "#1C1C1E", ink: "#F2F2F7", mute: "#A1A1A8", line: "#38383A", chip: "#2C2C2E", dark: true }
+};
+
 function miniApp(theme: Theme, accent: Accent, ui: Ui, tiny = false): string {
   const one = (th: Exclude<Theme, "auto">): string => {
     // forme « Papier » en automatique : ses propres couleurs papier (clair) et encre (sombre), comme dans style.css
-    const paper = ui === "papier" && theme === "auto";
-    const t = paper ? PAPER_TOKENS[th === "dark" ? "dark" : "light"] : THEME_TOKENS[th];
+    const paper = ui === "papier" && theme === "auto", plans = ui === "ios" && theme === "auto";
+    const t = paper ? PAPER_TOKENS[th === "dark" ? "dark" : "light"] : plans ? PLANS_TOKENS[th === "dark" ? "dark" : "light"] : THEME_TOKENS[th];
     const a0 = ACCENT_TOKENS[accent][t.dark ? "dark" : "light"];
-    const a: [string, string, string, string] = paper && accent === "green" ? (t.dark ? ["#7BD8A6", "#141714", "#141714", "#1F2A23"] : ["#1A6B4A", "#F3F0E8", "#F3F0E8", "#E1E8DC"]) : a0;
+    const a: [string, string, string, string] = paper && accent === "green" ? (t.dark ? ["#7BD8A6", "#141714", "#141714", "#1F2A23"] : ["#1A6B4A", "#F3F0E8", "#F3F0E8", "#E1E8DC"])
+      : plans && accent === "green" ? (t.dark ? ["#4A8EF5", "#000000", "#000000", "#16294A"] : ["#155BD0", "#F2F2F7", "#F2F2F7", "#E3ECFB"]) : a0;
     const [ha, hb] = t.head ?? [a[1], a[2]];
     const vars = `--m-bg:${t.bg};--m-card:${t.card};--m-ink:${t.ink};--m-mute:${t.mute};--m-line:${t.line};--m-chip:${t.chip};--m-a:${a[0]};--m-ha:${ha};--m-hb:${hb};--m-soft:${a[3]}`;
     const chip = (l: string): string => `<span class="mc" style="background:${COLORS[l]};color:${lineText(l)}">${l}</span>`;

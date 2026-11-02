@@ -1076,3 +1076,165 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 :root[data-ui="papier"] .look-card.on{border:2px solid var(--ink)}
 :root[data-ui="papier"] .look-card .mini-wrap,:root[data-ui="papier"] .look-link .mini-wrap{border-radius:4px}
 :root[data-ui="papier"] .row-switch,:root[data-ui="papier"] .look-link{background:transparent;border-radius:0;box-shadow:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-left:0;padding-right:0}
+
+/* ================================================================================================================
+   Forme « Plans » (par défaut) : dans l'esprit d'Apple Plans et des réglages de l'iPhone. Fond gris très clair (noir en
+   sombre), listes groupées dans des cartes arrondies, séparateurs fins, grand titre, recherche grise, bleu système pour
+   les actions. Couleurs propres avec le thème « Automatique » ; avec un autre thème, ses couleurs sont gardées.
+   ================================================================================================================ */
+:root[data-ui="ios"]{--font:"Inter",-apple-system,"SF Pro Text",Roboto,system-ui,sans-serif;--r:12px;--sh:none}
+:root[data-ui="ios"][data-palette=""][data-scheme="light"]{
+  --bg:#F2F2F7;--card:#FFFFFF;--ink:#111114;--mute:#6C6C70;--line:#E2E2E7;--chip:#E9E9EE;--nav:#F9F9FB;
+  --search-bg:#E9E9EE;--search-ink:#111114;--map:#EFEDE7}
+:root[data-ui="ios"][data-palette=""][data-scheme="dark"]{
+  --bg:#000000;--card:#1C1C1E;--ink:#F2F2F7;--mute:#A1A1A8;--line:#38383A;--chip:#2C2C2E;--nav:#121214;
+  --search-bg:#2C2C2E;--search-ink:#F2F2F7;--map:#1E1F22}
+/* vert par défaut → bleu système (les autres couleurs principales sont gardées) */
+:root[data-ui="ios"][data-palette=""][data-scheme="light"][data-accent="green"]{--accent:#155BD0;--accent-deep:#0F47A6;--accent-soft:#E3ECFB;--accent-ink:#155BD0;--on-accent:#fff}
+:root[data-ui="ios"][data-palette=""][data-scheme="dark"][data-accent="green"]{--accent:#4A8EF5;--accent-deep:#0F2A52;--accent-soft:#16294A;--accent-ink:#6FA6FF;--on-accent:#fff}
+:root[data-ui="ios"][data-palette=""]{--head-a:var(--bg);--head-b:var(--bg)}
+:root[data-ui="ios"] :is(.lb-m,.lb-clock,.dep .t,.dep .f .n,.tile .t,.tile em,.trow .t){font-variant-numeric:tabular-nums}
+
+/* en-têtes : à plat sur le fond, grand titre, icônes en bleu */
+:root[data-ui="ios"] .hwrap{box-shadow:none;border-radius:0;padding-bottom:0}
+:root[data-ui="ios"] header,:root[data-ui="ios"] .bar,:root[data-ui="ios"] .nv-top,:root[data-ui="ios"] .nt-top{background:var(--bg);color:var(--ink);border-radius:0;box-shadow:none}
+:root[data-ui="ios"] header svg,:root[data-ui="ios"] .bar svg{stroke:var(--accent)}
+:root[data-ui="ios"] header .top button,:root[data-ui="ios"] .bar button,:root[data-ui="ios"] .thead .top button{background:transparent;box-shadow:none;border-radius:10px}
+:root[data-ui="ios"] .bar .bt{font-weight:700;font-size:22px;letter-spacing:-.3px}
+:root[data-ui="ios"] .thead h1{font-size:34px;font-weight:700;letter-spacing:-.4px;line-height:1.15}
+:root[data-ui="ios"] .thead small{font-weight:500;font-size:15px}
+:root[data-ui="ios"] .search{background:var(--chip);border-radius:12px;box-shadow:none;padding-left:12px}
+:root[data-ui="ios"] .search:focus-within{box-shadow:0 0 0 2px var(--accent)}
+:root[data-ui="ios"] .search .go{border-radius:10px}
+
+/* barre d'onglets */
+:root[data-ui="ios"] nav{background:var(--nav);box-shadow:none;border-top:1px solid var(--line)}
+:root[data-ui="ios"] nav button{color:#8E8E93;font-weight:500;font-size:11px}
+:root[data-ui="ios"] nav button.on{color:var(--accent);font-weight:600}
+:root[data-ui="ios"] nav button.on .ni{background:none}
+
+/* accueil : cartes blanches arrondies sur fond gris, sans ombre */
+:root[data-ui="ios"] .tiles{gap:10px}
+:root[data-ui="ios"] .tile{background:var(--card);border-radius:12px;box-shadow:none;padding:12px 14px}
+:root[data-ui="ios"] .tile h2{font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--mute)}
+:root[data-ui="ios"] .tile .big{font-weight:700;letter-spacing:-.5px;font-size:30px}
+:root[data-ui="ios"] .tile .big.sm{font-size:22px;letter-spacing:-.3px}
+:root[data-ui="ios"] .tile .big small{font-weight:500;color:var(--mute);font-size:15px}
+:root[data-ui="ios"] .tile-go{background:var(--card);color:var(--ink)}
+:root[data-ui="ios"] .tile-go h2,:root[data-ui="ios"] .tile-go p{color:var(--mute)}
+:root[data-ui="ios"] .tile-go h2 svg{color:var(--accent)}
+:root[data-ui="ios"] .tile-go::after{display:none}
+:root[data-ui="ios"] .tile-alert,:root[data-ui="ios"] .tile-ok,:root[data-ui="ios"] .tile-bike,:root[data-ui="ios"] .tile-place{background:var(--card);min-height:0}
+:root[data-ui="ios"] .tile-alert h2{color:#D63A2F}
+:root[data-ui="ios"][data-scheme="dark"] .tile-alert h2{color:#FF6B5E}
+:root[data-ui="ios"] .tile-ok h2{color:#1F8F45}
+:root[data-ui="ios"] .tile-bike h2{color:#4E8A12}
+:root[data-ui="ios"] .tile-bike .big{color:var(--ink)}
+:root[data-ui="ios"] .tile-place h2{color:var(--mute)}
+:root[data-ui="ios"] .tile-place h2 svg{color:var(--accent)}
+:root[data-ui="ios"] .tile-place.empty,:root[data-ui="ios"] .tile-empty{background:transparent;border:1.5px dashed var(--line)}
+:root[data-ui="ios"] .tile-stop h2{color:var(--ink);font-size:16px;font-weight:600}
+:root[data-ui="ios"] .tile-stop h2 svg{color:#F6B400;fill:#F6B400}
+:root[data-ui="ios"] .tile-svc .si{background:var(--accent-soft);border-radius:9px}
+:root[data-ui="ios"] .tile-add{border:0;background:var(--card);border-radius:12px;color:var(--accent);font-weight:600}
+:root[data-ui="ios"] .tile:active,:root[data-ui="ios"] .tile-add:active{transform:none;background:var(--chip)}
+
+/* pastilles de ligne */
+:root[data-ui="ios"] .ln{border-radius:6px;font-weight:700}
+:root[data-ui="ios"] .ln.sm{border-radius:5px}
+
+/* listes de passages : cartes groupées, sans bande de couleur */
+:root[data-ui="ios"] .box,:root[data-ui="ios"] .dep,:root[data-ui="ios"] .trip{background:var(--card);border-radius:12px;box-shadow:none;border:0}
+:root[data-ui="ios"] .dep{padding:12px 14px;margin-bottom:10px}
+:root[data-ui="ios"] .dep::before{display:none}
+:root[data-ui="ios"] .dep .t{font-weight:700;letter-spacing:-.3px}
+:root[data-ui="ios"] .dep .t.soon{color:#1F8F45}
+:root[data-ui="ios"][data-scheme="dark"] .dep .t.soon{color:#3FD16B}
+:root[data-ui="ios"] .dep .dirs{border-radius:9px;background:var(--chip);padding:2px;gap:0}
+:root[data-ui="ios"] .dep .dirs button{border-radius:7px;font-size:13px;font-weight:500;color:var(--ink)}
+:root[data-ui="ios"] .dep .dirs button.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+:root[data-ui="ios"][data-scheme="dark"] .dep .dirs button.on{background:#636366}
+:root[data-ui="ios"] .box:active,:root[data-ui="ios"] .dep:active,:root[data-ui="ios"] .item:active{transform:none;opacity:.7}
+
+/* tableau des départs : liste groupée */
+:root[data-ui="ios"] .lboard{background:var(--card);color:var(--ink);border-radius:12px;box-shadow:none}
+:root[data-ui="ios"] .lb-h{border-bottom:1px solid var(--line);padding:12px 14px 10px}
+:root[data-ui="ios"] .lb-h small{color:var(--mute);font-size:12px;font-weight:600;letter-spacing:.2px}
+:root[data-ui="ios"] .lb-h b{color:var(--ink);font-size:20px;font-weight:700}
+:root[data-ui="ios"] .lb-clock{color:var(--mute);font-weight:600;font-size:17px}
+:root[data-ui="ios"] .lb-r{border-top:0;padding:10px 14px;position:relative}
+:root[data-ui="ios"] .lb-r+.lb-r::before{content:"";position:absolute;top:0;left:70px;right:0;height:1px;background:var(--line)}
+:root[data-ui="ios"] .lb-r:active{background-color:var(--chip)}
+:root[data-ui="ios"] .lb-r .ln{border-radius:6px}
+:root[data-ui="ios"] .lb-d b{color:var(--ink);font-weight:600}
+:root[data-ui="ios"] .lb-d small{color:var(--mute);font-weight:400}
+:root[data-ui="ios"] .lb-d small.lb-x{color:#D63A2F}
+:root[data-ui="ios"] .lb-m{color:var(--ink);font-weight:600;font-size:20px}
+:root[data-ui="ios"] .lb-m small{color:var(--mute);font-weight:500}
+:root[data-ui="ios"] .lb-m.q{color:#1F8F45;font-size:15px;letter-spacing:0}
+:root[data-ui="ios"][data-scheme="dark"] .lb-m.q{color:#3FD16B}
+:root[data-ui="ios"] .lb-r.ter em.ok{color:#1F8F45}
+:root[data-ui="ios"] .lb-r.ter em.late{color:#B5600E}
+:root[data-ui="ios"] .lb-r.ter em.x{color:#D63A2F}
+:root[data-ui="ios"] .lb-r.ter.off .lb-d b{color:var(--mute)}
+:root[data-ui="ios"] .lb-bell{color:var(--accent)}
+:root[data-ui="ios"] .lb-bell.on{color:#fff;background:var(--accent)}
+:root[data-ui="ios"] .lb-bell.on svg{fill:none}
+
+/* carte : panneau du bas avec poignée, filtres en contrôle segmenté, boutons blancs */
+:root[data-ui="ios"] .sheet{border-radius:14px 14px 0 0;background:var(--bg);box-shadow:0 -2px 18px rgba(0,0,0,.14)}
+:root[data-ui="ios"] .sheet .grab svg{display:none}
+:root[data-ui="ios"] .sheet .grab::before{content:"";display:block;width:36px;height:5px;border-radius:3px;background:#C4C4C8;margin:7px auto 5px}
+:root[data-ui="ios"][data-scheme="dark"] .sheet .grab::before{background:#5A5A5E}
+:root[data-ui="ios"] .sheet h3,:root[data-ui="ios"] .sheet .shead{font-size:22px;font-weight:700;letter-spacing:-.3px;text-align:left;padding:0 18px}
+:root[data-ui="ios"] .seg{background:var(--chip);border-radius:9px;padding:2px;gap:0;margin:0 14px 12px}
+:root[data-ui="ios"] .seg button{background:transparent;border-radius:7px;padding:7px 4px;font-size:13px;font-weight:500;color:var(--ink);flex-direction:row;gap:5px}
+:root[data-ui="ios"] .seg button.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+:root[data-ui="ios"][data-scheme="dark"] .seg button.on{background:#636366}
+:root[data-ui="ios"] .seg svg{width:17px;height:17px}
+:root[data-ui="ios"] .seg.pills{margin:0 18px 12px;padding:2px}
+:root[data-ui="ios"] .seg.pills button{border-radius:7px}
+:root[data-ui="ios"] .seg.pills button.on{background:var(--card);color:var(--ink)}
+:root[data-ui="ios"] .lyr{border-radius:16px;background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.15)}
+:root[data-ui="ios"] .lyr.on{box-shadow:0 0 0 2px var(--accent),0 1px 4px rgba(0,0,0,.15)}
+:root[data-ui="ios"] .tools{border-radius:10px;background:var(--card);box-shadow:0 1px 6px rgba(0,0,0,.18)}
+:root[data-ui="ios"] .tools button{color:var(--accent)}
+:root[data-ui="ios"] .msearch{border-radius:12px;background:var(--card);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+
+/* boutons, cadres, réglages */
+:root[data-ui="ios"] .go{border-radius:12px;font-weight:600}
+:root[data-ui="ios"] .pill{border-radius:14px;font-weight:600;background:var(--accent-soft);color:var(--accent-ink)}
+:root[data-ui="ios"] .sact2{border:0;border-radius:12px;background:var(--card);color:var(--accent);font-weight:600}
+:root[data-ui="ios"] .sacts .go,:root[data-ui="ios"] .sact2{flex-direction:column;gap:4px;padding:10px 6px;font-size:13px}
+:root[data-ui="ios"] .sacts svg{width:22px;height:22px}
+:root[data-ui="ios"] .whenlink{color:var(--accent);font-weight:500}
+:root[data-ui="ios"] .overlay{background:var(--bg)}
+:root[data-ui="ios"] .pgrp,:root[data-ui="ios"] .bfc,:root[data-ui="ios"] .reppick,:root[data-ui="ios"] .whenbox,:root[data-ui="ios"] .noelhead,:root[data-ui="ios"] .row-switch,:root[data-ui="ios"] .look-link{background:var(--card);border-radius:12px;box-shadow:none;border:0}
+:root[data-ui="ios"] .look-card{border-radius:12px;background:var(--card);box-shadow:none;border:2px solid transparent}
+:root[data-ui="ios"] .look-card.on{border-color:var(--accent)}
+:root[data-ui="ios"] .rep{border-radius:12px;background:var(--card)}
+:root[data-ui="ios"] .fapprox,:root[data-ui="ios"] .fstall{border-radius:12px}
+:root[data-ui="ios"] .modal .dlg{border-radius:14px}
+:root[data-ui="ios"] .sub{font-size:13px;font-weight:600;letter-spacing:0;text-transform:uppercase;color:var(--mute);margin-left:4px}
+:root[data-ui="ios"] .star.on svg{fill:var(--accent);stroke:var(--accent)}
+
+/* véhicules sur la carte : pastille arrondie, contour blanc, légère ombre */
+:root[data-ui="ios"] .veh .vb{border-radius:6px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+
+/* aperçu de la forme « Plans » (écran Apparence) */
+.mini.ui-ios{--mr:10px;font-family:"Inter",system-ui,sans-serif}
+.mini.ui-ios .m-head b{font-size:28px;font-weight:700;letter-spacing:-.4px}
+.mini.ui-ios .m-head i{background:transparent;box-shadow:inset 0 0 0 1.5px var(--m-a);border-radius:8px;width:22px;height:22px}
+.mini.ui-ios .m-go{background:var(--m-chip);color:var(--m-mute);padding:9px 12px}
+.mini.ui-ios .m-go small{display:none}
+.mini.ui-ios .m-go b{font-size:15px;font-weight:500;color:var(--m-mute)}
+.mini.ui-ios .m-tile{box-shadow:none}
+.mini.ui-ios .m-tile b{font-weight:600}
+.mini.ui-ios .mc{border-radius:4px}
+.mini.ui-ios .m-alert,.mini.ui-ios .m-bike{background:var(--m-card)}
+.mini.ui-ios .m-bike b{color:#4E8A12}
+.mini.ui-ios .m-n{color:var(--m-ink)}
+
+:root[data-ui="ios"] .seg button,:root[data-ui="ios"] .seg.pills button{flex:1 1 0;justify-content:center}
+:root[data-ui="ios"] .lyr{opacity:.6}
+:root[data-ui="ios"] .lyr.on{opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.18)}

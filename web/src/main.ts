@@ -9,6 +9,11 @@ import "@fontsource/plus-jakarta-sans/latin-700.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-700.css";
 import "@fontsource/plus-jakarta-sans/latin-800.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-800.css";
+// forme « Plans » (par défaut) : Inter, proche de la police des iPhone
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
 // forme « Papier » : jeux complets (chaque fichier ne se charge que pour les caractères présents à l'écran)
 import "@fontsource/instrument-serif/400.css";
 import "@fontsource/ibm-plex-sans/400.css";

@@ -34,6 +34,7 @@ export interface WidgetSetup {
 function widgetTheme(): { palette: string; ink: string; mute: string } {
   const dark = document.documentElement.dataset["scheme"] === "dark";
   // forme « Papier » en automatique : fonds papier (clair) et encre (sombre), comme dans l'application
+  if (S.prefs.ui === "ios" && S.prefs.theme === "auto") return dark ? { palette: "sysdark", ink: "#F2F2F7", mute: "#A1A1A8" } : { palette: "sys", ink: "#111114", mute: "#6C6C70" };
   if (S.prefs.ui === "papier" && S.prefs.theme === "auto") return dark ? { palette: "ink", ink: "#ECE8DD", mute: "#9BA49D" } : { palette: "paper", ink: "#15201B", mute: "#5E6A63" };
   const th = S.prefs.theme === "auto" ? (dark ? "dark" : "light") : S.prefs.theme;
   const t = THEME_TOKENS[th];
