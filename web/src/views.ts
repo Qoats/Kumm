@@ -16,6 +16,7 @@ import { MAPPATHS, mapRoutes } from "./map";
 import { POIS, S, STOPS, USER, mins, render, stopById } from "./store";
 import type { PlaceKey } from "./store";
 import { commuteTo } from "./commute";
+import { HOUSES, TOWN } from "./illus";
 import { rainText, weather } from "./weather";
 import { FORECASTS, LINE_ROUTES, REPORTS, STATS, debug, ensureStats, nextDepartures, quayOf } from "./api";
 import type { LineRoute, LineStats, NetStats, Punct } from "./api";
@@ -94,15 +95,20 @@ const pinIcon = (): string => ic("pin", 'width="22" height="22" fill="none" stro
 /** En-tête de l'accueil : date, salutation, raccourcis, puis la recherche */
 export function header(): string {
   const h = new Date().getHours();
-  const hello = h < 5 ? "Bonne nuit" : h < 12 ? "Bonjour" : h < 18 ? "Bon après-midi" : "Bonsoir";
+  // forme « Alsace » : on salue en alsacien (bonjour le matin, salut la journée, bonsoir)
+  const hello = ELSASS() ? (h >= 5 && h < 11 ? "Güete Morje" : h >= 11 && h < 18 ? "Salü" : "Güete Owe") + ' <em>!</em>'
+    : h < 5 ? "Bonne nuit" : h < 12 ? "Bonjour" : h < 18 ? "Bon après-midi" : "Bonsoir";
   const date = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
   return `<header class="thead">
     <div class="top">
       <div><small>${esc(date.charAt(0).toUpperCase() + date.slice(1))}${wxLine()}</small><h1>${hello}</h1></div>
       <span class="ic"><button data-act="msgs" aria-label="Messages">${ic("mail")}</button><button data-act="prefs" aria-label="Réglages">${ic("sliders")}</button><button data-act="account" aria-label="Compte">${ic("user")}</button></span>
-    </div>
+    </div>${ELSASS() ? TOWN : ""}
   </header>`;
 }
+
+/** Forme « Alsace » : dessins, salutations et petites phrases en alsacien */
+const ELSASS = (): boolean => S.prefs.ui === "elsass";
 
 /** « · 12° · Pluie vers 15:30 » dans l'en-tête de l'accueil */
 function wxLine(): string {
@@ -113,7 +119,7 @@ function wxLine(): string {
 }
 
 export function bar(title: string, back?: string): string {
-  return `<div class="bar"><button data-act="${back ?? "closeOverlay"}" aria-label="Retour">${ic("back")}</button><h1 class="bt" id="ovtitle">${esc(title)}</h1></div>`;
+  return `<div class="bar"><button data-act="${back ?? "closeOverlay"}" aria-label="Retour">${ic("back")}</button><h1 class="bt" id="ovtitle">${esc(title)}</h1>${ELSASS() ? HOUSES : ""}</div>`;
 }
 
 /* ============ ÉCRANS ============ */
@@ -161,7 +167,7 @@ function trafficTile(): string {
 /** Tuiles « Maison » et « Travail » : durée du prochain trajet et heure de départ ; à régler d'un toucher si vide.
     Appui long : changer l'adresse. */
 function placeTile(which: PlaceKey): string {
-  const label = which === "home" ? "Maison" : "Travail", icon: IconName = which === "home" ? "home" : "store";
+  const label = which === "home" ? "Maison" : ELSASS() ? "Boulot" : "Travail", icon: IconName = which === "home" ? "home" : "store";
   const p = S.places[which];
   if (!p) return `<button class="tile tile-place empty" data-place="${which}"><h2>${ic(icon)}${label}</h2><div class="big sm">Ajouter</div><p>Votre adresse ${which === "home" ? "de la maison" : "du travail"}</p></button>`;
   const near = haversine(USER, p) < 250;
@@ -252,7 +258,7 @@ export function screenHome(): string {
     ["Objets perdus", "lost", CTS_OBJETS_TROUVES], ["Aide et contact", "help", "act:help"]
   ];
   return `<div class="pad tiles">
-    <button class="tile w tile-go" data-tab="search"><h2>${ic("navigate")}Naviguer</h2><div class="big sm">Où allez-vous ?</div><p>Tram, bus, train, vélo ou à pied, guidé jusqu’à destination</p></button>
+    <button class="tile w tile-go" data-tab="search"><h2>${ic("navigate")}Naviguer</h2><div class="big sm">${ELSASS() ? "Où on va ?" : "Où allez-vous ?"}</div><p>Tram, bus, train, vélo ou à pied, guidé jusqu’à destination</p></button>
     ${noelTile()}
     ${placeTile("home")}${placeTile("work")}
     ${favs || `<button class="tile w tile-empty" data-act="favs"><h2>${ic("star")}Vos arrêts</h2><p>Ajoutez vos arrêts favoris : leurs prochains passages s’afficheront ici</p></button>`}
@@ -1010,7 +1016,10 @@ export function departureBoard(name: string, list: StopDeparture[], max = 16, st
     const bell = stopId ? `<button class="lb-bell${on ? " on" : ""}" data-arr="${esc(`${r.line}|${r.dest}|${r.t.slice(0, 3).join(",")}`)}" aria-label="Me prévenir avant le passage">${ic("bell")}</button>` : "";
     return `<div class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b><button class="dlink" data-line="${esc(r.line)}">${esc(r.dest)}</button></b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}${bell}</div>`;
   }).join("");
-  return `<div class="lboard"><div class="lb-h"><span><small>Prochains départs</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
+  // forme « Alsace » : un tram ou un bus à quai, ça s'annonce (« Viens, le tram est là ! »)
+  const first = list2[0], here = ELSASS() && mins(first.t[0]) < 1
+    ? `<div class="kummbar">${ic("tram")}<span><b>Kumm, dr ${isTram(first.line) ? "Tram" : "Bus"} isch do !</b>${esc(lineLabel(first.line))} vers ${esc(first.dest)}, à quai.</span></div>` : "";
+  return `${here}<div class="lboard"><div class="lb-h"><span><small>Prochains départs</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
 }
 
 /** Tableau des départs d'une gare, comme sur les écrans en gare : heure prévue, retard ou suppression, destination, numéro du train */
@@ -1112,6 +1121,12 @@ const PAPER_TOKENS: Record<"light" | "dark", Tokens> = {
   dark: { bg: "#141714", card: "#1B1F1B", ink: "#ECE8DD", mute: "#9BA49D", line: "#2C322D", chip: "#232823", dark: true }
 };
 
+/** Couleurs de la forme « Alsace » avec le thème automatique (mêmes valeurs que style.css) */
+const ELSASS_TOKENS: Record<"light" | "dark", Tokens> = {
+  light: { bg: "#FBF8F4", card: "#FFFFFF", ink: "#231A16", mute: "#6F625B", line: "#ECE4DC", chip: "#F3ECE6", dark: false },
+  dark: { bg: "#17110F", card: "#221A17", ink: "#F4ECE6", mute: "#B3A49B", line: "#3A2E29", chip: "#2E2420", dark: true }
+};
+
 /** Couleurs de la forme « Plans » avec le thème automatique (mêmes valeurs que style.css) */
 const PLANS_TOKENS: Record<"light" | "dark", Tokens> = {
   light: { bg: "#F2F2F7", card: "#FFFFFF", ink: "#111114", mute: "#6C6C70", line: "#E2E2E7", chip: "#E9E9EE", dark: false },
@@ -1121,10 +1136,12 @@ const PLANS_TOKENS: Record<"light" | "dark", Tokens> = {
 function miniApp(theme: Theme, accent: Accent, ui: Ui, tiny = false): string {
   const one = (th: Exclude<Theme, "auto">): string => {
     // forme « Papier » en automatique : ses propres couleurs papier (clair) et encre (sombre), comme dans style.css
-    const paper = ui === "papier" && theme === "auto", plans = ui === "ios" && theme === "auto";
-    const t = paper ? PAPER_TOKENS[th === "dark" ? "dark" : "light"] : plans ? PLANS_TOKENS[th === "dark" ? "dark" : "light"] : THEME_TOKENS[th];
+    const paper = ui === "papier" && theme === "auto", plans = ui === "ios" && theme === "auto", elsass = ui === "elsass" && theme === "auto";
+    const sc = th === "dark" ? "dark" : "light";
+    const t = paper ? PAPER_TOKENS[sc] : plans ? PLANS_TOKENS[sc] : elsass ? ELSASS_TOKENS[sc] : THEME_TOKENS[th];
     const a0 = ACCENT_TOKENS[accent][t.dark ? "dark" : "light"];
     const a: [string, string, string, string] = paper && accent === "green" ? (t.dark ? ["#7BD8A6", "#141714", "#141714", "#1F2A23"] : ["#1A6B4A", "#F3F0E8", "#F3F0E8", "#E1E8DC"])
+      : elsass && accent === "green" ? (t.dark ? ["#F0806C", "#17110F", "#17110F", "#3A221D"] : ["#B23A2B", "#FBF8F4", "#FBF8F4", "#F6E3DE"])
       : plans && accent === "green" ? (t.dark ? ["#4A8EF5", "#000000", "#000000", "#16294A"] : ["#155BD0", "#F2F2F7", "#F2F2F7", "#E3ECFB"]) : a0;
     const [ha, hb] = t.head ?? [a[1], a[2]];
     const vars = `--m-bg:${t.bg};--m-card:${t.card};--m-ink:${t.ink};--m-mute:${t.mute};--m-line:${t.line};--m-chip:${t.chip};--m-a:${a[0]};--m-ha:${ha};--m-hb:${hb};--m-soft:${a[3]}`;

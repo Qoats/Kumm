@@ -6,71 +6,80 @@
 <title>Kumm – les transports de Strasbourg, en direct</title>
 <meta name="description" content="Kumm affiche les passages en temps réel du réseau CTS et des TER du Grand Est, montre où se trouve votre tram sur la carte et vous guide jusqu’à destination. Application indépendante, gratuite, sans publicité et sans compte.">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#F3F0E8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#141714" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F3E9E1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#201714" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="Kumm – les transports de Strasbourg, en direct">
 <meta property="og:description" content="Le prochain tram, à la minute près : passages en temps réel, trams et bus sur la carte, guidage jusqu’à destination.">
-<meta property="og:image" content="https://kumm.fr/img/arret-clair.webp?v=0.50.0">
+<meta property="og:image" content="https://kumm.fr/img/arret-clair.webp?v=0.52.0">
 <meta property="og:url" content="https://kumm.fr/">
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="stylesheet" href="/fonts/fonts.css">
 <style>
-:root{--paper:#F3F0E8;--ink:#15201B;--mute:#5E6A63;--soft:#2E3A34;--line:#D3CDBF;--green:#1A6B4A;--tag:#E8E3D7;--shot:#15201B}
-@media (prefers-color-scheme:dark){:root{--paper:#141714;--ink:#ECE8DD;--mute:#9BA49D;--soft:#C9CFC9;--line:#2C322D;--green:#7BD8A6;--tag:#232823;--shot:#3A413B}}
+:root{--bg:#FBF8F4;--sky:#F3E9E1;--card:#FFFFFF;--ink:#231A16;--mute:#6F625B;--soft:#4A3D36;--line:#ECE4DC;--brick:#B23A2B;--brick-ink:#A33426;--brick-soft:#F6E3DE;--green:#1F7A45;--draw:#B23A2B}
+@media (prefers-color-scheme:dark){:root{--bg:#17110F;--sky:#201714;--card:#221A17;--ink:#F4ECE6;--mute:#B3A49B;--soft:#D9CCC4;--line:#3A2E29;--brick:#F0806C;--brick-ink:#F29A88;--brick-soft:#3A221D;--green:#5ED38E;--draw:#E8745F}}
 *{box-sizing:border-box;margin:0}
-html{background:var(--paper)}
-body{background:var(--paper);color:var(--ink);font:400 18px/1.55 "IBM Plex Sans","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-a{color:inherit}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font:400 18px/1.55 "Bricolage Grotesque","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--brick-ink)}
 .w{max-width:1120px;margin:0 auto;padding:0 32px}
-.top{border-bottom:1px solid var(--ink)}
-.top .w{display:flex;align-items:center;justify-content:space-between;height:64px}
-.logo{display:flex;align-items:center;gap:10px;font:400 30px "Instrument Serif",Georgia,serif;text-decoration:none}
-.logo img{width:24px;height:24px}
-.top nav a{font-size:15px;margin-left:28px;text-decoration:none;color:var(--mute)}
-.top nav a:hover{color:var(--ink)}
-.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;padding:72px 0 64px;align-items:end;border-bottom:1px solid var(--line)}
-h1{font:400 76px/1 "Instrument Serif",Georgia,serif;letter-spacing:-1px}
-h1 em{color:var(--green)}
-.lead{font-size:20px;margin:26px 0 30px;max-width:30em;color:var(--soft)}
-.cta{display:inline-flex;gap:10px;align-items:center;background:var(--ink);color:var(--paper);text-decoration:none;font-weight:600;padding:14px 22px;font-size:16px;border-radius:4px}
+.top{background:var(--sky)}
+.top .w{display:flex;align-items:center;justify-content:space-between;height:68px}
+.logo{display:flex;align-items:center;gap:10px;font:800 26px "Bricolage Grotesque",sans-serif;letter-spacing:-.6px;text-decoration:none;color:var(--ink)}
+.logo img{width:28px;height:28px;border-radius:8px}
+.top nav a{font-size:15px;font-weight:600;margin-left:26px;text-decoration:none;color:var(--soft)}
+.top nav a:hover{color:var(--brick-ink)}
+.hero{background:var(--sky)}
+.hero .w{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;padding-top:40px;padding-bottom:0}
+.kicker{font:700 16px "Bricolage Grotesque";color:var(--brick-ink);margin-bottom:10px}
+h1{font:800 64px/1.02 "Bricolage Grotesque",sans-serif;letter-spacing:-2px}
+h1 em{font-style:normal;color:var(--brick)}
+.lead{font-size:20px;margin:22px 0 28px;max-width:30em;color:var(--soft)}
+.cta{display:inline-flex;gap:10px;align-items:center;background:var(--brick);color:#fff;text-decoration:none;font-weight:700;padding:15px 24px;font-size:16px;border-radius:14px}
+@media (prefers-color-scheme:dark){.cta{color:#1A100D}}
 .cta-note{display:block;margin-top:14px;font-size:15px;color:var(--mute)}
-.board{border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);font-family:"IBM Plex Mono",ui-monospace,monospace}
-.board .hd{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;letter-spacing:2px;color:var(--mute);border-bottom:1px solid var(--ink);padding:12px 0}
-.board .hd b{color:var(--ink);font-size:20px;letter-spacing:0}
-.board .r{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);font-size:17px}
-.board .r:last-child{border:0}
-.board .m{font-size:24px;font-weight:600}
-.board .q{color:var(--green);font-size:16px}
-.ln{display:inline-grid;place-items:center;width:32px;height:28px;border-radius:4px;font:700 15px "IBM Plex Sans",sans-serif;color:#fff}
+.card{background:var(--card);border-radius:20px;padding:16px 18px;box-shadow:0 10px 30px -18px rgba(80,40,20,.45)}
+.card .hd{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.card .hd span{font-size:14px;font-weight:600;color:var(--mute)}
+.card .hd b{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.card .r{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:17px;font-weight:600}
+.card .r:last-child{border:0}
+.card .m{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+.card .m small{font-size:14px;font-weight:500;color:var(--mute);margin-left:2px}
+.now{display:inline-flex;align-items:center;gap:6px;background:color-mix(in srgb,var(--green) 14%,var(--card));color:var(--green);font-size:14px;font-weight:700;padding:4px 10px;border-radius:20px}
+.now i{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.ln{display:inline-grid;place-items:center;width:32px;height:28px;border-radius:7px;font:800 15px "Bricolage Grotesque",sans-serif;color:#fff}
 .cap{font-size:14px;color:var(--mute);margin-top:10px}
+.town{display:block;width:100%;height:auto;max-height:150px;margin-top:36px}
 .feat{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;padding:72px 0;border-bottom:1px solid var(--line)}
 .feat.rev .txt{order:2}
-h2{font:400 46px/1.05 "Instrument Serif",Georgia,serif;margin-bottom:18px}
+h2{font:800 42px/1.08 "Bricolage Grotesque",sans-serif;letter-spacing:-1.2px;margin-bottom:16px}
 .feat p{max-width:28em;color:var(--soft)}
 .feat p+p{margin-top:12px}
 figure{margin:0}
-figure img{width:100%;max-width:340px;height:auto;border:1px solid var(--shot);border-radius:18px;display:block;margin:0 auto}
-figcaption{text-align:center;font-size:14px;color:var(--mute);margin-top:12px}
-.ex{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:15px;background:var(--tag);padding:2px 6px}
+figure img{width:100%;max-width:340px;height:auto;border-radius:28px;display:block;margin:0 auto;box-shadow:0 18px 40px -22px rgba(80,40,20,.55)}
+figcaption{text-align:center;font-size:14px;color:var(--mute);margin-top:14px}
+.ex{font-weight:700;background:var(--brick-soft);color:var(--brick-ink);padding:2px 8px;border-radius:8px}
 .cols{padding:72px 0;display:grid;grid-template-columns:1fr 1fr;gap:64px;border-bottom:1px solid var(--line)}
-.cols ul{list-style:none;padding:0}
-.cols li{padding:12px 0;border-bottom:1px solid var(--line)}
-.cols li:first-child{border-top:1px solid var(--line)}
+.cols ul{list-style:none;padding:0;background:var(--card);border-radius:20px;padding:4px 18px}
+.cols li{padding:13px 0;border-bottom:1px solid var(--line)}
+.cols li:last-child{border:0}
 .cols li b{display:block}
 .cols li span{color:var(--mute);font-size:16px}
 .cols ol{padding-left:22px;color:var(--soft)}
 .cols ol li{border:0;padding:4px 0}
 .cols p{color:var(--soft);max-width:28em}
 .cols p+p,.cols p+ol,.cols ol+p{margin-top:12px}
+.alsa{display:inline-block;background:var(--brick-soft);color:var(--brick-ink);border-radius:10px;padding:2px 10px;font-weight:700}
 footer{padding:36px 0 60px;font-size:14px;color:var(--mute)}
 footer p+p{margin-top:6px}
 @media (max-width:820px){
   .w{padding:0 18px}
   .top nav a{margin-left:14px;font-size:14px}
-  .hero,.feat,.cols{grid-template-columns:1fr;gap:28px;padding:48px 0}
+  .hero .w,.feat,.cols{grid-template-columns:1fr;gap:28px}
+  .feat,.cols{padding:48px 0}
   .feat.rev .txt{order:0}
-  h1{font-size:48px}
-  h2{font-size:36px}
+  h1{font-size:44px;letter-spacing:-1.2px}
+  h2{font-size:34px}
   .lead{font-size:18px}
 }
 @media (max-width:420px){.top nav a.opt{display:none}}
@@ -82,68 +91,85 @@ footer p+p{margin-top:6px}
   <nav><a class="opt" href="#appli">L’appli</a><a class="opt" href="#vie-privee">Vie privée</a><a href="https://app.kumm.fr">Testeurs</a></nav>
 </div></header>
 
-<main class="w">
-  <section class="hero">
+<section class="hero"><div class="w">
     <div>
-      <h1>Le prochain tram à Homme de Fer, <em>à la minute près.</em></h1>
-      <p class="lead">Kumm affiche les passages en temps réel du réseau CTS et des TER du Grand Est, montre où se trouve votre tram sur la carte et vous guide jusqu’à l’adresse où vous allez. L’appli est gratuite, sans publicité et sans compte.</p>
+      <p class="kicker">Kumm ! « Viens », en alsacien.</p>
+      <h1>Ton tram à Homme de Fer, <em>à la minute près.</em></h1>
+      <p class="lead">Kumm affiche les passages en temps réel du réseau CTS et des TER du Grand Est, montre où se trouve ton tram sur la carte et te guide jusqu’à l’adresse où tu vas. Gratuit, sans publicité et sans compte.</p>
       <span class="cta" aria-disabled="true">Android · bientôt sur le Play Store</span>
-      <span class="cta-note">En test en ce moment. Vous avez un identifiant ? <a href="https://app.kumm.fr">Ouvrir la version web</a>.</span>
+      <span class="cta-note">En test en ce moment. Tu as un identifiant ? <a href="https://app.kumm.fr">Ouvrir la version web</a>.</span>
     </div>
     <div>
-      <div class="board" aria-label="Exemple de tableau des départs">
-        <div class="hd"><span>HOMME DE FER · SAM. 31 OCT.</span><b>14:02</b></div>
-        <div class="r"><span class="ln" style="background:#009EE0">B</span><span>Hoenheim Gare</span><span class="m">2 min</span></div>
-        <div class="r"><span class="ln" style="background:#E10D19">A</span><span>Parc des Sports</span><span class="m">2 min</span></div>
-        <div class="r"><span class="ln" style="background:#009933">D</span><span>Poteries</span><span class="m">5 min</span></div>
+      <div class="card" aria-label="Exemple de prochains départs">
+        <div class="hd"><b>Homme de Fer</b><span>Sam. 31 oct. · 14:02</span></div>
+        <div class="r"><span class="ln" style="background:#E10D19">A</span><span>Parc des Sports</span><span class="now"><i></i>À quai</span></div>
+        <div class="r"><span class="ln" style="background:#009EE0">B</span><span>Hoenheim Gare</span><span class="m">2<small>min</small></span></div>
+        <div class="r"><span class="ln" style="background:#009933">D</span><span>Poteries</span><span class="m">5<small>min</small></span></div>
       </div>
       <p class="cap">Relevé un samedi à 14 h. Les mêmes horaires que sur l’écran de la station, sans avoir à y être.</p>
     </div>
-  </section>
+  </div>
+  <div class="w"><svg class="town" role="img" aria-label="Maisons à colombages, cathédrale de Strasbourg et tram, dessinés" viewBox="0 0 390 118" preserveAspectRatio="xMidYMax meet" aria-hidden="true"><defs><filter id="kumm-hand"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="2.2"/></filter></defs><g fill="none" stroke="var(--draw)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" filter="url(#kumm-hand)">
+  <path d="M0 112 H390"/>
+  <path d="M8 112 V70 L30 44 L52 70 V112"/><path d="M8 70 H52 M8 86 H52 M8 100 H52 M19 70 L30 86 L41 70 M19 86 L30 100 L41 86 M30 44 V70"/>
+  <rect x="14" y="74" width="8" height="8"/><rect x="38" y="74" width="8" height="8"/><path d="M26 112 V102 H34 V112"/>
+  <path d="M52 112 V78 L70 58 L88 78 V112"/><path d="M52 92 H88 M61 78 L70 92 L79 78 M61 92 L70 104 L79 92"/><rect x="57" y="82" width="7" height="7"/><rect x="76" y="82" width="7" height="7"/>
+  <path d="M112 112 V52 H176 V112"/><path d="M112 52 L118 44 H170 L176 52"/>
+  <circle cx="144" cy="78" r="13"/><circle cx="144" cy="78" r="5"/><path d="M131 78 H157 M144 65 V91 M135 69 L153 87 M153 69 L135 87"/>
+  <path d="M128 112 V98 Q134 90 140 98 V112 M148 112 V98 Q154 90 160 98 V112"/>
+  <path d="M112 52 V28 H130 V52"/><path d="M114 28 L121 6 L128 28"/><path d="M121 6 V1"/><path d="M116 22 H126 M117 16 H125 M118 10 H124"/>
+  <path d="M117 36 V46 M125 36 V46"/><path d="M158 52 V40 H174 V52"/>
+  <path d="M190 112 V74 L208 50 L226 74 V112"/><path d="M190 74 H226 M190 90 H226 M199 74 L208 90 L217 74 M208 50 V74"/><rect x="195" y="94" width="8" height="10"/><rect x="213" y="94" width="8" height="10"/>
+  <path d="M240 108 V84 Q240 78 246 78 H362 Q378 78 382 92 L384 108 Z"/>
+  <path d="M250 84 H268 V96 H250 Z M276 84 H294 V96 H276 Z M302 84 H320 V96 H302 Z M328 84 H346 V96 H328 Z M356 84 H370 Q376 84 378 96 H356 Z"/>
+  <path d="M270 78 V74 H286 L282 70 M282 70 L292 62"/><circle cx="262" cy="110" r="3"/><circle cx="350" cy="110" r="3"/>
+</g></svg></div>
+</section>
 
+<main class="w">
   <section class="feat" id="appli">
-    <div class="txt"><h2>Vos arrêts, sans chercher</h2>
-      <p>Ajoutez l’arrêt où vous montez tous les matins : ses prochains passages s’affichent dès l’ouverture. Enregistrez aussi votre adresse et celle du travail, Kumm calcule le trajet depuis là où vous êtes.</p>
+    <div class="txt"><h2>Tes arrêts, sans chercher</h2>
+      <p>Ajoute l’arrêt où tu montes tous les matins : ses prochains passages s’affichent dès l’ouverture. Enregistre aussi ton adresse et celle du boulot, Kumm calcule le trajet depuis là où tu es.</p>
       <p>Il indique aussi si la ligne est souvent en retard à cette heure-là, par exemple <span class="ex">à l’heure 86 %</span>, d’après les passages relevés depuis un mois.</p></div>
-    <figure><picture><source srcset="/img/accueil-sombre.webp?v=0.50.0" media="(prefers-color-scheme: dark)"><img src="/img/accueil-clair.webp?v=0.50.0" alt="Écran d’accueil de Kumm : trajets Maison et Travail, prochains passages à Homme de Fer" width="390" height="844" loading="lazy"></picture><figcaption>L’accueil, avec vos trajets et vos arrêts</figcaption></figure>
+    <figure><picture><source srcset="/img/accueil-sombre.webp?v=0.52.0" media="(prefers-color-scheme: dark)"><img src="/img/accueil-clair.webp?v=0.52.0" alt="Écran d’accueil de Kumm : trajets Maison et Travail, prochains passages à Homme de Fer" width="390" height="844" loading="lazy"></picture><figcaption>L’accueil, avec tes trajets et tes arrêts</figcaption></figure>
   </section>
 
   <section class="feat rev">
     <div class="txt"><h2>Les départs, comme en station</h2>
       <p>La fiche d’un arrêt reprend le tableau des écrans de la CTS : chaque ligne, sa direction et le passage suivant. Les trams supprimés et les retards des TER y figurent aussi.</p>
-      <p>Sur Android, une cloche à côté d’un départ vous prévient quelques minutes avant, même téléphone en poche.</p></div>
-    <figure><picture><source srcset="/img/arret-sombre.webp?v=0.50.0" media="(prefers-color-scheme: dark)"><img src="/img/arret-clair.webp?v=0.50.0" alt="Fiche de l’arrêt Homme de Fer : tableau des prochains départs" width="390" height="844" loading="lazy"></picture><figcaption>La fiche d’un arrêt</figcaption></figure>
+      <p>Sur Android, une cloche à côté d’un départ te prévient quelques minutes avant, même téléphone en poche. Et quand le tram est à quai, Kumm te le dit à sa façon : <span class="alsa">Kumm, dr Tram isch do !</span></p></div>
+    <figure><picture><source srcset="/img/arret-sombre.webp?v=0.52.0" media="(prefers-color-scheme: dark)"><img src="/img/arret-clair.webp?v=0.52.0" alt="Fiche de l’arrêt Homme de Fer : tableau des prochains départs" width="390" height="844" loading="lazy"></picture><figcaption>La fiche d’un arrêt</figcaption></figure>
   </section>
 
   <section class="feat">
     <div class="txt"><h2>Le tram sur la carte</h2>
       <p>Les trams, bus et TER avancent sur la carte entre les arrêts. Quand la CTS ne met plus à jour un véhicule, Kumm l’affiche en pointillé : sa position n’est plus sûre.</p>
-      <p>Pour un trajet, le guidage vous accompagne à pied jusqu’à l’arrêt, compte les arrêts à bord, puis vous mène jusqu’à l’adresse.</p></div>
-    <figure><picture><source srcset="/img/carte-sombre.webp?v=0.50.0" media="(prefers-color-scheme: dark)"><img src="/img/carte-clair.webp?v=0.50.0" alt="Carte du centre de Strasbourg avec les trams en direct et les arrêts à proximité" width="390" height="844" loading="lazy"></picture><figcaption>La carte, trams et bus en direct</figcaption></figure>
+      <p>Pour un trajet, le guidage t’accompagne à pied jusqu’à l’arrêt, compte les arrêts à bord, puis te mène jusqu’à l’adresse.</p></div>
+    <figure><picture><source srcset="/img/carte-sombre.webp?v=0.52.0" media="(prefers-color-scheme: dark)"><img src="/img/carte-clair.webp?v=0.52.0" alt="Carte du centre de Strasbourg avec les trams en direct et les arrêts à proximité" width="390" height="844" loading="lazy"></picture><figcaption>La carte, trams et bus en direct</figcaption></figure>
   </section>
 
   <section class="cols" id="installer">
     <h2>Où trouver Kumm</h2>
     <div>
-      <p>Kumm est en phase de test. L’application Android sera publiée prochainement sur le Play Store ; avec elle, les alertes arrivent aussi quand l’application est fermée.</p>
+      <p>Kumm est en phase de test. L’appli Android sera publiée prochainement sur le Play Store ; avec elle, les alertes arrivent aussi quand l’appli est fermée.</p>
       <p>La version web marche dans n’importe quel navigateur. Pendant la phase de test, il faut un identifiant :</p>
-      <ol><li>ouvrez <a href="https://app.kumm.fr">app.kumm.fr</a> et connectez-vous ;</li><li>sur iPhone, touchez Partager puis « Sur l’écran d’accueil » ;</li><li>Kumm apparaît ensuite avec vos autres applications.</li></ol>
+      <ol><li>ouvre <a href="https://app.kumm.fr">app.kumm.fr</a> et connecte-toi ;</li><li>sur iPhone, touche Partager puis « Sur l’écran d’accueil » ;</li><li>Kumm apparaît ensuite avec tes autres applis.</li></ol>
     </div>
   </section>
 
   <section class="cols" id="vie-privee">
-    <h2>Ce que Kumm garde de vous</h2>
+    <h2>Ce que Kumm garde de toi</h2>
     <ul>
-      <li><b>Vos favoris restent sur votre téléphone</b><span>Pas de compte, rien à créer.</span></li>
-      <li><b>Votre position n’est pas conservée</b><span>Elle sert à trouver les arrêts proches. Elle n’est envoyée au serveur que pour calculer un itinéraire, et pendant un guidage, sans nom ni identifiant.</span></li>
+      <li><b>Tes favoris restent sur ton téléphone</b><span>Pas de compte, rien à créer.</span></li>
+      <li><b>Ta position n’est pas conservée</b><span>Elle sert à trouver les arrêts proches. Elle n’est envoyée au serveur que pour calculer un itinéraire, et pendant un guidage, sans nom ni identifiant.</span></li>
       <li><b>Pas de publicité ni de statistiques de visite</b><span>L’appli ne revend rien et ne suit personne.</span></li>
-      <li><b>Alertes : seulement vos lignes</b><span>Et l’identifiant de notification du téléphone, rien d’autre. <a href="/confidentialite.html">Tous les détails</a></span></li>
+      <li><b>Alertes : seulement tes lignes</b><span>Et l’identifiant de notification du téléphone, rien d’autre. <a href="/confidentialite.html">Tous les détails</a></span></li>
     </ul>
   </section>
 </main>
 
 <footer><div class="w">
-  <p>Kumm est un projet indépendant, ni édité ni approuvé par la CTS ni par l’Eurométropole de Strasbourg. Pour acheter vos titres, utilisez l’application de la CTS.</p>
+  <p>Kumm est un projet indépendant, ni édité ni approuvé par la CTS ni par l’Eurométropole de Strasbourg. Pour acheter tes titres, utilise l’application de la CTS.</p>
   <p>Données : CTS et SNCF (données ouvertes), Eurométropole de Strasbourg (Licence Ouverte), nextbike, Base Adresse Nationale, Transitous, Open-Meteo. Cartes © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>.</p>
   <p><a href="/mentions-legales.html">Mentions légales</a> · <a href="/confidentialite.html">Confidentialité</a></p>
 </div></footer>
