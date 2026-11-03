@@ -24,7 +24,7 @@ export interface Vehicle {
   n?: string;
   /** à quai au terminus, en attente du départ de sa prochaine course */
   w?: boolean;
-  /** vitesse estimée par le serveur (km/h) ; pour un tram ou un bus, l'application calcule la vitesse du moment (profileOf) */
+  /** vitesse estimée par le serveur (km/h) ; l'application calcule la vitesse du moment (profileOf) */
   s?: number;
   /** tram ou bus : vitesse de croisière réelle sur ce tronçon (km/h), apprise des trajets partagés par les voyageurs */
   c?: number;
@@ -81,9 +81,13 @@ function cumOf(v: Vehicle, p: [number, number][]): number[] {
 /* Les horaires CTS laissent ~95 s pour ~500 m entre deux stations (20 km/h de moyenne), dont 20 à 30 s à quai et l'attente
    aux feux. Le véhicule reste donc à quai une partie du créneau, puis roule à une vitesse de croisière normale (CRUISE) ;
    si l'horaire laisse plus de temps que ça, il roule un peu moins vite, s'il en laisse moins, plus vite. */
-const ACCEL: Record<string, number> = { tram: 1.0, bus: 0.9 };
-const CRUISE: Record<string, number> = { tram: 40 / 3.6, bus: 35 / 3.6 };   // m/s
+/* Train (TER) : pas de GPS public à la SNCF ; comme sur les cartes de trains, la position est calculée sur les rails entre
+   l'heure de départ et l'heure d'arrivée (retards SNCF compris). Il démarre doucement (~0,45 m/s², un TER chargé), roule à
+   la vitesse qu'il faut pour tenir l'horaire et freine avant la gare ; le temps à quai est déjà dans l'horaire SNCF. */
+const ACCEL: Record<string, number> = { tram: 1.0, bus: 0.9, ter: 0.45 };
+const CRUISE: Record<string, number> = { tram: 40 / 3.6, bus: 35 / 3.6, ter: 120 / 3.6 };   // m/s
 const MAX_WAIT = 45;   // s, temps à quai au plus (montées et descentes, feu au départ, horaire arrondi à la minute)
+const WAIT_OF: Record<string, number> = { ter: 0 };
 interface Profile { wait: number; T: number; D: number; acc: number; vc: number; ramp: number }
 const profiles = new WeakMap<Vehicle, Profile | null>();
 function profileOf(v: Vehicle): Profile | null {
@@ -95,7 +99,7 @@ function profileOf(v: Vehicle): Profile | null {
     // temps qu'il faut à vitesse normale (accélération et freinage compris) ; le reste du créneau : à quai, au plus MAX_WAIT
     const need = D < (vt * vt) / acc0 ? 2 * Math.sqrt(D / acc0) : D / vt + vt / acc0;
     // temps à quai : celui observé à cet arrêt par les voyageurs (champ q), sinon ce que l'horaire laisse, au plus MAX_WAIT
-    const wait = Math.min(v.q ?? MAX_WAIT, Math.max(0, span - need), span * 0.6), T = span - wait;
+    const wait = Math.min(v.q ?? WAIT_OF[v.m ?? ""] ?? MAX_WAIT, Math.max(0, span - need), span * 0.6), T = span - wait;
     // croisière vc pour parcourir D en T : D = vc·T − vc²/acc ; trop court pour cette accélération : profil en triangle
     let acc = acc0;
     const disc = acc * acc * T * T - 4 * acc * D;
@@ -206,7 +210,7 @@ function speedAt(v: Vehicle, t: number): number | null {
   const dt = first ? (t - first[0]) / 1000 : 0;
   const ms = first && dt >= 0.8 ? (pr.D * Math.max(0, f - first[1])) / dt : 0;
   // horaire très serré (arrondi à la minute) : on n'affiche pas une vitesse impossible
-  return Math.round(Math.min(v.m === "tram" ? 70 : 60, ms * 3.6));
+  return Math.round(Math.min(v.m === "ter" ? 160 : v.m === "tram" ? 70 : 60, ms * 3.6));
 }
 
 /** Point du tracé à la fraction f, et indice du segment où il se trouve */
@@ -265,7 +269,7 @@ export function followInfo(v: Vehicle, t = serverNow()): { state: string; speed:
   if (v.x) return { state: "Immobilisé", speed: 0, next };   // la durée est dans l'encadré au-dessus
   const atStop = v.a[0] === v.b[0] && v.a[1] === v.b[1];
   if (atStop) return { state: "À quai", speed: 0, next };
-  // tram ou bus : vitesse du moment (encore à quai, accélération, croisière, freinage) ; train : moyenne du serveur
+  // vitesse du moment (encore à quai, accélération, croisière, freinage), pour un tram, un bus ou un train
   const pr = profileOf(v);
   if (pr && (t - v.a[2]) / 1000 < pr.wait && progress(v, t) < 0.01) return { state: "À quai", speed: 0, next };
   const now = speedAt(v, t);
