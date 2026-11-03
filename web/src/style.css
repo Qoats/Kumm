@@ -1425,3 +1425,11 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 :root[data-ui="elsass"] .seg button,:root[data-ui="elsass"] .seg.pills button{flex:1 1 0;justify-content:center}
 :root[data-ui="elsass"] .lyr{opacity:.6}
 :root[data-ui="elsass"] .lyr.on{opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+
+/* Alsace : salutation sur une ligne ; en-tête replié quand on fait défiler l'accueil */
+:root[data-ui="elsass"] .thead h1{font-size:min(40px,8.6vw);white-space:nowrap;transition:font-size .2s}
+:root[data-ui="elsass"] .thead .top{margin-bottom:6px}
+:root[data-ui="elsass"] .thead .town{transition:height .22s ease,opacity .18s ease}
+:root[data-ui="elsass"][data-hs="1"] .thead .town{height:0;opacity:0;margin:0}
+:root[data-ui="elsass"][data-hs="1"] .thead h1{font-size:26px}
+:root[data-ui="elsass"][data-hs="1"] header.thead{box-shadow:0 1px 0 var(--line)}

@@ -95,6 +95,7 @@ function draw(): void {
   lastPage = "";
   const t = S.tab;
   let body: string;
+  if (t !== "home") document.documentElement.dataset.hs = "0";
   if (t === "home") body = header() + `<main>${screenHome()}</main>`;
   else if (t === "search") body = `<main><h1 class="sr">Recherche</h1>${screenSearch()}</main>`;
   else if (t === "lines") body = `<main><h1 class="sr">Toutes les lignes</h1>${screenLines()}</main>`;
@@ -929,3 +930,12 @@ else void initReal();
 render();
 hideSplash();
 void initWidgets();   // l'application est affichée sous l'animation de lancement : elle peut s'effacer
+
+// accueil : quand on fait défiler, l'en-tête (salutation et dessin) se replie pour laisser la place
+document.addEventListener("scroll", e => {
+  const m = e.target as HTMLElement;
+  if (S.tab !== "home" || !(m instanceof HTMLElement) || m.tagName !== "MAIN") return;
+  // deux seuils pour ne pas osciller : on replie au-delà de 60 px, on déplie tout en haut
+  const cur = document.documentElement.dataset.hs, v = m.scrollTop > 60 ? "1" : m.scrollTop < 8 ? "0" : cur ?? "0";
+  if (document.documentElement.dataset.hs !== v) document.documentElement.dataset.hs = v;
+}, { capture: true, passive: true });
