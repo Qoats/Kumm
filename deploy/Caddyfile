@@ -30,3 +30,8 @@ app.kumm.fr {
 		}
 	}
 }
+
+# --- Messagerie Relais : relais.kumm.fr (projet Docker séparé ~/relais, réseau kumm_default) ---
+relais.kumm.fr {
+	reverse_proxy relais:8080
+}
