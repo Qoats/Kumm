@@ -162,6 +162,26 @@ class TransportRepository {
         Fleet(parseFleet(json), json.optLong("now", System.currentTimeMillis()))
     }
 
+    internal suspend fun homeInfo(): HomeInfo = withContext(Dispatchers.IO) {
+        if (isDemo) return@withContext demoHome
+        val (traffic, station) = feedPair(
+            { get("messages").optJSONArray("items").objects().mapNotNull { message ->
+                val title = message.string("title") ?: return@mapNotNull null
+                val lines = message.optJSONArray("lines")
+                TrafficNotice(title, (0 until (lines?.length() ?: 0)).mapNotNull { lines?.optString(it) },
+                    message.string("text").orEmpty())
+            } },
+            { get("velhop", "poi").optJSONArray("items").objects().mapNotNull { item ->
+                val name = item.string("name") ?: return@mapNotNull null
+                val point = position(item.optDouble("lat"), item.optDouble("lon")) ?: return@mapNotNull null
+                val count = Regex("""(\d+)\s*v[ée]lo""", RegexOption.IGNORE_CASE)
+                    .find(item.string("info").orEmpty())?.groupValues?.get(1)?.toIntOrNull() ?: return@mapNotNull null
+                BikeStation(name, point, count)
+            }.minByOrNull { it.position.distance(Position(48.5846, 7.7507)) } }
+        )
+        HomeInfo(traffic, station)
+    }
+
     private fun ctsDepartures(refs: List<String>): List<Departure> {
         var answered = false
         var error: IOException? = null
@@ -190,10 +210,10 @@ class TransportRepository {
         return firstData to secondData
     }
 
-    private fun get(route: String): JSONObject {
+    private fun get(route: String, namespace: String = "api"): JSONObject {
         val base = URI(BuildConfig.API_BASE.trimEnd('/'))
         require(base.scheme == "https" && base.host != null && base.rawUserInfo == null && base.rawQuery == null && base.rawFragment == null)
-        val connection = URI("$base/api/$route").toURL().openConnection() as HttpURLConnection
+        val connection = URI("$base/$namespace/$route").toURL().openConnection() as HttpURLConnection
         connection.instanceFollowRedirects = false
         connection.connectTimeout = 6_000
         connection.readTimeout = 8_000

@@ -51,14 +51,14 @@ private const val STOP = "kumm-stop"
 private val strasbourg = Position(48.5846, 7.7507)
 
 @Composable
-internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?) {
+internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?, line: String?) {
     var filter by rememberSaveable { mutableStateOf<Mode?>(null) }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var mapFailed by remember { mutableStateOf(false) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
     var tick by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
-    val vehicles = fleet.value?.vehicles.orEmpty()
+    val vehicles = fleet.value?.vehicles.orEmpty().filter { line == null || it.line == line || (line == "TER" && it.mode == Mode.TER) }
     val currentVehicle = vehicles.firstOrNull { it.id == selected && (filter == null || it.mode == filter) }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -120,7 +120,7 @@ internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?) {
             }
         }
     }
-    LaunchedEffect(style, fleet.value, filter, tick) {
+    LaunchedEffect(style, fleet.value, filter, line, tick) {
         val sample = fleet.value
         val elapsed = if (sample == null) 0 else (tick - sample.receivedAt).coerceIn(0, 45_000)
         val now = (sample?.serverTime ?: 0) + elapsed

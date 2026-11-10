@@ -13,14 +13,15 @@ import java.time.Instant
 
 data class Load<T>(val value: T? = null, val loading: Boolean = false, val error: String? = null)
 
-data class KummState(
+internal data class KummState(
     val stops: Load<List<Stop>> = Load(),
     val departures: Load<List<Departure>> = Load(),
     val fleet: Load<Fleet> = Load(),
-    val selectedStop: Stop? = null
+    val selectedStop: Stop? = null,
+    val homeInfo: Load<HomeInfo> = Load()
 )
 
-class KummViewModel : ViewModel() {
+internal class KummViewModel : ViewModel() {
     private val repository = TransportRepository()
     private val mutableState = MutableStateFlow(KummState())
     val state = mutableState.asStateFlow()
@@ -28,7 +29,21 @@ class KummViewModel : ViewModel() {
     private var stopJob: Job? = null
     private var departuresJob: Job? = null
 
-    init { loadStops() }
+    init {
+        loadStops()
+        refreshHomeInfo()
+    }
+
+    private fun refreshHomeInfo() = viewModelScope.launch {
+        mutableState.update { it.copy(homeInfo = Load(loading = true)) }
+        try {
+            val info = repository.homeInfo()
+            mutableState.update { it.copy(homeInfo = Load(value = info)) }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            mutableState.update { it.copy(homeInfo = Load(error = message(e))) }
+        }
+    }
 
     fun loadStops() {
         if (stopJob?.isActive == true) return
