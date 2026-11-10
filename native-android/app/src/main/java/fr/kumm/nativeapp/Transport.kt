@@ -182,6 +182,39 @@ class TransportRepository {
         HomeInfo(traffic, station)
     }
 
+    internal suspend fun lineDirections(line: String): List<LineDirection> = withContext(Dispatchers.IO) {
+        if (!isDemo) return@withContext parseLineDirections(get("line-route?line=" + encode(line)))
+        val sample = when (line) {
+            "A" -> demoStops.take(2)
+            "C" -> demoStops.drop(1).take(2)
+            "TER" -> listOf(demoStops.first(), demoStops.last())
+            else -> emptyList()
+        }.map { LineStop(it.id, it.name) }
+        if (sample.size < 2) emptyList() else listOf(
+            LineDirection(sample.last().name, sample), LineDirection(sample.first().name, sample.reversed())
+        )
+    }
+
+    internal suspend fun addresses(query: String): List<TripPlace> = withContext(Dispatchers.IO) {
+        if (isDemo) return@withContext emptyList()
+        parseAddresses(get("address?q=" + encode(query.take(100)), "geo"))
+    }
+
+    internal suspend fun plans(query: TripQuery): List<TripPlan> = withContext(Dispatchers.IO) {
+        if (isDemo) return@withContext demoPlan(query)
+        val from = query.from.position
+        val to = query.to.position
+        val options = buildString {
+            if (query.mode == TripMode.TRANSIT) {
+                query.time?.let { append("&time=").append(encode(it.toString())) }
+                if (query.arriveBy) append("&arrive=1")
+                if (query.stepFree) append("&stepfree=1")
+            }
+        }
+        val response = get("${query.mode.path}?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}$options", "geo")
+        if (query.mode == TripMode.TRANSIT) parseTransit(response) else parseStreetPlans(response, query.mode)
+    }
+
     private fun ctsDepartures(refs: List<String>): List<Departure> {
         var answered = false
         var error: IOException? = null

@@ -129,7 +129,7 @@ internal fun AlsaceHome(
                 Tile(click = search) {
                     TileLabel(R.drawable.alsace_navigate, "Naviguer", MaterialTheme.colorScheme.primary)
                     TileTitle("Où on va ?")
-                    TileNote("Trouve un arrêt et consulte les départs en tram, bus ou TER.")
+                    TileNote("En tram, bus, train, à vélo ou à pied : calcule ton trajet.")
                 }
             }
             item {

@@ -122,6 +122,9 @@ private val clockFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.FRANCE).wi
 private fun KummApp(appearance: String, changeAppearance: (String) -> Unit, model: KummViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    var lineDetails by rememberSaveable { mutableStateOf<String?>(null) }
+    var planning by rememberSaveable { mutableStateOf(false) }
+    val plannerRepository = remember { TransportRepository() }
     var query by rememberSaveable { mutableStateOf("") }
     var mapFocus by remember { mutableStateOf<Position?>(null) }
     var mapLine by rememberSaveable { mutableStateOf<String?>(null) }
@@ -146,6 +149,7 @@ private fun KummApp(appearance: String, changeAppearance: (String) -> Unit, mode
         preferences.edit().putStringSet("favourites", favIds).apply()
     }
     fun showMap(focus: Position? = null, line: String? = null) {
+        lineDetails = null
         mapFocus = focus
         mapLine = line
         model.selectStop(null)
@@ -165,16 +169,21 @@ private fun KummApp(appearance: String, changeAppearance: (String) -> Unit, mode
     }
 
     val stop = state.selectedStop
-    BackHandler(tab != Tab.HOME || stop != null) {
-        if (stop != null) model.selectStop(null) else { pick = Pick.NONE; tab = Tab.HOME }
+    BackHandler(planning || lineDetails != null || tab != Tab.HOME || stop != null) {
+        when {
+            planning -> planning = false
+            stop != null -> model.selectStop(null)
+            lineDetails != null -> lineDetails = null
+            else -> { pick = Pick.NONE; tab = Tab.HOME }
+        }
     }
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            if (tab != Tab.HOME || stop != null) {
+            if (planning || lineDetails != null || tab != Tab.HOME || stop != null) {
                 TopAppBar(
-                    title = { Text(stop?.name ?: when (tab) {
+                    title = { Text(if (planning) "Itinéraire" else stop?.name ?: lineDetails?.let { "Ligne $it" } ?: when (tab) {
                         Tab.MAP -> mapLine?.let { "Ligne $it" } ?: "Carte du réseau"
                         else -> when (pick) {
                             Pick.HOME -> "Arrêt près de la maison"
@@ -184,7 +193,13 @@ private fun KummApp(appearance: String, changeAppearance: (String) -> Unit, mode
                         }
                     }, fontFamily = bricolage, fontWeight = FontWeight.ExtraBold) },
                     navigationIcon = {
-                        if (stop != null) IconButton(onClick = { model.selectStop(null) }) {
+                        if (planning || lineDetails != null || stop != null) IconButton(onClick = {
+                            when {
+                                planning -> planning = false
+                                stop != null -> model.selectStop(null)
+                                else -> lineDetails = null
+                            }
+                        }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour")
                         }
                     }
@@ -192,7 +207,7 @@ private fun KummApp(appearance: String, changeAppearance: (String) -> Unit, mode
             }
         },
         bottomBar = {
-            AlsaceTabs(tab) { item ->
+            if (!planning && lineDetails == null) AlsaceTabs(tab) { item ->
                 model.selectStop(null)
                 pick = Pick.NONE
                 if (item == Tab.MAP) showMap()
@@ -201,15 +216,19 @@ private fun KummApp(appearance: String, changeAppearance: (String) -> Unit, mode
         }
     ) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets)) {
-            if (model.isDemo && (tab != Tab.HOME || stop != null)) DemoLabel()
+            if (model.isDemo && (tab != Tab.HOME || stop != null || lineDetails != null)) DemoLabel()
             when {
+                planning -> PlannerScreen(stops, model.isDemo, plannerRepository)
                 stop != null -> StopScreen(stop, state.departures, model::loadDepartures,
                     favourite = stop.id in favIds, toggleFavourite = { toggleFavourite(stop) }) {
                     showMap(focus = stop.position)
                 }
+                lineDetails != null -> LineScreen(lineDetails.orEmpty(), stops, plannerRepository, model::selectStop) {
+                    showMap(line = lineDetails)
+                }
                 tab == Tab.HOME -> AlsaceHome(
                     model.isDemo, state.homeInfo, home, work, stops.filter { it.id in favIds },
-                    search = { findStop(Pick.NONE) },
+                    search = { planning = true },
                     place = { isHome ->
                         val saved = if (isHome) home else work
                         if (saved != null) model.selectStop(saved) else findStop(if (isHome) Pick.HOME else Pick.WORK)
@@ -218,7 +237,7 @@ private fun KummApp(appearance: String, changeAppearance: (String) -> Unit, mode
                     openStop = model::selectStop,
                     traffic = { dialog = HomeDialog.TRAFFIC }, bike = { dialog = HomeDialog.BIKE },
                     settings = { dialog = HomeDialog.SETTINGS }, account = { dialog = HomeDialog.ACCOUNT },
-                    openLine = { showMap(line = it) }
+                    openLine = { lineDetails = it }
                 )
                 tab == Tab.SEARCH -> SearchScreen(query, { query = it }, state.stops, model::loadStops) { chosen ->
                     when (pick) {

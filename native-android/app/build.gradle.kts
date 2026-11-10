@@ -23,8 +23,8 @@ android {
         minSdk = 26
         targetSdk = 36
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
-        versionCode = 2
-        versionName = "0.1.1-preview"
+        versionCode = 3
+        versionName = "0.1.2-preview"
         buildConfigField("String", "API_BASE", javaString(apiBase))
         buildConfigField("String", "API_KEY", javaString(apiKey))
         buildConfigField("boolean", "LIVE_DATA", liveData.get().toString())

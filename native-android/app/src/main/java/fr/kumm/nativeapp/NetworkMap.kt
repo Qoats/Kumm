@@ -34,24 +34,28 @@ import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import org.maplibre.geojson.LineString
 
 private const val VEHICLES = "kumm-vehicles"
 private const val VEHICLE_LAYER = "kumm-vehicles-layer"
 private const val STOP = "kumm-stop"
+private const val TRIP = "kumm-trip"
 private val strasbourg = Position(48.5846, 7.7507)
 
 @Composable
-internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?, line: String?) {
+internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?, line: String?, tripPaths: List<List<Position>> = emptyList()) {
     var filter by rememberSaveable { mutableStateOf<Mode?>(null) }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var mapFailed by remember { mutableStateOf(false) }
@@ -112,7 +116,20 @@ internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?, line: String?) {
     LaunchedEffect(map, focus) {
         if (focus != null) map?.moveCamera(CameraUpdateFactory.newLatLngZoom(focus.latLng(), 15.0))
     }
-    LaunchedEffect(lifecycle) {
+    LaunchedEffect(style, tripPaths) {
+        val loaded = style ?: return@LaunchedEffect
+        val features = tripPaths.filter { it.size >= 2 }.map { path ->
+            Feature.fromGeometry(LineString.fromLngLats(path.map { it.point() }))
+        }
+        loaded.getSourceAs<GeoJsonSource>(TRIP)?.setGeoJson(FeatureCollection.fromFeatures(features))
+        val points = tripPaths.flatten().distinct()
+        if (points.size >= 2) {
+            val bounds = LatLngBounds.Builder().includes(points.map { it.latLng() }).build()
+            mapView.post { if (style === loaded && mapView.isAttachedToWindow) map?.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 72)) }
+        }
+    }
+    LaunchedEffect(lifecycle, tripPaths.isEmpty()) {
+        if (tripPaths.isNotEmpty()) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 tick = SystemClock.elapsedRealtime()
@@ -138,7 +155,7 @@ internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?, line: String?) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+        if (tripPaths.isEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text("Tout") })
             Mode.entries.forEach { mode ->
@@ -148,6 +165,7 @@ internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?, line: String?) {
         if (fleet.loading && fleet.value == null) LinearProgressIndicator(Modifier.fillMaxWidth())
         val notice = when {
             mapFailed -> "Fond de carte indisponible."
+            tripPaths.isNotEmpty() -> "Tracé de l’itinéraire"
             fleet.error != null -> if (fleet.value == null) fleet.error else "Dernières positions connues."
             currentVehicle != null -> "${currentVehicle.line} · ${currentVehicle.destination} · position estimée"
             fleet.value != null && vehicles.none { filter == null || it.mode == filter } -> "Aucun véhicule dans ce filtre."
@@ -161,6 +179,11 @@ internal fun NetworkMap(fleet: Load<Fleet>, focus: Position?, line: String?) {
 private fun configureLayers(style: Style) {
     style.addSource(GeoJsonSource(VEHICLES))
     style.addSource(GeoJsonSource(STOP))
+    style.addSource(GeoJsonSource(TRIP))
+    style.addLayer(LineLayer("kumm-trip-layer", TRIP).withProperties(
+        PropertyFactory.lineColor("#B23A2B"), PropertyFactory.lineWidth(5f),
+        PropertyFactory.lineJoin("round"), PropertyFactory.lineCap("round")
+    ))
     val colors = Expression.match(Expression.get("mode"), Expression.literal("#167159"),
         Expression.stop("TRAM", "#B23A2B"), Expression.stop("BUS", "#176CAC"), Expression.stop("TER", "#6F46B8"))
     style.addLayer(CircleLayer(VEHICLE_LAYER, VEHICLES).withProperties(
