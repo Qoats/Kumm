@@ -154,12 +154,14 @@ export async function addArrival(a: ArrivalAlert, onWebFire: (a: ArrivalAlert) =
 }
 
 export async function removeArrival(a: ArrivalAlert): Promise<void> {
+  if (NATIVE) {
+    const saved = localStorage.getItem(TOKEN_KEY);
+    if (!PUSH_READY || !saved) throw new Error("Notifications indisponibles");
+    const r = await fetch(url("/api/arrival"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ token: saved, cancel: true, refs: a.refs, line: a.line, dest: a.dest }) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+  }
   const k = arrivalKey(a);
   saveArrivals(arrivals().filter(x => arrivalKey(x) !== k));
   window.clearTimeout(webTimers.get(k)); webTimers.delete(k);
-  if (NATIVE && PUSH_READY) {
-    const saved = localStorage.getItem(TOKEN_KEY);
-    if (saved) await fetch(url("/api/arrival"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ token: saved, cancel: true, refs: a.refs, line: a.line, dest: a.dest }) }).catch(() => {});
-  }
 }

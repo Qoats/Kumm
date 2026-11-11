@@ -66,17 +66,20 @@ export function ensurePlanned(): void {
   if (!tripReady()) return;
   if (S.trip.when.kind !== "now" && S.trip.when.at < Date.now() - PAST_GRACE) { S.trip.when = { kind: "now", at: 0 }; whenResetAt = Date.now(); }
   const origin = originPlace(), dest = S.trip.dest as Place;
-  const key = keyOf(origin, dest), when = tripTime(), whenKey = whenKeyOf(when);
+  const stepFree = S.prefs.stepFree;
+  const key = keyOf(origin, dest), when = tripTime(), whenKey = `${whenKeyOf(when)}|stepFree:${stepFree}`;
   // « maintenant » : horaires recalculés après 2 minutes ; une heure choisie, après 10 minutes
   if (!forced && TRIP && TRIP.key === key && TRIP.whenKey === whenKey && Date.now() - TRIP.at < (when ? CHOSEN_MAX_AGE : TRANSIT_MAX_AGE)) return;
   forced = false;
   const prev = TRIP && TRIP.key === key ? TRIP : null;
   const sameWhen = prev?.whenKey === whenKey;
+  const loadWalk = !prev || prev.walk.status === "error";
+  const loadBike = !prev || prev.bike.status === "error";
   const t: TripState = {
     key, whenKey, at: Date.now(), origin, dest,
     transit: prev && sameWhen ? { ...prev.transit, status: "loading" } : { status: "loading" },
-    walk: prev ? prev.walk : { status: "loading" },
-    bike: prev ? prev.bike : { status: "loading" },
+    walk: loadWalk ? { status: "loading" } : prev.walk,
+    bike: loadBike ? { status: "loading" } : prev.bike,
     fallback: sameWhen ? prev?.fallback : undefined
   };
   if (!prev || (!sameWhen && S.trip.mode === "transit")) S.trip.sel = 0;
@@ -95,20 +98,29 @@ export function ensurePlanned(): void {
     .then(j => {
       t.transit = { status: "ok", data: j };
       if (TRIP === t) { JOURNEYS = j; if (S.trip.mode === "transit" && S.trip.sel >= j.length) S.trip.sel = 0; }
-      if (!j.length && !t.fallback) void useFallback();
+      if (!stepFree && !j.length && !t.fallback) void useFallback();
     })
     .catch(e => {
       t.transit = { status: "error", error: why(e), data: t.transit.data };
-      if (!t.transit.data?.length && !t.fallback) void useFallback();
+      if (!stepFree && !t.transit.data?.length && !t.fallback) void useFallback();
     })
     .finally(done);
-  if (prev) return;
-  fetchWalk(origin, dest)
-    .then(r => { t.walk = { status: "ok", data: r }; })
-    .catch(e => { t.walk = { status: "error", error: why(e) }; })
-    .finally(done);
-  fetchBike(origin, dest)
-    .then(r => { t.bike = { status: "ok", data: r }; if (TRIP === t) { BIKE_ROUTES.length = 0; BIKE_ROUTES.push(...r); } })
-    .catch(e => { t.bike = { status: "error", error: why(e) }; })
-    .finally(done);
+  // Les requêtes de marche et de vélo en cours survivent à un recalcul des horaires.
+  if (loadWalk) {
+    const walk = t.walk;
+    void fetchWalk(origin, dest)
+      .then(data => { walk.status = "ok"; walk.data = data; })
+      .catch(e => { walk.status = "error"; walk.error = why(e); })
+      .finally(() => { if (TRIP?.walk === walk) render(); });
+  }
+  if (loadBike) {
+    const bike = t.bike;
+    void fetchBike(origin, dest)
+      .then(data => {
+        bike.status = "ok"; bike.data = data;
+        if (TRIP?.bike === bike) { BIKE_ROUTES.length = 0; BIKE_ROUTES.push(...data); }
+      })
+      .catch(e => { bike.status = "error"; bike.error = why(e); })
+      .finally(() => { if (TRIP?.bike === bike) render(); });
+  }
 }
