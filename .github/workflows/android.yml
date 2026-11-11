@@ -8,12 +8,8 @@
 name: APK Android
 
 on:
-  workflow_dispatch:
-    inputs:
-      publier:
-        description: "Proposer cette version aux téléphones (mise à jour dans l'application)"
-        type: boolean
-        default: true
+  push:
+    branches: ["release/kumm-correctifs-android"]
 
 jobs:
   apk:
@@ -158,14 +154,20 @@ jobs:
       # Un seul commit sur la branche « apk », remplacé à chaque version : l'historique du dépôt ne grossit pas.
       # Seul un APK signé est publié (un APK de test ne pourrait pas s'installer par-dessus).
       - name: Publier pour les mises à jour dans l'application
-        if: env.SIGNED == '1' && inputs.publier
+        if: env.SIGNED == '1'
         env:
           PUSH_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
         run: |
           V=$(node -p "require('./package.json').version")
+          git fetch -q origin refs/heads/apk
+          APK_BASE=$(git rev-parse FETCH_HEAD)
+          CURRENT_CODE=$(git show "$APK_BASE:latest.json" | jq -er '.code | select(type == "number")')
+          test "${{ github.run_number }}" -gt "$CURRENT_CODE"
+          BT=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs kumm.apk | grep -Fx 'Signer #1 certificate SHA-256 digest: e49b3210f93b9d8b13ba3d22e295572f951b102f238fb3c142c1dfc0bd1bfa02'
           D="$RUNNER_TEMP/apk"; mkdir -p "$D"; cp kumm.apk "$D/"
           printf '{"version":"%s","code":%s,"size":%s,"sha256":"%s","date":"%s"}\n' "$V" "${{ github.run_number }}" "$(stat -c%s kumm.apk)" "$(sha256sum kumm.apk | cut -d' ' -f1)" "$(date -u +%FT%TZ)" > "$D/latest.json"
           cat "$D/latest.json"
           cd "$D" && git init -q -b apk && git add kumm.apk latest.json
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "APK $V (version ${{ github.run_number }})"
-          git push -q -f "$PUSH_URL" apk
+          git push -q --force-with-lease="refs/heads/apk:$APK_BASE" "$PUSH_URL" apk
