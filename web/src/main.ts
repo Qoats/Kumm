@@ -317,7 +317,12 @@ app.addEventListener("click", e => {
     S.arrPick = null; render();
     if (d.arrlead === "x" || !s) return;
     const a = { stopId: s.id, refs: s.refs?.length ? s.refs : [s.id], stop: s.name, line: pick.line, dest: pick.dest, at: pick.at, lead: Number(d.arrlead) };
-    if (d.arrlead === "del") { void removeArrival(a).then(() => { toast("Alerte annulée"); render(); }); return; }
+    if (d.arrlead === "del") {
+      void removeArrival(a)
+        .then(() => { toast("Alerte annulée"); render(); })
+        .catch(() => toast("Impossible d’annuler l’alerte. Réessayez."));
+      return;
+    }
     void addArrival(a, x => { toast(`${x.line} vers ${x.dest} : passage dans ${x.lead} min`); render(); })
       .then(() => { toast(`Kumm vous préviendra ${a.lead} min avant le passage du ${a.line}`); render(); })
       .catch(e => toast(e instanceof Error ? e.message : "Alerte impossible"));
