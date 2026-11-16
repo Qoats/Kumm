@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const files = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" }).split("\0").filter(Boolean);
-const sensitive = /(?:^|\/)(?:\.env(?:\.[^/]*)?|.*\.(?:keystore|jks|pem|p12|pfx|key|zip|apk|aab)|local\.properties|google-services\.json|session-key)$/i;
+const sensitive = /(?:^|\/)(?:\.env(?:\.[^/]*)?|.*\.(?:keystore|jks|pem|p12|pfx|key|zip|apk|aab)|local\.properties|\.envrc|\.npmrc|google-services\.json|session-key)$/i;
 const examples = new Set([".env.example", ".env.production.example", "web/.env.android"]);
 const textFile = /(?:^|\/)(?:Dockerfile|Caddyfile|\.env[^/]*)$|\.(?:ts|js|mjs|json|md|txt|csv|yml|yaml|html|xml|sh|properties|gradle|py)$/i;
 const direct = /^[ \t]*(?:export[ \t]+)?([A-Z0-9_]*(?:CTS_TOKEN|SNCF_TOKEN|API_KEY|APP_KEY|PASSWORD|CLIENT_SECRET))\s*=\s*["']?([^\s"'#]+)/i;

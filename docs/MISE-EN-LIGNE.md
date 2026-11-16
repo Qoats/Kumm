@@ -31,7 +31,7 @@ Organisation des noms : `kumm.fr` = site vitrine et pages légales, `app.kumm.fr
 | `TRUST_PROXY` | `1` **seulement si un proxy est devant le serveur** (hébergeur, Caddy…) ; déjà mis par `docker-compose.yml`. Sans proxy, laissez-le vide : sinon chacun pourrait choisir son adresse et contourner la limite de requêtes |
 | `GEO_USER_AGENT` | `Kumm/1.0 (contact@votre-domaine.fr)` : **un vrai contact**, exigé par OpenStreetMap et courtois envers les autres services |
 | `CORS_ORIGINS` | `https://localhost,capacitor://localhost` (l'application Android) |
-| `RATE_LIMIT_PER_MIN` | 240 par défaut ; baissez si besoin |
+| `RATE_LIMIT_PER_MIN` | 600 par défaut ; baissez si besoin |
 | `CTS_BUDGET_PER_MIN` | 1500 par défaut : **à régler avec les quotas donnés par la CTS** |
 | `UNKNOWN_REF_PER_MIN` | 60 par défaut ; `VALIDATE_STOP_REFS=0` désactive ce filtrage si des arrêts valables étaient refusés |
 | `ET_POLL_S` | 30 par défaut : le serveur charge les passages de **tout le réseau** en un appel (`estimated-timetable`) toutes les 30 s et répond aux arrêts depuis la mémoire ; un arrêt absent de cette photo est demandé à la CTS comme avant. `0` = désactivé |
@@ -52,10 +52,10 @@ Plusieurs services utilisés par Kumm sont **gratuits, communautaires et à usag
 | Adresses | Base Adresse Nationale (service public) | convient, en vous identifiant (`GEO_USER_AGENT`) |
 | Vélhop | flux GBFS nextbike (public) | convient |
 | Parkings relais | open data de l'Eurométropole | convient (réponses gardées 2 minutes) |
-| CTS | votre jeton | **demandez à la CTS vos quotas** et les conditions de mise en cache |
+| CTS | GTFS public par défaut | Configurer quotas et conditions de cache uniquement avant l’activation autorisée de SIRI |
 
 ## 6. Avant d'ouvrir au public (liste de contrôle)
-- [ ] **Accord CTS** : relire les conditions (quotas, mise en cache, attribution, usage du nom « CTS », obligation de mention).
+- [ ] **Sources CTS**. Attribuer le GTFS public. Vérifier les conditions de la convention avant l’activation de SIRI.
 - [ ] **Politique de confidentialité** publiée sur une adresse web (modèle : `POLITIQUE-CONFIDENTIALITE.md`, à adapter) et lien dans l'application et sur la fiche du magasin.
 - [ ] **Mentions légales** : éditeur, contact, hébergeur.
 - [ ] `GEO_USER_AGENT` avec une vraie adresse de contact.
@@ -67,5 +67,5 @@ Plusieurs services utilisés par Kumm sont **gratuits, communautaires et à usag
 ## 7. Faire évoluer sans casser les anciennes applications
 Des téléphones garderont longtemps une ancienne version : **ne supprimez et ne changez jamais** le comportement des adresses `/api`, `/geo`, `/poi`, `/tiles`, `/health` ; ajoutez-en de nouvelles. Si une évolution devient vraiment incompatible, relevez `MIN_APP_VERSION` : les anciennes versions affichent alors « mise à jour nécessaire ».
 
-## 8. Publier sur le Play Store (plus tard)
-Compte développeur Google Play (frais d'inscription à vérifier), une **clé de signature à sauvegarder à plusieurs endroits** (la perdre empêche toute mise à jour), un fichier `.aab` signé, la fiche (description, captures, icône), l'adresse de la politique de confidentialité et le formulaire « sécurité des données » (la localisation est utilisée et transmise au serveur pour les itinéraires). L'APK de test de GitHub est signé « debug » : il ne peut pas être publié tel quel.
+## 8. Préparer Google Play
+Voir [Préparer Kumm pour Google Play](GOOGLE-PLAY.md) pour le profil AAB, la signature, les permissions et les essais Android.

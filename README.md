@@ -27,13 +27,23 @@ Le code est sous licence MIT (fichier `LICENSE`). Les données gardent leurs con
 ## Structure
 
 ```
-shared/   types communs (arrêt, passage, réponses de l'API CTS)
-server/   GTFS CTS, services ouverts et relais SIRI facultatif
-web/      l'application (écrans, carte, API) — compilée par Vite
+web/             application et ressources Vite
+server/          serveur HTTP, GTFS CTS, services ouverts et SIRI facultatif
+shared/          types communs au client et au serveur
+android-src/     classes Java et manifeste complémentaire
+android-res/     ressources Android
+android/         projet Capacitor généré localement
+data/            géométrie versionnée utilisée par le serveur
+scripts/android/ préparation, vérification et publication Android
+scripts/         génération des données et contrôles manuels
+tests/           tests serveur et distribution Android
+deploy/          Caddy et mise à jour du VPS
+vitrine/         site public indépendant de l’application
+docs/            procédures de maintenance et de diffusion
 ```
 
 ## Installer et lancer (une seule fois, puis à chaque session)
-Node 22 ou plus récent. Dans PowerShell, utilisez `npm.cmd` si `npm` est bloqué.
+Node 22.12 ou plus récent. Dans PowerShell, utilisez `npm.cmd` si `npm` est bloqué.
 
 1. `npm.cmd install`
 2. `copy .env.example .env`
@@ -51,7 +61,7 @@ L'APK est l'application Kumm dans un habillage Android (Capacitor). Elle ne cont
 ### 2. Compiler l'APK
 **Avec Android Studio** (gratuit, développeur.android.com/studio ; il contient le JDK 21 nécessaire) :
 1. `npm.cmd install`
-2. `npx cap add android` (une fois), puis `node scripts/prepare-android.mjs play 170` et `npm.cmd run build:android` (compile la page et la copie dans le projet Android)
+2. `npx cap add android` (une fois), puis `node scripts/android/prepare-android.mjs play 170` et `npm.cmd run build:android` (compile la page et la copie dans le projet Android)
 3. `npm.cmd run android:open` (ouvre le projet dans Android Studio ; premier chargement : plusieurs minutes)
 4. Menu **Build → Build Bundle(s) / APK(s) → Build APK(s)**. Le fichier est `android/app/build/outputs/apk/debug/app-debug.apk`.
 
@@ -68,7 +78,7 @@ Après réactivation autorisée des perturbations, Réglages → « Alertes traf
 Mise en place pas à pas : `docs/DEPLOIEMENT-VPS.md`, section « Alertes trafic ».
 
 ### Icône et écran de démarrage
-Les icônes Android (toutes tailles, icône adaptative Android 8+) et l'écran de démarrage sont dans `android-res/`, dessinés d'après le logo par `python3 scripts/build-android-icons.py` (Pillow). Le workflow les copie dans le projet Android ; en local, après `npx cap add android` : `cp -r android-res/. android/app/src/main/res/`.
+Les icônes Android (toutes tailles, icône adaptative Android 8+) et l'écran de démarrage sont dans `android-res/`, dessinés d'après le logo par `python3 scripts/android/build-android-icons.py` (Pillow). Le workflow les copie dans le projet Android ; en local, après `npx cap add android` : `cp -r android-res/. android/app/src/main/res/`.
 
 ### Signature : installer chaque version par-dessus la précédente
 Android n'accepte une mise à jour que si elle est signée avec **la même clé** que la version installée. Le workflow « APK Android » signe l'APK avec la clé de l'application si ces deux secrets existent (Settings → Secrets and variables → Actions → **Secrets** → New repository secret) :
