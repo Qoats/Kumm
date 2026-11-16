@@ -19,7 +19,39 @@ permissions:
   contents: read
 
 jobs:
+  verification:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:secrets
+      - run: npm run typecheck
+      - run: npm test
+      - run: bash tests/vps-apk.test.sh
+      - name: Valider Compose et démarrer l’image de test
+        run: |
+          cp .env.production.example .env
+          docker compose config --quiet
+          docker build -t kumm-ci .
+          container=$(docker run -d --network none kumm-ci)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          for i in {1..15}; do
+            if docker exec "$container" node -e 'Promise.all([fetch("http://127.0.0.1:3000/health"), fetch("http://127.0.0.1:3000/"), fetch("http://127.0.0.1:3000/api/kumm-mode").then(r => r.json())]).then(([health, web, mode]) => process.exit(health.ok && web.ok && mode.cts === "scheduled" && !mode.traffic ? 0 : 1)).catch(() => process.exit(1))'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs "$container"
+          exit 1
+
   apk:
+    needs: verification
     runs-on: ubuntu-24.04
     env:
       PROFILE: ${{ inputs.profil || 'play' }}
@@ -38,9 +70,6 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
-      - run: npm run check:secrets
-      - run: npm run typecheck
-      - run: npm test
       - name: Projet Android
         env:
           GOOGLE_SERVICES_JSON: ${{ github.event_name == 'workflow_dispatch' && secrets.GOOGLE_SERVICES_JSON || '' }}
@@ -49,10 +78,10 @@ jobs:
           if [ "$PROFILE" = sideload ]; then export VITE_SIDELOAD_UPDATES=1; fi
           npx cap add android
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            node scripts/firebase-android.mjs
+            node scripts/android/firebase-android.mjs
             export VITE_PUSH=1
           fi
-          node scripts/prepare-android.mjs "$PROFILE" "$VERSION_CODE"
+          node scripts/android/prepare-android.mjs "$PROFILE" "$VERSION_CODE"
           npm run build:android
       - name: APK de test et bundle Play
         working-directory: android
@@ -65,9 +94,9 @@ jobs:
           fi
       - name: Vérifier les fichiers générés
         run: |
-          python3 scripts/check-android-package.py kumm-test.apk
+          python3 scripts/android/check-android-package.py kumm-test.apk
           if [ "$PROFILE" = play ]; then
-            python3 scripts/check-android-package.py kumm-play-unsigned.aab
+            python3 scripts/android/check-android-package.py kumm-play-unsigned.aab
             ANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
             "$ANALYZER" manifest permissions kumm-test.apk > "${RUNNER_TEMP}/kumm-permissions"
             ! grep -q REQUEST_INSTALL_PACKAGES "${RUNNER_TEMP}/kumm-permissions"
@@ -96,7 +125,7 @@ jobs:
           "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/aligne.apk"
           "$BT/apksigner" sign --ks "$RUNNER_TEMP/kumm.jks" --ks-type PKCS12 --ks-pass env:KS_PASS --ks-key-alias kumm --out ../kumm.apk "$RUNNER_TEMP/aligne.apk"
           "$BT/apksigner" verify ../kumm.apk
-          python3 ../scripts/check-android-package.py ../kumm.apk
+          python3 ../scripts/android/check-android-package.py ../kumm.apk
       - uses: actions/upload-artifact@v6
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.profil == 'sideload' && inputs.publier
         with:
@@ -106,12 +135,16 @@ jobs:
 
   publier:
     needs: apk
+    concurrency: kumm-publication-apk
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.profil == 'sideload' && inputs.publier
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
       - uses: actions/download-artifact@v7
         with:
           name: kumm-apk-sideload-signe
@@ -120,15 +153,18 @@ jobs:
         env:
           VERSION_CODE: ${{ github.run_number }}
         run: |
-          V=$(node -p "require('./package.json').version")
           D="$RUNNER_TEMP/kumm-publication"
           APK="$D/kumm.apk"
-          printf '{"version":"%s","code":%s,"size":%s,"sha256":"%s","date":"%s"}\n' "$V" "$VERSION_CODE" "$(stat -c%s "$APK")" "$(sha256sum "$APK" | cut -d' ' -f1)" "$(date -u +%FT%TZ)" > "$D/latest.json"
-          git worktree add --detach "$RUNNER_TEMP/kumm-apk-tree" origin/apk || {
-            git fetch origin apk
-            git worktree add --detach "$RUNNER_TEMP/kumm-apk-tree" FETCH_HEAD
-          }
-          cp "$APK" "$D/latest.json" "$RUNNER_TEMP/kumm-apk-tree/"
-          git -C "$RUNNER_TEMP/kumm-apk-tree" add kumm.apk latest.json
-          git -C "$RUNNER_TEMP/kumm-apk-tree" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "APK $V (version $VERSION_CODE)"
-          git -C "$RUNNER_TEMP/kumm-apk-tree" push origin HEAD:refs/heads/apk
+          git fetch --quiet origin refs/heads/apk
+          previous=$(git rev-parse --verify 'FETCH_HEAD^{commit}')
+          P="$RUNNER_TEMP/kumm-apk-tree"
+          git worktree add --detach "$P" "$previous"
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" verify --print-certs "$P/kumm.apk" > "$D/previous.cert"
+          "$BT/apksigner" verify --print-certs "$APK" > "$D/candidate.cert"
+          "$BT/aapt" dump badging "$APK" > "$D/candidate.badging"
+          node scripts/android/release.mjs "$APK" "$VERSION_CODE" "$P/latest.json" "$D/candidate.badging" "$D/previous.cert" "$D/candidate.cert" "$D/latest.json"
+          cp "$APK" "$D/latest.json" "$P/"
+          git -C "$P" add kumm.apk latest.json
+          git -C "$P" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "APK Android (version $VERSION_CODE)"
+          git -C "$P" push origin HEAD:refs/heads/apk

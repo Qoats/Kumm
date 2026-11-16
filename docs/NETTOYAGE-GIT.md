@@ -1,6 +1,6 @@
 # Retirer l’archive contenant le jeton CTS
 
-1. Vérifier la révocation du jeton CTS exposé auprès de la CTS. Fournir un nouveau jeton serveur uniquement après obtention de l’autorisation SIRI. Retirer l’ancien `APP_KEY` du serveur et le secret `KUMM_APP_KEY` de GitHub Actions au moment de la migration. La clé statique publiée ne doit pas être réutilisée pour une API privée.
+1. Le propriétaire a confirmé la révocation du jeton CTS exposé. Fournir un nouveau jeton serveur uniquement après obtention de l’autorisation SIRI. Retirer l’ancien `APP_KEY` du serveur et le secret `KUMM_APP_KEY` de GitHub Actions au moment de la migration. La clé statique publiée ne doit pas être réutilisée pour une API privée.
 2. Inventorier les branches, demandes de fusion, forks et téléchargements. Le fichier `kumm-v0.9.1-PRIVE-avec-jeton.zip` est absent de l’arborescence actuelle et reste accessible dans les commits historiques. Vérifier séparément les anciens APK et artefacts CI, notamment les builds contenant l’ancienne clé d’application.
 3. Dans un nouveau miroir isolé, répéter le retrait du chemin et le contrôle avant toute décision sur le dépôt partagé.
 

@@ -51,18 +51,14 @@ sudo usermod -aG docker kumm
 Déconnectez-vous puis reconnectez-vous (`exit`, puis `ssh kumm@ADRESSE_IP`). Test : `docker --version`, `docker compose version`, puis `docker run --rm hello-world`.
 Si `apt update` signale une erreur sur le dépôt Docker, vérifiez `cat /etc/apt/sources.list.d/docker.sources` : la ligne `Suites:` doit afficher le nom de votre version (par exemple `noble` ou `resolute`).
 
-## 4. Envoyer le projet
-Sur le PC, dans le dossier où se trouve l'archive :
+## 4. Récupérer le dépôt sur le VPS
+
+```sh
+git clone --single-branch --branch main https://github.com/Qoats/Kumm.git ~/kumm
+cd ~/kumm
 ```
-scp kumm-serveur-v0.10.4.zip kumm@ADRESSE_IP:~/
-```
-Sur le VPS :
-```
-mkdir -p ~/kumm && cd ~/kumm
-unzip -o ../kumm-serveur-v0.10.4.zip
-rm ../kumm-serveur-v0.10.4.zip
-```
-L'archive « serveur » ne contient **aucun secret** : le jeton sera saisi sur le VPS (étape suivante).
+
+Pour une instance existante, gardez le répertoire suivi par le service systemd. Pour un dépôt privé, utilisez une clé de déploiement GitHub en lecture seule et l’URL SSH correspondante.
 
 ## 5. Créer le fichier de réglages de production
 ```
@@ -70,7 +66,7 @@ cd ~/kumm
 cp .env.production.example .env
 nano .env
 ```
-Remplacez `colle-ton-token-ici` par votre jeton CTS et vérifiez `GEO_USER_AGENT` (mettez une vraie adresse de contact). Enregistrez avec Ctrl+O, Entrée, puis quittez avec Ctrl+X. `chmod 600 .env` limite la lecture du fichier à votre utilisateur. Vous ne refaites cette étape qu'une fois : les mises à jour ne touchent pas à ce fichier.
+Vérifiez `GEO_USER_AGENT` (indiquez une adresse de contact). Les horaires GTFS publics fonctionnent avec `CTS_MODE=scheduled`. Le jeton serveur est requis uniquement lors d’une activation autorisée de SIRI. Enregistrez avec Ctrl+O, Entrée, puis quittez avec Ctrl+X. `chmod 600 .env` limite la lecture du fichier à votre utilisateur. Vous ne refaites cette étape qu'une fois : les mises à jour ne touchent pas à ce fichier.
 
 ## 6. Lancer
 ```
@@ -167,8 +163,9 @@ Activation et premier passage :
 sudo systemctl daemon-reload && sudo systemctl enable --now kumm-update.timer && sudo systemctl start kumm-update.service
 journalctl -u kumm-update -n 20 --no-pager     # « APK : version … disponible »
 ```
-Le dépôt est privé : le serveur s'y connecte avec une clé de déploiement en lecture seule (`ssh-keygen -t ed25519 -f ~/.ssh/kumm_deploy -N ""`, clé publique ajoutée dans GitHub → Settings → Deploy keys, et `~/.ssh/config` : `Host github.com` / `IdentityFile ~/.ssh/kumm_deploy` / `IdentitiesOnly yes`), puis `git clone git@github.com:Qoats/Kumm.git ~/kumm`.
-Publier une version pour les téléphones : Actions → « APK Android » → Run workflow (case « Proposer cette version aux téléphones » cochée).
+Le minuteur suit `main`. Une fusion sur cette branche peut donc déclencher une mise en production au prochain passage.
+Pour livrer une mise à jour hors Play, utilisez « APK Android » sur `main`, choisissez le profil `sideload` et cochez l’option de publication. Le job vérifie le certificat et le numéro de version avant de pousser sur `apk`. Le serveur vérifie la taille et l’empreinte avant de servir l’APK.
+
 Vérification : `https://app.kumm.fr/app/latest.json`, ou la partie `apk` de `/health`.
 
 ## Dépannage rapide

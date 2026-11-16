@@ -5,7 +5,7 @@ const profile = process.argv[2] ?? "play";
 const code = process.argv[3] ?? "1";
 const version = JSON.parse(fs.readFileSync("package.json", "utf8")).version;
 if (!["play", "sideload"].includes(profile) || !/^[1-9][0-9]{0,9}$/.test(code) || Number(code) > 2_100_000_000) {
-  throw new Error("Usage : node scripts/prepare-android.mjs play|sideload VERSION_CODE");
+  throw new Error("Usage : node scripts/android/prepare-android.mjs play|sideload VERSION_CODE");
 }
 const sideload = profile === "sideload";
 const app = "android/app";

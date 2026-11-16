@@ -22,19 +22,34 @@ update_caddy() {
 }
 
 update_apk() {
-  git fetch -q origin apk 2>/dev/null || return 0          # pas encore d'APK publié
-  local rev; rev=$(git rev-parse origin/apk)
+  git fetch -q origin refs/heads/apk 2>/dev/null || return 0
+  local rev; rev=$(git rev-parse --verify 'FETCH_HEAD^{commit}') || return 1
   [ "$rev" = "$(cat apk/.rev 2>/dev/null)" ] && return 0
-  mkdir -p apk
-  # dossier créé par Docker (propriétaire root) avant le premier passage de ce script : on le reprend
-  [ -w apk ] || docker run --rm -v "$PWD/apk:/d" node:22-alpine chown "$(id -u):$(id -g)" /d
-  # l'APK d'abord, latest.json ensuite : l'application ne voit la nouvelle version qu'une fois le fichier complet
-  git show origin/apk:kumm.apk > apk/kumm.apk.tmp && git show origin/apk:latest.json > apk/latest.json.tmp || { rm -f apk/*.tmp; return 0; }
-  local want; want=$(sed -n 's/.*"sha256":"\([0-9a-f]*\)".*/\1/p' apk/latest.json.tmp)
-  if [ "$(sha256sum apk/kumm.apk.tmp | cut -d' ' -f1)" != "$want" ]; then echo "APK : empreinte incorrecte, ignoré"; rm -f apk/*.tmp; return 0; fi
-  mv apk/kumm.apk.tmp apk/kumm.apk && mv apk/latest.json.tmp apk/latest.json && echo "$rev" > apk/.rev
-  echo "APK : version $(sed -n 's/.*"version":"\([^"]*\)".*/\1/p' apk/latest.json) disponible pour l'application"
+  mkdir -p apk || return 1
+  # Compose peut avoir créé le dossier monté avec root comme propriétaire.
+  [ -w apk ] || docker run --rm -v "$PWD/apk:/d" node:22-alpine chown "$(id -u):$(id -g)" /d || return 1
+  stage_apk "$rev"
 }
+
+stage_apk() (
+  local rev=$1 tmp want size
+  tmp=$(mktemp -d 'apk/.incoming.XXXXXX') || exit 1
+  trap 'rm -f -- "$tmp/kumm.apk" "$tmp/latest.json" "$tmp/rev"; rmdir -- "$tmp"' EXIT
+  git show "$rev:kumm.apk" > "$tmp/kumm.apk" &&
+    git show "$rev:latest.json" > "$tmp/latest.json" || exit 1
+  want=$(sed -nE 's/.*"sha256"[[:space:]]*:[[:space:]]*"([a-f0-9]{64})".*/\1/p' "$tmp/latest.json")
+  size=$(sed -nE 's/.*"size"[[:space:]]*:[[:space:]]*([0-9]+).*/\1/p' "$tmp/latest.json")
+  if [ "$(stat -c%s "$tmp/kumm.apk")" != "$size" ] || [ "$(sha256sum "$tmp/kumm.apk" | cut -d' ' -f1)" != "$want" ]; then
+    echo "APK : taille ou empreinte incorrecte, version ignorée"
+    exit 1
+  fi
+  # Le serveur vérifie la paire. Le marqueur n'avance qu'après les deux fichiers.
+  printf '%s\n' "$rev" > "$tmp/rev" &&
+    chmod 644 "$tmp/kumm.apk" "$tmp/latest.json" &&
+    mv "$tmp/kumm.apk" apk/kumm.apk && mv "$tmp/latest.json" apk/latest.json &&
+    mv "$tmp/rev" apk/.rev || exit 1
+  echo "APK : version $(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' apk/latest.json) disponible pour l'application"
+)
 
 update_server() {
   git fetch -q origin main || exit 1
@@ -57,5 +72,6 @@ update_server() {
   fi
 }
 
-main "$@"
-exit
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi

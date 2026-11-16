@@ -1,5 +1,5 @@
 # Icônes Android de Kumm (android-res/), dessinées d'après web/public/favicon.svg : dégradé vert, « K » en ligne de plan de transport.
-# Utilisation : python3 scripts/build-android-icons.py   (Pillow requis) ; le workflow « APK Android » copie android-res/ dans le projet.
+# Utilisation : python3 scripts/android/build-android-icons.py   (Pillow requis) ; le workflow « APK Android » copie android-res/ dans le projet.
 import os
 from PIL import Image, ImageDraw
 
