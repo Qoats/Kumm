@@ -3,6 +3,8 @@ dist
 android
 **/.env
 **/.env.*
+**/.envrc
+**/.npmrc
 **/*.jks
 **/*.keystore
 **/*.pem
@@ -11,6 +13,7 @@ android
 **/*.key
 **/*.apk
 **/*.aab
+**/*.zip
 **/local.properties
 **/google-services.json
 .git

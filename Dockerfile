@@ -4,7 +4,11 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY . .
+COPY tsconfig.json tsconfig.server.json vite.config.ts ./
+COPY web ./web
+COPY server ./server
+COPY shared ./shared
+COPY data ./data
 RUN npm run build
 
 # Image finale : le serveur n'utilise aucune dépendance (seulement Node), donc pas de node_modules

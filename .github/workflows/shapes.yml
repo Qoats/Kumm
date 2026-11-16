@@ -1,38 +1,54 @@
-# Tracés des lignes CTS et voies ferrées (véhicules et trains sur la carte) : téléchargés chaque nuit depuis OpenStreetMap.
-# Si le réseau a changé (nouvelle ligne, itinéraire modifié durablement), data/shapes.json ou data/rail.json est mis à jour sur main,
-# puis le serveur l'installe tout seul (mise à jour automatique du VPS). Sinon, rien n'est enregistré.
+# Données de carte OpenStreetMap, vérifiées hors ligne sur les PR et actualisées chaque nuit.
 name: Tracés des lignes
 
 on:
+  pull_request:
+    paths: [data/**, scripts/build-shapes.mjs, scripts/build-rail.mjs, scripts/validate-geodata.mjs, .github/workflows/shapes.yml]
   schedule:
-    - cron: "17 3 * * *"     # chaque nuit vers 5 h (heure de Strasbourg)
-  workflow_dispatch: {}
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      publier:
+        description: "Enregistrer les changements sur main"
+        type: boolean
+        default: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  shapes:
+  validation:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && !inputs.publier)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 22
+      - run: node scripts/validate-geodata.mjs
 
-      - name: Télécharger les tracés depuis OpenStreetMap
+  actualisation:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publier))
+    permissions:
+      contents: write
+    concurrency: kumm-traces-main
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Télécharger les tracés des lignes
         run: node scripts/build-shapes.mjs
-
-      - name: Télécharger les voies ferrées depuis OpenStreetMap
-        continue-on-error: true     # sans elles, les trains vont en ligne droite : les tracés des lignes sont enregistrés quand même
+      - name: Télécharger les voies ferrées
+        continue-on-error: true
         run: node scripts/build-rail.mjs
-
-      - name: Enregistrer s'ils ont changé
+      - run: node scripts/validate-geodata.mjs
+      - name: Enregistrer les données modifiées
         run: |
-          if [ -z "$(git status --porcelain -- data/shapes.json data/rail.json)" ]; then echo "Réseau inchangé : rien à enregistrer."; exit 0; fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -z "$(git status --porcelain -- data/shapes.json data/rail.json)" ]; then echo "Réseau inchangé."; exit 0; fi
           git add data/shapes.json data/rail.json
-          git commit -m "Tracés des lignes mis à jour depuis OpenStreetMap"
-          git push
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Tracés des lignes mis à jour depuis OpenStreetMap"
+          git push origin HEAD:refs/heads/main
