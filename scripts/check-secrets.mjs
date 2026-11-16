@@ -1,43 +1,31 @@
-// Contrôle avant de publier : cherche jetons, clés privées et fichiers sensibles dans le projet.
-// Utilisation : npm run check:secrets   (code de sortie 1 si quelque chose est trouvé)
+// Analyse des fichiers qui peuvent être commités, sans afficher leurs valeurs.
 import fs from "node:fs";
-import path from "node:path";
+import { execFileSync } from "node:child_process";
 
-const ROOT = process.cwd();
-const SKIP_DIRS = new Set(["node_modules", "dist", ".git", ".gradle", "build"]);
-const SKIP_PREFIX = ["android/app/src/main/assets/public"];
-const BINARY = /\.(png|jpg|jpeg|gif|ico|jar|woff2?|ttf|zip|apk|aab)$/i;
-const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
-const TOKEN_LINE = /(CTS_TOKEN|TOKEN|API_KEY|SECRET|PASSWORD)\s*[=:]\s*["']?([^\s"'#]+)/i;
-// valeurs d'exemple et lectures de variables (process.env.X, import.meta…) : pas des secrets
-const PLACEHOLDER = /^(colle-ton-token-ici|votre|xxx+|\.\.\.|changeme|<.*>|\$\{.*\}|process\.env|import\.meta|os\.environ|Boolean\(|env\.)/i;
-const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
-const SENSITIVE_FILE = /(^|\/)(\.env|\.env\.local|.*\.keystore|.*\.jks|.*\.pem|local\.properties|google-services\.json)$/;
+const files = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" }).split("\0").filter(Boolean);
+const sensitive = /(?:^|\/)(?:\.env(?:\.[^/]*)?|.*\.(?:keystore|jks|pem|p12|pfx|key|zip|apk|aab)|local\.properties|google-services\.json|session-key)$/i;
+const examples = new Set([".env.example", ".env.production.example", "web/.env.android"]);
+const textFile = /(?:^|\/)(?:Dockerfile|Caddyfile|\.env[^/]*)$|\.(?:ts|js|mjs|json|md|txt|csv|yml|yaml|html|xml|sh|properties|gradle|py)$/i;
+const direct = /^[ \t]*(?:export[ \t]+)?([A-Z0-9_]*(?:CTS_TOKEN|SNCF_TOKEN|API_KEY|APP_KEY|PASSWORD|CLIENT_SECRET))\s*=\s*["']?([^\s"'#]+)/i;
+const privateMaterial = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{60,})\b/i;
+const uuid = /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/i;
+const uri = /https?:\/\/[^\s/<>\x27\x22:@]+:[^\s/<>\x27\x22@]+@/i;
+const placeholder = /^(?:votre|your|fixture|xxx+|changeme|<|\$\{|\.{3})/i;
+const failures = new Set();
 
-const mask = s => (s.length <= 6 ? "***" : s.slice(0, 4) + "…(masqué)");
-const problems = [];
-
-function walk(dir) {
-  for (const name of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, name.name);
-    const rel = path.relative(ROOT, full).split(path.sep).join("/");
-    if (name.isDirectory()) { if (!SKIP_DIRS.has(name.name) && !SKIP_PREFIX.some(p => rel.startsWith(p))) walk(full); continue; }
-    if (SENSITIVE_FILE.test(rel)) problems.push(`${rel} : fichier sensible, à ne pas publier (exclu par .gitignore, mais ne l'envoyez pas à la main)`);
-    if (BINARY.test(rel) || rel === "package-lock.json") continue;
-    let text; try { text = fs.readFileSync(full, "utf8"); } catch { continue; }
-    text.split("\n").forEach((line, i) => {
-      const where = `${rel}:${i + 1}`;
-      if (PRIVATE_KEY.test(line)) problems.push(`${where} : clé privée`);
-      const t = TOKEN_LINE.exec(line);
-      if (t && t[2].length >= 8 && !PLACEHOLDER.test(t[2])) problems.push(`${where} : valeur secrète possible (${t[1]} = ${mask(t[2])})`);
-      for (const m of line.matchAll(UUID)) problems.push(`${where} : identifiant de forme jeton (${mask(m[0])})`);
-    });
-  }
+for (const file of files) {
+  if (sensitive.test(file) && !examples.has(file)) failures.add(file + " : fichier sensible ou archive");
+  if (!textFile.test(file) || file === "package-lock.json" || !fs.existsSync(file)) continue;
+  fs.readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+    const value = direct.exec(line)?.[2];
+    if ((value && !placeholder.test(value)) || privateMaterial.test(line) || uuid.test(line) || uri.test(line)) {
+      failures.add(`${file}:${i + 1} : contenu sensible possible`);
+    }
+  });
 }
-
-walk(ROOT);
-if (problems.length) {
-  console.error("✗ À corriger avant de publier :\n" + [...new Set(problems)].map(p => "  - " + p).join("\n"));
-  process.exit(1);
+if (failures.size) {
+  console.error([...failures].join("\n"));
+  process.exitCode = 1;
+} else {
+  console.log("Contrôle des fichiers Git réussi.");
 }
-console.log("✓ Aucun jeton, clé privée ni fichier sensible trouvé.");

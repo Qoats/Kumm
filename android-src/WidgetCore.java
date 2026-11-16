@@ -86,7 +86,6 @@ public final class WidgetCore {
         h.setReadTimeout(8000);
         // le serveur reconnaît l'application Android à son origine (accès privé), et à sa clé si elle est configurée
         h.setRequestProperty("Origin", "https://localhost");
-        if (!s.optString("key", "").isEmpty()) h.setRequestProperty("X-App-Key", s.optString("key"));
         try {
             int code = h.getResponseCode();
             InputStream in = code < 400 ? h.getInputStream() : h.getErrorStream();
@@ -268,13 +267,13 @@ public final class WidgetCore {
                         JSONArray only = cfg.optJSONArray("only");
                         StringBuilder o = new StringBuilder();
                         for (int i = 0; only != null && i < only.length(); i++) { if (o.length() > 0) o.append('~'); o.append(only.optString(i)); }
-                        j = get(c, "/api/widget/stop?refs=" + enc(join(cfg.optJSONArray("refs"))) + (cfg.optString("sncf").isEmpty() ? "" : "&sncf=" + enc(cfg.optString("sncf")))
+                        j = get(c, "/api/widget/stop?gtfs=1&refs=" + enc(join(cfg.optJSONArray("refs"))) + (cfg.optString("sncf").isEmpty() ? "" : "&sncf=" + enc(cfg.optString("sncf")))
                             + (o.length() > 0 ? "&only=" + enc(o.toString()) : ""));
                     } else {
                         v.setOnClickPendingIntent(id(c, "w_root"), open(c, widgetId, 0, "carte"));
                         double[] pos = position(c);
                         if (pos == null) { v.setTextViewText(id(c, "w_title"), "Arrêt le plus proche"); return message(c, v, "Ouvrez Kumm avec la position activée"); }
-                        j = get(c, "/api/widget/nearby?lat=" + pos[0] + "&lon=" + pos[1]);
+                        j = get(c, "/api/widget/nearby?gtfs=1&lat=" + pos[0] + "&lon=" + pos[1]);
                         v.setTextViewText(id(c, "w_title"), j.optString("name", "Arrêt le plus proche"));
                         if (j.has("dist")) {
                             int m = j.optInt("dist");
@@ -284,7 +283,8 @@ public final class WidgetCore {
                     JSONArray deps = j.optJSONArray("deps");
                     if (deps == null || deps.length() == 0) return message(c, v, "Aucun passage pour le moment");
                     fillDepartures(c, v, deps, 4);
-                    if (type.equals("stop")) v.setTextViewText(id(c, "w_sub"), "màj " + hm(System.currentTimeMillis()));
+                    if (j.optBoolean("scheduled")) v.setTextViewText(id(c, "w_sub"), "Horaires théoriques");
+                    else if (type.equals("stop")) v.setTextViewText(id(c, "w_sub"), "màj " + hm(System.currentTimeMillis()));
                 } catch (Exception e) { return message(c, v, e.getMessage() != null ? e.getMessage() : "Serveur injoignable"); }
                 return v;
             }
@@ -304,7 +304,7 @@ public final class WidgetCore {
                 v.setOnClickPendingIntent(id(c, "w_root"), open(c, widgetId, 0, "stop:" + cfg.optString("stopId")));
                 if (type.equals("trip")) v.setTextViewText(id(c, "w_from"), "depuis " + cfg.optString("name"));
                 try {
-                    JSONObject j = get(c, "/api/widget/stop?refs=" + enc(join(cfg.optJSONArray("refs"))) + (cfg.optString("sncf").isEmpty() ? "" : "&sncf=" + enc(cfg.optString("sncf"))));
+                    JSONObject j = get(c, "/api/widget/stop?gtfs=1&refs=" + enc(join(cfg.optJSONArray("refs"))) + (cfg.optString("sncf").isEmpty() ? "" : "&sncf=" + enc(cfg.optString("sncf"))));
                     JSONArray deps = j.optJSONArray("deps");
                     JSONObject g = null;
                     for (int i = 0; deps != null && i < deps.length(); i++) {
@@ -318,6 +318,7 @@ public final class WidgetCore {
                         return v;
                     }
                     v.setTextViewText(id(c, "w_time"), hm(t.optLong(0)) + (g.optBoolean("rt") && type.equals("trip") ? " •" : ""));
+                    if (j.optBoolean("scheduled") && !line.equals("TER")) v.setTextViewText(id(c, "w_dest"), dest + " · Horaire théorique");
                     if (type.equals("trip")) {
                         StringBuilder b = new StringBuilder();
                         for (int i = 1; i < t.length(); i++) b.append(i == 1 ? "puis " : " · ").append(hm(t.optLong(i)));
@@ -335,6 +336,11 @@ public final class WidgetCore {
                 JSONArray lines = shared(c).optJSONArray("lines");
                 String ls = lines != null && lines.length() > 0 ? join(lines) : "*";
                 try {
+                    if (!shared(c).optBoolean("traffic")) {
+                        v.setTextViewText(id(c, "w_title"), "Prochainement disponible");
+                        v.setTextViewText(id(c, "w_sub"), "");
+                        return v;
+                    }
                     JSONObject j = get(c, "/api/widget/traffic?lines=" + enc(ls));
                     int n = j.optInt("n");
                     JSONArray items = j.optJSONArray("items");

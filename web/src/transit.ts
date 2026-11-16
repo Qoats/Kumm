@@ -2,7 +2,7 @@ import type { MotisItinerary, MotisLeg, MotisPlan } from "../../shared/geo-api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import type { LL } from "./geo";
-import { appHeaders, url } from "./config";
+import { url } from "./config";
 import { S } from "./store";
 
 /** Une étape d'un trajet : à pied, ou à bord d'un tram / bus / train */
@@ -113,7 +113,7 @@ export interface TripTime { at: number; arrive: boolean }
 export async function fetchTransit(from: LL, to: LL, when?: TripTime): Promise<Journey[]> {
   const t = when ? `&time=${encodeURIComponent(new Date(when.at).toISOString())}${when.arrive ? "&arrive=1" : ""}` : "";
   const sf = S.prefs.stepFree ? "&stepfree=1" : "";
-  const r = await fetch(url(`/geo/transit?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}${t}${sf}`), { headers: appHeaders() });
+  const r = await fetch(url(`/geo/transit?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}${t}${sf}`));
   if (!r.ok) {
     const detail = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 140);
     throw new Error(`erreur ${r.status}${detail ? " : " + detail : ""}`);

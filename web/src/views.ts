@@ -41,6 +41,7 @@ export const lineChip = (l: string, sm = false, alert = false): string => {
 const chipAlert = (l: string): string =>
   `<button class="ln" data-line="${esc(l)}" style="background:${COLORS[l] ?? "#777"};color:${lineText(l)}">${esc(l)}${hasAlert(l) ? '<span class="al" style="color:#fff">!</span>' : ""}</button>`;
 const live = '<span class="live"></span>';
+const theoreticalLabel = () => CONFIG.CTS_REALTIME ? "" : '<small class="src">Horaires théoriques · CTS</small>';
 /** Ordre des lignes : trams (A à F), lignes G et H, lignes à lettre et numéro (C1, L1…), puis bus par numéro */
 const lineOrder = (l: string): string =>
   /^[A-F]$/.test(l) ? "0" + l : /^[GH]$/.test(l) ? "1" + l : /^[A-Z]+\d+$/.test(l) ? "2" + l.replace(/\d+/, d => d.padStart(4, "0")) : /^\d+$/.test(l) ? "3" + l.padStart(4, "0") : "4" + l;
@@ -156,7 +157,7 @@ export function overlayBikePick(): string {
 /** Tuile infos trafic : nombre de perturbations et la première */
 function trafficTile(): string {
   if (!MESSAGES.length) {
-    const t = MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Indisponibles pour le moment" : "Aucune perturbation signalée";
+    const t = !CONFIG.CTS_TRAFFIC ? "Prochainement disponible" : MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Indisponibles pour le moment" : "Aucune perturbation signalée";
     return `<button class="tile tile-ok" data-act="msgs"><h2>${ic("bell")}Info trafic</h2><p class="msg">${t}</p></button>`;
   }
   const m = MESSAGES[0], n = MESSAGES.length;
@@ -283,9 +284,10 @@ export function favRows(list: StopDeparture[]): string {
   const rows = list.flatMap(({ d }) => d.times.filter(t => t > now - 30000).slice(0, 1).map(t => ({ d, t })))
     .sort((a, b) => a.t - b.t).slice(0, 3);
   if (!rows.length) return '<p class="none">Aucun passage prévu</p>';
-  return rows.map(({ d, t }) => {
+  return (rows.some(({ d }) => d.line !== "TER") ? theoreticalLabel() : "") + rows.map(({ d, t }) => {
     const m = mins(t);
-    return `<div class="trow">${lineChip(d.line, true)}<b class="dn">${esc(d.dest)}</b><i class="${m < 2 ? "soon" : ""}${m < 1 ? " q" : ""}">${m < 1 ? "À quai" : m + "′"}</i></div>`;
+    const atPlatform = m < 1 && (CONFIG.CTS_REALTIME || d.line === "TER");
+    return `<div class="trow">${lineChip(d.line, true)}<b class="dn">${esc(d.dest)}</b><i class="${m < 2 ? "soon" : ""}${atPlatform ? " q" : ""}">${atPlatform ? "À quai" : m + "′"}</i></div>`;
   }).join("");
 }
 
@@ -594,7 +596,7 @@ export function whenSheet(): string {
   return `<div class="wback" data-act="whenClose"></div><div class="wsheet" role="dialog" aria-label="Heure du trajet">
     <b class="wtitle">Heure du trajet</b>
     <div class="wtabs">${kinds.map(([k, l]) => `<button data-wk="${k}" class="${w.kind === k ? "on" : ""}">${l}</button>`).join("")}</div>
-    ${w.kind === "now" ? `<p class="wnow">Trajets au départ dès maintenant, avec les horaires en temps réel.</p>` : `
+    ${w.kind === "now" ? `<p class="wnow">${CONFIG.CTS_REALTIME ? "Trajets au départ dès maintenant, avec les horaires en temps réel." : "Trajets au départ dès maintenant, avec les horaires théoriques."}</p>` : `
     <div class="wpick">
       <input id="wdate" type="date" value="${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}" aria-label="Date">
       <input id="wtime" type="time" value="${pad2(d.getHours())}:${pad2(d.getMinutes())}" aria-label="Heure">
@@ -817,7 +819,7 @@ export function plannedBoard(name: string, list: PlannedDeparture[], at: number)
   }
   if (!rows.size) return '<div class="empty" style="padding:24px">Aucun passage prévu à cette heure</div>';
   const body = [...rows.values()].map(r => `<div class="lb-r" role="button" tabindex="0" data-line="${esc(r.line)}" aria-label="Ligne ${esc(r.line)} vers ${esc(r.dest)}">${lineChip(r.line, true)}<span class="lb-d"><b>${esc(r.dest)}</b><small>${r.t.slice(1, 5).map(hm).join(" · ")}</small></span><span class="lb-m">${hm(r.t[0])}</span></div>`).join("");
-  return `<div class="lboard"><div class="lb-h"><span><small>Horaires prévus · CTS</small><b>${esc(name)}</b></span></div>${body}</div>`;
+  return `<div class="lboard"><div class="lb-h"><span><small>Horaires théoriques · CTS</small><b>${esc(name)}</b></span></div>${body}</div>`;
 }
 
 export function overlayStop(id: string): string {
@@ -834,6 +836,7 @@ export function overlayStop(id: string): string {
 }
 
 export function overlayMsgs(): string {
+  if (!CONFIG.CTS_TRAFFIC) return `<div class="overlay">${bar("Infos trafic")}<main><div class="pad"><div class="empty">Prochainement disponible</div></div></main></div>`;
   const elev = MESSAGES.filter(isElevatorMsg);
   const dis = MESSAGES.filter(m => m.channel === "disruption" && !isElevatorMsg(m)), works = MESSAGES.filter(m => m.channel === "works" && !isElevatorMsg(m));
   const empty = MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Infos trafic indisponibles pour le moment." : "Aucune perturbation signalée.";
@@ -865,7 +868,7 @@ export function overlayAccount(): string {
 /** « FAQ / Contact » : questions fréquentes sur Kumm, contact de Kumm, et aide de la CTS pour les titres de transport */
 export function overlayHelp(): string {
   const qa: [string, string][] = [
-    ["Les horaires sont-ils en temps réel ?", "Oui quand la CTS ou la SNCF les publient en temps réel (petit signal à côté des minutes) ; sinon ce sont les horaires prévus."],
+    ["Les horaires sont-ils en temps réel ?", !CONFIG.CTS_REALTIME ? "Les horaires CTS sont théoriques, issus du GTFS officiel. Les horaires TER restent distincts." : "Oui quand la CTS ou la SNCF les publient en temps réel (petit signal à côté des minutes) ; sinon ce sont les horaires prévus."],
     ["La position des trams, bus et trains est-elle un GPS ?", "Non : elle est estimée d’après les horaires. Quand un voyageur partage son trajet, la position devient réelle pour tout le monde."],
     ["Comment aller quelque part ?", "Cherchez un arrêt, une adresse ou un lieu dans Recherche, puis touchez « Naviguer » : transports, à pied ou à vélo."],
     ["Kumm vend-il des billets ?", "Non. Les titres de transport s’achètent dans l’application officielle de la CTS, en agence ou dans les points de vente."],
@@ -972,15 +975,15 @@ export function depCards(list: StopDeparture[], max = Infinity): string {
     // toute la carte ouvre l'arrêt au toucher ; pour le clavier et le lecteur d'écran, c'est le nom de l'arrêt (un vrai bouton,
     // les sélecteurs de direction ne peuvent pas être dans un autre bouton)
     return `<div class="dep" style="--lc:${c};--lt:${lineText(COLORS[g.line] ? g.line : lineLabel(g.line))}" data-stop="${esc(g.stop.id)}">
-      <div class="h">${lineChip(g.line, true, hasAlert(g.line))}<b><button class="dlink" data-stop="${esc(g.stop.id)}">${esc(g.stop.name)}</button></b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 ? "À quai" : m + " min"}${live}</span></div>
+      <div class="h">${lineChip(g.line, true, hasAlert(g.line))}<b><button class="dlink" data-stop="${esc(g.stop.id)}">${esc(g.stop.name)}</button></b><span class="t ${m < 2 ? "soon" : ""}">${m < 1 && CONFIG.CTS_REALTIME ? "À quai" : m + " min"}${CONFIG.CTS_REALTIME ? live : ""}</span></div>
       ${picker}
       ${g.cx.get(dest)?.length ? `<div class="cxl">Supprimé : ${g.cx.get(dest)!.slice(0, 3).map(x => hm(x)).join(", ")}</div>` : ""}
       ${picker && t.length < 2 ? "" : `<div class="f">${picker
         // la direction est déjà dans le sélecteur : seulement les passages suivants
         ? `<span>Ensuite</span>`
-        : `<span>${ic(lineKind(g.line) === "ter" ? "train" : isTram(g.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(dest)}</b></span></span>`}<span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${live}</span>`).join("")}</span></div>`}</div>`;
+        : `<span>${ic(lineKind(g.line) === "ter" ? "train" : isTram(g.line) ? "tram" : "bus", 'width="22" height="22" fill="none" stroke="#999" stroke-width="1.800"')} vers <span class="to"><b>${esc(dest)}</b></span></span>`}<span style="white-space:nowrap">${t.slice(1, 3).map(x => `<span class="n">${mins(x)} min${CONFIG.CTS_REALTIME ? live : ""}</span>`).join("")}</span></div>`}</div>`;
   });
-  return rows.join("") || '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
+  return rows.length ? theoreticalLabel() + rows.join("") : '<div class="empty" style="padding:24px">Aucun passage prévu pour le moment</div>';
 }
 
 /** Choix du délai de l'alerte avant un passage (fenêtre ouverte par la cloche d'un départ) */
@@ -1013,13 +1016,13 @@ export function departureBoard(name: string, list: StopDeparture[], max = 16, st
     const m = mins(r.t[0]), n = r.t[1] !== undefined ? mins(r.t[1]) : null;
     // cloche : « prévenez-moi avant ce passage » (délai au choix) ; allumée si une alerte est en cours
     const on = stopId && arrivals().some(a => arrivalKey(a) === `${stopId}|${r.line}|${r.dest}`);
-    const bell = stopId ? `<button class="lb-bell${on ? " on" : ""}" data-arr="${esc(`${r.line}|${r.dest}|${r.t.slice(0, 3).join(",")}`)}" aria-label="Me prévenir avant le passage">${ic("bell")}</button>` : "";
-    return `<div class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b><button class="dlink" data-line="${esc(r.line)}">${esc(r.dest)}</button></b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}${bell}</div>`;
+    const bell = stopId && CONFIG.CTS_REALTIME ? `<button class="lb-bell${on ? " on" : ""}" data-arr="${esc(`${r.line}|${r.dest}|${r.t.slice(0, 3).join(",")}`)}" aria-label="Me prévenir avant le passage">${ic("bell")}</button>` : "";
+    return `<div class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b><button class="dlink" data-line="${esc(r.line)}">${esc(r.dest)}</button></b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 && CONFIG.CTS_REALTIME ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}${bell}</div>`;
   }).join("");
   // forme « Alsace » : un tram ou un bus à quai, ça s'annonce (« Viens, le tram est là ! »)
-  const first = list2[0], here = ELSASS() && mins(first.t[0]) < 1
+  const first = list2[0], here = CONFIG.CTS_REALTIME && ELSASS() && mins(first.t[0]) < 1
     ? `<div class="kummbar">${ic("tram")}<span><b>Kumm, dr ${isTram(first.line) ? "Tram" : "Bus"} isch do !</b>${esc(lineLabel(first.line))} vers ${esc(first.dest)}, à quai.</span></div>` : "";
-  return `${here}<div class="lboard"><div class="lb-h"><span><small>Prochains départs</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
+  return `${here}<div class="lboard"><div class="lb-h"><span><small>${CONFIG.CTS_REALTIME ? "Prochains départs" : "Horaires théoriques · CTS"}</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
 }
 
 /** Tableau des départs d'une gare, comme sur les écrans en gare : heure prévue, retard ou suppression, destination, numéro du train */
@@ -1191,11 +1194,11 @@ export function overlaySettings(): string {
     <div class="sub">Accessibilité</div>
     <button class="row-switch" data-stepfree="1" role="switch" aria-checked="${!!p.stepFree}"><span>Itinéraires sans escaliers<br><small style="color:var(--mute)">Ascenseurs et rampes pour les correspondances ; les ascenseurs en panne sont signalés sur la fiche des stations</small></span><span class="switch ${p.stepFree ? "on" : ""}"></span></button>
     <div class="sub">Alertes trafic</div>
-    <button class="row-switch" data-alerts="toggle"><span>Me prévenir des perturbations<br><small style="color:var(--mute)">${NATIVE && !PUSH_READY ? "Indisponible dans cette version de l'application" : "Une notification pour chaque nouvel incident sur les lignes suivies"}</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
-    ${S.alerts.enabled ? alertSettings() : ""}
+    <button class="row-switch" data-alerts="toggle" ${CONFIG.CTS_TRAFFIC ? "" : "disabled"}><span>Me prévenir des perturbations<br><small style="color:var(--mute)">${!CONFIG.CTS_TRAFFIC ? "Prochainement disponible" : NATIVE && !PUSH_READY ? "Indisponible dans cette version de l'application" : "Une notification pour chaque nouvel incident sur les lignes suivies"}</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
+    ${CONFIG.CTS_TRAFFIC && S.alerts.enabled ? alertSettings() : ""}
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
-      <div class="src">Horaires et arrêts : CTS (open data)<br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires, temps réel) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
+      <div class="src">Horaires théoriques et arrêts : CTS / Eurométropole de Strasbourg · Licence Ouverte 2.0 <a href="https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts" target="_blank" rel="noopener noreferrer">Source</a><br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires, temps réel) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
       <div class="src" style="margin-top:10px"><a href="https://kumm.fr/mentions-legales.html" target="_blank" rel="noopener">Mentions légales</a> · <a href="https://kumm.fr/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></div></div>
     <button class="ghost" data-act="replayOnb">Revoir la présentation</button>
     ${CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher une mise à jour</button>` : ""}

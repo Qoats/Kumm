@@ -29,8 +29,8 @@ import "@fontsource/ibm-plex-sans/700.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource/ibm-plex-mono/600.css";
 import "./style.css";
-import { CONFIG, VERSION, url } from "./config";
-import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MOCK_MESSAGES, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
+import { loadServerMode, CONFIG, VERSION, url } from "./config";
+import { COLORS, DIRS, LINE_MODES, LINE_NAMES, MESSAGES, TEXT_COLORS, MSG_STATE, isHub, isTram, kindOfStop, lineKind, lineLabel } from "./data";
 import { ic, type IconName } from "./icons";
 import { TRAINS, ensureForecast, ensureReports, sendReport, ensureLineRoute, ensureStats, loadLineInfo, loadMessages, loadPois, loadQuayLines, loadQuayModes, loadStops, nextDepartures, nextTrains, OFFLINE, onOfflineChange, placeOnTramQuays, plannedDepartures } from "./api";
 import { fmtDist, haversine } from "./geo";
@@ -830,17 +830,21 @@ function applyQuayModes(): void {
 }
 
 async function initReal(): Promise<void> {
+  await loadServerMode();
+  render();
   // alertes : réglages renvoyés au programme d'arrière-plan à chaque démarrage ; toucher une notification ouvre les infos trafic
-  if (S.alerts.enabled) syncAlerts(S.alerts).catch(e => console.warn("Alertes trafic :", e));
+  if (CONFIG.CTS_TRAFFIC && S.alerts.enabled) syncAlerts(S.alerts).catch(e => console.warn("Alertes trafic :", e));
   onAlertTap(() => { S.overlay = { k: "msgs" }; render(); });
-  void refreshMessages();
-  setInterval(() => { if (!document.hidden) void refreshMessages(); }, 5 * 60_000);
+  if (CONFIG.CTS_TRAFFIC) {
+    void refreshMessages();
+    setInterval(() => { if (!document.hidden) void refreshMessages(); }, 5 * 60_000);
+  }
   // modes des lignes (tram / bus / TER) : améliore le classement des arrêts dès qu'ils arrivent
   void loadLineInfo().then(info => { Object.assign(LINE_MODES, info.modes); Object.assign(LINE_NAMES, info.names); Object.assign(COLORS, info.colors); Object.assign(TEXT_COLORS, info.text); Object.assign(DIRS, info.ends); render(); }).catch(e => console.warn("lines-discovery indisponible :", e));
   // 1) démarrage instantané avec la liste d'arrêts gardée sur le téléphone (7 jours)
   try {
     const c = JSON.parse(localStorage.getItem("stopsCache2") ?? "null") as { t: number; list: typeof STOPS } | null;
-    if (c && Date.now() - c.t < 7 * 864e5) { STOPS.length = 0; c.list.forEach(s => STOPS.push(project(s))); applyQuayModes(); render(); }
+    if (CONFIG.CTS_REALTIME && c && Date.now() - c.t < 7 * 864e5) { STOPS.length = 0; c.list.forEach(s => STOPS.push(project(s))); applyQuayModes(); render(); }
   } catch { /* pas de cache */ }
   // 2) mise à jour depuis l'API
   try {
@@ -848,11 +852,11 @@ async function initReal(): Promise<void> {
     STOPS.length = 0; list.forEach(s => STOPS.push(project(s)));
     placeOnTramQuays(STOPS, quayModes); STOPS.forEach(project);
     rebuildPois();
-    try { localStorage.setItem("stopsCache2", JSON.stringify({ t: Date.now(), list })); } catch { /* ignoré */ }
+    if (CONFIG.CTS_REALTIME) try { localStorage.setItem("stopsCache2", JSON.stringify({ t: Date.now(), list })); } catch { /* ignoré */ }
     render();
   } catch (e) {
     console.error(e);
-    if (!STOPS.length) toast("Connexion à l’API CTS impossible");
+    if (!STOPS.length) toast("Liste des arrêts indisponible");
   }
   applyQuayLines();
   void loadQuayLines().then(m => {
@@ -887,7 +891,7 @@ async function checkVersion(): Promise<void> {
     }
   } catch { /* serveur injoignable : les écrans l'indiquent déjà */ }
 }
-if (!CONFIG.USE_MOCK) void checkVersion();
+if (!CONFIG.USE_MOCK && (!Capacitor.isNativePlatform() || CAN_UPDATE)) void checkVersion();
 // nouvelle version de l'application : proposée quelques secondes après le lancement (sans gêner l'affichage des horaires)
 if (!CONFIG.USE_MOCK && CAN_UPDATE) {
   setTimeout(() => { if (!S.upd) void offerUpdate(false); }, 2500);
@@ -930,8 +934,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if
 // premier lancement (ou conditions modifiées) : présentation avant tout le reste
 { const steps = onboardingSteps(); if (steps.length) S.onb = { steps, i: 0, refused: false }; }
 
-if (CONFIG.USE_MOCK) { MESSAGES.push(...MOCK_MESSAGES); MSG_STATE.status = "ok"; }
-else void initReal();
+if (!CONFIG.USE_MOCK) void initReal();
 render();
 hideSplash();
 void initWidgets();   // l'application est affichée sous l'animation de lancement : elle peut s'effacer

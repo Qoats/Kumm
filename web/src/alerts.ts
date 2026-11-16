@@ -5,7 +5,7 @@
  * - Version web : notifications du navigateur, seulement tant que la page est ouverte.
  */
 import { Capacitor } from "@capacitor/core";
-import { appHeaders, url } from "./config";
+import { url } from "./config";
 import type { TrafficMsg } from "./data";
 
 export interface AlertPrefs {
@@ -69,7 +69,7 @@ async function pushToken(): Promise<string> {
 
 /** Envoie l'abonnement (ou la désinscription) au serveur Kumm ; lève une erreur lisible en cas de refus */
 async function sendSubscription(body: Record<string, unknown>): Promise<void> {
-  const r = await fetch(url("/api/alerts"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const r = await fetch(url("/api/alerts"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) {
     const j = (await r.json().catch(() => ({}))) as { message?: string };
     throw new Error(r.status === 503 ? "Le serveur Kumm n'est pas encore configuré pour les alertes (Firebase)" : (j.message ?? "HTTP " + r.status));
@@ -137,7 +137,7 @@ export async function addArrival(a: ArrivalAlert, onWebFire: (a: ArrivalAlert) =
   if (!(await askPermission())) throw new Error("Notifications refusées : autorisez-les pour Kumm dans les réglages du téléphone");
   if (NATIVE) {
     if (!PUSH_READY) throw new Error("Notifications indisponibles dans cette version de l'application");
-    const r = await fetch(url("/api/arrival"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" },
+    const r = await fetch(url("/api/arrival"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: await pushToken(), refs: a.refs, stop: a.stop, line: a.line, dest: a.dest, at: a.at, lead: a.lead }) });
     if (!r.ok) { const j = (await r.json().catch(() => ({}))) as { message?: string }; throw new Error(j.message ?? "HTTP " + r.status); }
   } else {
@@ -157,7 +157,7 @@ export async function removeArrival(a: ArrivalAlert): Promise<void> {
   if (NATIVE) {
     const saved = localStorage.getItem(TOKEN_KEY);
     if (!PUSH_READY || !saved) throw new Error("Notifications indisponibles");
-    const r = await fetch(url("/api/arrival"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" },
+    const r = await fetch(url("/api/arrival"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: saved, cancel: true, refs: a.refs, line: a.line, dest: a.dest }) });
     if (!r.ok) throw new Error("HTTP " + r.status);
   }

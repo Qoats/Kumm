@@ -1,5 +1,5 @@
 import type { ServerResponse } from "node:http";
-import { AUTH, BASE, REQUESTOR, ROOT, TOKEN } from "./config.js";
+import { AUTH, BASE, CTS_LIVE, REQUESTOR, ROOT, TOKEN } from "./config.js";
 import { ctsPaused, describeError } from "./cts.js";
 import { GEO_USER_AGENT, TRANSIT } from "./geo.js";
 import { send } from "./http.js";
@@ -12,7 +12,7 @@ async function probe(url: string, headers: Record<string, string> = {}, wantText
   const ctl = new AbortController();
   const to = setTimeout(() => ctl.abort(), 6000);
   try {
-    const r = await fetch(url, { headers, signal: ctl.signal });
+    const r = await fetch(url, { headers, signal: ctl.signal, redirect: "error" });
     const type = r.headers.get("content-type") ?? "";
     return { status: r.status, type, text: wantText ? (await r.text()).slice(0, 4_000_000) : undefined };
   } catch (e) {
@@ -25,6 +25,7 @@ const brief = (p: Probe): string => (p.error ? "ERREUR : " + p.error : String(p.
 
 let lastDiag = 0;
 export async function diag(res: ServerResponse): Promise<void> {
+  if (!CTS_LIVE) return send(res, 404, "text/plain", "Diagnostic indisponible");
   if (Date.now() - lastDiag < 10_000) return send(res, 429, "text/plain", "Patientez 10 secondes entre deux diagnostics");
   lastDiag = Date.now();
   const origin = new URL(ROOT).origin;

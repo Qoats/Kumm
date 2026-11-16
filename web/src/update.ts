@@ -6,7 +6,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { PluginListenerHandle } from "@capacitor/core";
 import { App } from "@capacitor/app";
-import { appHeaders, url } from "./config";
+import { url } from "./config";
 
 export interface Release { version: string; code: number; size: number; sha256: string }
 
@@ -19,12 +19,12 @@ interface Updater {
 // objet de l'extension : utilisé directement, jamais renvoyé par une fonction async (il répond aussi à « then »)
 const Updater = registerPlugin<Updater>("KummUpdater");
 
-export const CAN_UPDATE = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android" && Capacitor.isPluginAvailable("KummUpdater");
+export const CAN_UPDATE = import.meta.env["VITE_SIDELOAD_UPDATES"] === "1" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android" && Capacitor.isPluginAvailable("KummUpdater");
 
 /** Version plus récente que celle installée, null si à jour ; « unpublished » : le serveur n'a encore aucun APK à distribuer */
 export async function checkUpdate(): Promise<Release | null | "unpublished"> {
   if (!CAN_UPDATE) return null;
-  const [info, r] = await Promise.all([App.getInfo(), fetch(url("/app/latest.json"), { cache: "no-store", headers: appHeaders() })]);
+  const [info, r] = await Promise.all([App.getInfo(), fetch(url("/app/latest.json"), { cache: "no-store" })]);
   if (r.status === 404) return "unpublished";
   if (!r.ok) throw new Error("HTTP " + r.status);
   const j = (await r.json()) as Partial<Release>;

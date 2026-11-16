@@ -25,7 +25,9 @@ Organisation des noms : `kumm.fr` = site vitrine et pages légales, `app.kumm.fr
 ## 3. Variables d'environnement à définir chez l'hébergeur
 | Variable | Valeur |
 |---|---|
-| `CTS_TOKEN` | votre jeton CTS (**secret**, jamais dans le dépôt) |
+| `CTS_MODE` | `scheduled` par défaut. Valeur `live` uniquement après autorisation SIRI |
+| `CTS_TOKEN` | Jeton serveur requis uniquement pour `live` |
+| `CTS_TRAFFIC` | `1` active les perturbations en mode `live` |
 | `TRUST_PROXY` | `1` **seulement si un proxy est devant le serveur** (hébergeur, Caddy…) ; déjà mis par `docker-compose.yml`. Sans proxy, laissez-le vide : sinon chacun pourrait choisir son adresse et contourner la limite de requêtes |
 | `GEO_USER_AGENT` | `Kumm/1.0 (contact@votre-domaine.fr)` : **un vrai contact**, exigé par OpenStreetMap et courtois envers les autres services |
 | `CORS_ORIGINS` | `https://localhost,capacitor://localhost` (l'application Android) |
