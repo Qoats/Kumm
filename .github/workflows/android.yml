@@ -36,7 +36,8 @@ jobs:
       - run: bash tests/vps-apk.test.sh
       - name: Valider Compose et démarrer l’image de test
         run: |
-          docker compose --env-file .env.production.example config --no-env-resolution --quiet
+          cp .env.production.example .env
+          docker compose config --quiet
           docker build -t kumm-ci .
           container=$(docker run -d --network none kumm-ci)
           trap 'docker rm -f "$container" >/dev/null' EXIT
