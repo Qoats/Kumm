@@ -1,7 +1,7 @@
 import type { WalkRoute } from "../../shared/types";
 import type { OsrmResponse, OsrmRoute } from "../../shared/geo-api";
 import type { LL } from "./geo";
-import { appHeaders, url } from "./config";
+import { url } from "./config";
 
 export interface BikeRoute {
   distance: number;
@@ -19,7 +19,7 @@ const toSteps = (r: OsrmRoute): WalkRoute["steps"] =>
 
 /** Un ou plusieurs itinéraires à vélo (le serveur demande les alternatives à OSRM) */
 export async function fetchBike(from: LL, to: LL): Promise<BikeRoute[]> {
-  const r = await fetch(url(`/geo/bike?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}`), { headers: appHeaders() });
+  const r = await fetch(url(`/geo/bike?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}`));
   if (!r.ok) throw new Error("Service " + r.status);
   const j = (await r.json()) as OsrmResponse;
   if (j.code !== "Ok" || !j.routes?.length) throw new Error("Aucun itinéraire vélo");

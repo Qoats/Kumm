@@ -57,7 +57,7 @@ export async function send(
     if (res.writableEnded || res.destroyed) return;
     const headers: Record<string, string | number> = { "Content-Type": type };
     if (tag) headers["X-Cache"] = tag;
-    if (opts?.cache) headers["Cache-Control"] = opts.cache;
+    if (opts?.cache && !res.hasHeader("Cache-Control")) headers["Cache-Control"] = opts.cache;
     let payload: string | Buffer = body;
     const compressible = COMPRESSIBLE.test(type);
     if (compressible) headers["Vary"] = addVary(res, "Accept-Encoding");

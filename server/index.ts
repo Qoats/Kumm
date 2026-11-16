@@ -2,7 +2,7 @@
 // en gardant le jeton CTS côté serveur. Conçu pour un usage public : limites, cache borné, compression, arrêt propre.
 import http from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { AUTH, APP_KEY, BASE, CACHE_MAX, CTS_BUDGET_PER_MIN, ENABLE_DIAG, LIMIT, MIN_APP_VERSION, ORIGINS, PORT, REQUESTOR, ROOT, STALE_REALTIME_S, TILE_LIMIT, TOKEN, UNKNOWN_REF_PER_MIN, VALIDATE_STOP_REFS, VERSION } from "./config.js";
+import { AUTH, BASE, CTS_LIVE, CTS_TRAFFIC, CACHE_MAX, CTS_BUDGET_PER_MIN, ENABLE_DIAG, LIMIT, MIN_APP_VERSION, ORIGINS, PORT, REQUESTOR, ROOT, STALE_REALTIME_S, TILE_LIMIT, TOKEN, UNKNOWN_REF_PER_MIN, VALIDATE_STOP_REFS, VERSION } from "./config.js";
 import { cacheGet, cacheSet, cacheSize, cacheStats, cacheSweep } from "./cache.js";
 import { ctsCallsLastMinute, ctsPaused, describeError, fetchCts, fetchRetry } from "./cts.js";
 import { diag } from "./diag.js";
@@ -13,7 +13,7 @@ import { parkingsRelais, poiResult, velhop } from "./poi.js";
 import { recordRequest, stats } from "./stats.js";
 import { serveStatic } from "./static.js";
 import { serveUpdate, updateStatus } from "./updates.js";
-import { WEB_PRIVATE, allowed, keyMatches, loginRoute, logoutRoute } from "./access.js";
+import { WEB_PRIVATE, allowed, loginRoute, logoutRoute } from "./access.js";
 import { serveTile } from "./tiles.js";
 import { parseGeneralMessages } from "./messages.js";
 import { allCourses, vehiclesAt } from "./vehicles.js";
@@ -23,7 +23,7 @@ import { widgetData } from "./widgets.js";
 import { stallStatus } from "./stalls.js";
 import { lineRoutes, routesStatus } from "./routes.js";
 import { arrivalsStatus, startArrivals, watchArrival } from "./arrivals.js";
-import { scheduleStatus, startSchedule } from "./schedule.js";
+import { loadSchedule, scheduleStatus, scheduledDepartures, scheduledLineRoute, scheduledLines, scheduledQuayLines, scheduledQuayModes, scheduledStops, scheduledVisits, scheduleReady, startSchedule } from "./schedule.js";
 import { bikeForecast, bikesStatus, startBikes } from "./bikes.js";
 import { earlyStatus } from "./early.js";
 import { receiveReport, reportsFor, reportsStatus } from "./reports.js";
@@ -38,7 +38,7 @@ import { quayLinesJson, quayModesJson, realtimeStatus, setStopIndex, startRealti
 import { receiveRide, rideStatus } from "./ride.js";
 import type { CtsResult } from "./cts.js";
 
-if (!TOKEN) {
+if (CTS_LIVE && !TOKEN) {
   console.error("CTS_TOKEN manquant : copiez .env.example en .env et renseignez-le (ou définissez la variable chez votre hébergeur).");
   process.exit(1);
 }
@@ -169,18 +169,30 @@ function upstreamFor(name: string, search: string): () => Promise<CtsResult> {
       };
 }
 
-function api(res: ServerResponse, url: URL): Promise<void> | void {
+async function api(res: ServerResponse, url: URL): Promise<void> {
   const name = url.pathname.slice("/api/".length);
+  if (name.startsWith("gtfs/")) {
+    if (!scheduleReady()) await loadSchedule();
+    if (!scheduleReady()) return send(res, 503, "text/plain", "Horaires théoriques CTS momentanément indisponibles");
+    const ref = url.searchParams.get("MonitoringRef") ?? "";
+    const body = name === "gtfs/stops" ? scheduledStops() : name === "gtfs/lines" ? scheduledLines()
+      : name === "gtfs/departures" && REF.test(ref) ? scheduledDepartures(ref, Date.now() - 30_000) : null;
+    if (!body) return send(res, 400, "text/plain", "Paramètres invalides");
+    return send(res, 200, "application/json; charset=utf-8", JSON.stringify({ ...body, source: "gtfs" }), undefined,
+      { cache: name === "gtfs/departures" ? "no-store" : "public, max-age=300" });
+  }
+  if (name === "messages" && !CTS_TRAFFIC) return send(res, 200, "application/json", JSON.stringify({ items: [], available: false, message: "Prochainement disponible" }), undefined, { cache: "no-store" });
   if (name === "messages") return cached(res, "info:messages", 60, 3600, trafficMessages);
   // widgets Android (écran d'accueil) : réponses courtes depuis la mémoire, gardées 20 à 60 s
+  if (name === "widget/traffic" && !CTS_TRAFFIC) return send(res, 503, "text/plain", "Prochainement disponible");
   if (name.startsWith("widget/")) {
     const w = name.slice("widget/".length), ttl = w === "traffic" || w === "poi" ? 60 : 20;
     return cached(res, "widget:" + w + url.search, ttl, 0, () => widgetData(w, url, currentMessages, async kind => (kind === "velhop" ? velhopItems() : prItems())));
   }
   // position estimée des véhicules, depuis la photo du réseau en mémoire : recalculée au plus toutes les 5 s
   // mode des quais (tram ou bus) : place le repère d'une station de tram sur ses quais de tram, pas entre le tram et les bus
-  if (name === "quay-lines") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(quayLinesJson()), undefined, { cache: "public, max-age=600" });
-  if (name === "quay-modes") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(quayModesJson()), undefined, { cache: "public, max-age=600" });
+  if (name === "quay-lines") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(CTS_LIVE ? quayLinesJson() : scheduledQuayLines()), undefined, { cache: "public, max-age=600" });
+  if (name === "quay-modes") return send(res, 200, "application/json; charset=utf-8", JSON.stringify(CTS_LIVE ? quayModesJson() : scheduledQuayModes()), undefined, { cache: "public, max-age=600" });
   // départs des trains d'une gare de l'Eurométropole (horaires SNCF recalés en temps réel), recalculés au plus toutes les 20 s
   // gares TER suivies (Eurométropole, lignes de Lauterbourg et de Paris, tout le Grand Est) : fiches de l'application
   if (name === "ter-stations") return send(res, 200, "application/json; charset=utf-8", JSON.stringify({ items: followedStations() }), undefined, { cache: "public, max-age=3600" });
@@ -206,7 +218,7 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
   if (name === "line-route") {
     const line = url.searchParams.get("line") ?? "";
     if (!/^[A-Za-z0-9]{1,6}$/.test(line)) return send(res, 400, "text/plain", "Ligne invalide");
-    return cached(res, "info:line-route:" + line, 300, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(lineRoutes(line)) }));
+    return cached(res, "info:line-route:" + line, 300, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(CTS_LIVE ? lineRoutes(line) : scheduledLineRoute(line)) }));
   }
   if (name === "stats") {
     const line = url.searchParams.get("line");
@@ -215,9 +227,11 @@ function api(res: ServerResponse, url: URL): Promise<void> | void {
   }
   if (name === "vehicles") return cached(res, "info:vehicles", 5, 0, async () => ({ status: 200, type: "application/json; charset=utf-8", body: JSON.stringify(vehiclesAt()) }));
   const conf = ALLOWED[name];
-  if (!conf) return send(res, 404, "text/plain", "Endpoint inconnu");
+  if (!Object.hasOwn(ALLOWED, name)) return send(res, 404, "text/plain", "Endpoint inconnu");
   const clean = cleanQuery(name, url);
   if (clean === null) return send(res, 400, "text/plain", "Paramètres invalides");
+  if (!CTS_LIVE) return send(res, 503, "text/plain", "Temps réel CTS indisponible");
+  if (name === "general-message" && !CTS_TRAFFIC) return send(res, 503, "text/plain", "Prochainement disponible");
   // passages en direct : d'abord la photo du réseau gardée en mémoire (aucun appel à la CTS)
   if (name === "stop-monitoring") {
     const fromSnapshot = stopMonitoringFromSnapshot(url.searchParams.get("MonitoringRef") ?? "");
@@ -244,6 +258,7 @@ async function trafficMessages(): Promise<CtsResult> {
 /** Infos trafic pour la surveillance des alertes (même source que /api/messages, gardée 55 s) */
 let msgMemo: { at: number; items: TrafficMessage[] } = { at: 0, items: [] };
 async function currentMessages(): Promise<TrafficMessage[]> {
+  if (!CTS_TRAFFIC) return [];
   if (Date.now() - msgMemo.at < 55_000) return msgMemo.items;
   const r = await trafficMessages();
   if (r.status !== 200) throw new Error("HTTP " + r.status);
@@ -306,6 +321,14 @@ async function prefetch(): Promise<void> {
 }
 
 function geo(res: ServerResponse, url: URL): Promise<void> | void {
+  if (url.pathname === "/geo/stoptimes") {
+    const ref = url.searchParams.get("stop") ?? "", at = Date.parse(url.searchParams.get("time") ?? "");
+    if (!REF.test(ref) || !Number.isFinite(at)) return send(res, 400, "text/plain", "Paramètres invalides");
+    if (!scheduleReady()) return send(res, 503, "text/plain", "Horaires théoriques CTS momentanément indisponibles");
+    return send(res, 200, "application/json; charset=utf-8", JSON.stringify({ source: "gtfs", stopTimes: scheduledVisits([ref], at, 80).map(v => ({
+      routeShortName: v.line, headsign: v.dest, place: { scheduledDeparture: new Date(v.time).toISOString() }
+    })) }), undefined, { cache: "no-store" });
+  }
   const g = geoUpstream(url);
   if (!g) return send(res, 400, "text/plain", "Paramètres invalides");
   return cached(res, g.url, g.ttl, g.stale, () => fetchRetry(g.url, { "User-Agent": GEO_USER_AGENT, Accept: "application/json" }));
@@ -361,24 +384,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   securityHeaders(req, res);
   const origin = req.headers.origin;
   if (origin && ORIGINS.includes(origin)) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
-  if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-App-Key", "Access-Control-Max-Age": "86400" }); return void res.end(); }
+  if (req.method === "OPTIONS") { res.writeHead(204, { "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Kumm-Device", "Access-Control-Max-Age": "86400" }); return void res.end(); }
   // seule écriture possible : l'abonnement aux alertes trafic
   const isPost = req.method === "POST" && (url.pathname === "/api/alerts" || url.pathname === "/api/ride" || url.pathname === "/api/arrival" || url.pathname === "/api/report" || url.pathname === "/connexion");
   if (req.method !== "GET" && req.method !== "HEAD" && !isPost) return send(res, 405, "text/plain", "Méthode non autorisée");
 
   const p = url.pathname;
   if (p === "/health") return health(res);
-  // bêta privée : connexion demandée au navigateur (l'APK Android passe sans rien saisir)
+  if (p === "/api/kumm-mode") return send(res, 200, "application/json",
+    JSON.stringify({ protocol: 1, cts: CTS_LIVE ? "live" : "scheduled", traffic: CTS_TRAFFIC, private: WEB_PRIVATE }),
+    undefined, { cache: "no-store" });
+  // La bêta privée exige une session.
   if (p === "/connexion") return loginRoute(req, res, readBody);
   if (p === "/deconnexion") return logoutRoute(res);
   if (!allowed(req, res, p)) return;
 
   const isTile = p.startsWith("/tiles/");
   const isService = p.startsWith("/api/") || p.startsWith("/geo/") || p.startsWith("/poi/");
-  if (isService && APP_KEY && !keyMatches(req.headers["x-app-key"])) {
-    res.writeHead(403, { "Content-Type": "text/plain" });
-    return void res.end("Accès réservé à l'application");
-  }
   if ((isTile && !withinLimit(req, "tiles", TILE_LIMIT)) || (isService && !withinLimit(req, "api", LIMIT))) {
     res.writeHead(429, { "Content-Type": "text/plain", "Retry-After": "60" });
     return void res.end("Trop de requêtes : réessayez dans une minute");
@@ -392,20 +414,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
     }
     if (url.pathname === "/api/arrival") {
+      if (!CTS_LIVE && (body as { enabled?: boolean } | null)?.enabled !== false) return send(res, 503, "text/plain", "Alertes de passage CTS indisponibles");
       const r = watchArrival(body);
       return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
     }
     if (url.pathname === "/api/ride") {
       // position partagée par un voyageur à bord (voir ride.ts)
       const all = allCourses();
-      const r = all.courses.length ? receiveRide(body, all.courses, all.stopPos) : { status: 503, msg: "Réseau indisponible" };
+      const observed = all.courses.filter(c => !c.id.startsWith("gtfs:"));
+      const r = observed.length ? receiveRide(body, observed, all.stopPos) : { status: 503, msg: "Réseau indisponible" };
       return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
     }
+    if (!CTS_TRAFFIC && (body as { enabled?: boolean } | null)?.enabled !== false) return send(res, 503, "text/plain", "Prochainement disponible");
     const r = subscribe(body);
     return send(res, r.status, "application/json; charset=utf-8", JSON.stringify({ ok: r.status === 200, message: r.msg }));
   }
   // signalements d'un arrêt : propres à chaque appareil (les siens, même non confirmés), donc jamais en cache
-  if (p === "/api/reports") return send(res, 200, "application/json; charset=utf-8", JSON.stringify({ items: reportsFor((url.searchParams.get("stop") ?? "").slice(0, 40), (url.searchParams.get("device") ?? "").slice(0, 64)) }));
+  if (p === "/api/reports") return send(res, 200, "application/json; charset=utf-8", JSON.stringify({ items: reportsFor((url.searchParams.get("stop") ?? "").slice(0, 40), (typeof req.headers["x-kumm-device"] === "string" ? req.headers["x-kumm-device"] : "").slice(0, 64)) }), undefined, { cache: "private, no-store" });
   if (p.startsWith("/api/")) return api(res, url);
   if (p.startsWith("/geo/")) return geo(res, url);
   if (p === "/poi/velhop") return cached(res, "poi:velhop", 60, 600, async () => poiResult(await velhop()));
@@ -458,13 +483,15 @@ process.on("uncaughtException", e => { console.error("Erreur fatale :", e.messag
 
 server.listen(PORT, () => {
   console.log(`Kumm ${VERSION} : http://localhost:${PORT}`);
-  void prefetch();
-  startRealtime();
-  startTer();
-  startAlerts(currentMessages);
-  startArrivals();
+  if (CTS_LIVE) {
+    void prefetch();
+    startRealtime();
+    setInterval(() => { void prefetch(); }, 50 * 60_000).unref();
+  }
   startSchedule();
+  startTer();
+  if (CTS_TRAFFIC) startAlerts(currentMessages);
+  if (CTS_LIVE) startArrivals();
   startBikes();
   startParks();
-  setInterval(() => { void prefetch(); }, 50 * 60_000).unref();   // renouvelé avant l'expiration (1 h)
 });

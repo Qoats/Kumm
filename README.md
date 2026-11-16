@@ -1,17 +1,17 @@
 # Kumm
 
-Application web et Android pour le réseau de transports de Strasbourg : horaires en direct, carte, parkings relais, Vélhop, trajets avec correspondances et guidage à pied.
+Application web et Android pour le réseau de transports de Strasbourg : horaires théoriques CTS, carte, parkings relais, Vélhop, trajets avec correspondances et guidage à pied.
 
 > **Projet indépendant, non officiel.** Kumm n'est ni édité, ni approuvé, ni affilié à la CTS ni à l'Eurométropole de Strasbourg. Le logo et le nom sont propres au projet.
 
 ## Mettre en ligne pour le grand public
 Sur un VPS : **`docs/DEPLOIEMENT-VPS.md`** (Docker + Caddy, HTTPS automatique, site vitrine sur `kumm.fr`, application sur `app.kumm.fr`). Voir aussi **`docs/MISE-EN-LIGNE.md`** (hébergement, variables, supervision, services à remplacer, liste de contrôle, Play Store) et le modèle **`docs/POLITIQUE-CONFIDENTIALITE.md`**. Le serveur expose `/health` pour la supervision ; son fonctionnement en charge (cache, secours, limites, compression) y est décrit.
 
-## Utiliser ce projet avec votre propre jeton
-Le code est publié **sans aucun jeton**. Chaque personne qui fait tourner son propre serveur Kumm doit :
-1. créer son compte sur le portail Open Data de la CTS (contact : open-data [at] cts-strasbourg.fr) et générer **son** jeton ;
-2. le mettre dans un fichier `.env` (modèle : `.env.example`). Ce fichier n'est jamais publié (`.gitignore`).
-Les adresses des API (CTS, OpenStreetMap, Transitous…) ne sont pas des secrets : seul le jeton l'est.
+## Horaires CTS et autorisation SIRI Lite
+
+Le serveur utilise par défaut le GTFS officiel publié par la CTS sous la responsabilité de l’Eurométropole de Strasbourg, sous [Licence Ouverte 2.0](https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts). Il vérifie le cache toutes les heures, télécharge une mise à jour après 20 h et garde la dernière copie valide si le téléchargement échoue. Les heures respectent le calendrier GTFS et le fuseau Europe/Paris.
+
+Le temps réel est désactivé par défaut. Après autorisation, définir `CTS_MODE=live` et fournir un **nouveau jeton** CTS dans l’environnement du serveur. `CTS_TRAFFIC=1` réactive aussi les perturbations CTS. Le GTFS reste utilisé pour les horaires planifiés. Le serveur ne demande aucun jeton CTS en mode théorique.
 
 ## Publier ou contribuer sans rien divulguer
 - Ne mettez **jamais** de jeton dans le code, un fichier d'exemple, une capture d'écran ou un message de commit. Le jeton vit dans `.env` (poste local) ou dans les variables d'environnement de l'hébergeur.
@@ -22,48 +22,46 @@ Les adresses des API (CTS, OpenStreetMap, Transitous…) ne sont pas des secrets
 - Un APK contient l'adresse de votre serveur (jamais le jeton) : n'importe qui peut la lire. Publiez votre APK seulement si votre serveur est prêt à être utilisé par d'autres, ou laissez chacun compiler le sien avec sa propre adresse.
 
 ## Licences et données
-Le code est sous licence MIT (fichier `LICENSE`). Les données gardent leurs conditions : horaires et arrêts CTS (conditions du portail Open Data CTS), parkings et Vélhop (Licence Ouverte), cartes et marche à pied © contributeurs OpenStreetMap (ODbL, attribution obligatoire), trajets Transitous. Les tuiles du serveur public d'OpenStreetMap sont réservées à un usage modéré : pour une large diffusion, utilisez un fournisseur de tuiles dédié.
+Le code est sous licence MIT (fichier `LICENSE`). Les données gardent leurs conditions : horaires et arrêts CTS / Eurométropole de Strasbourg (Licence Ouverte 2.0), parkings et Vélhop (Licence Ouverte), cartes et marche à pied © contributeurs OpenStreetMap (ODbL, attribution obligatoire), trajets Transitous. Les tuiles du serveur public d'OpenStreetMap sont réservées à un usage modéré : pour une large diffusion, utilisez un fournisseur de tuiles dédié.
 
 ## Structure
 
 ```
 shared/   types communs (arrêt, passage, réponses de l'API CTS)
-server/   relais vers l'API CTS : token caché, cache, nouvelles tentatives
+server/   GTFS CTS, services ouverts et relais SIRI facultatif
 web/      l'application (écrans, carte, API) — compilée par Vite
 ```
 
 ## Installer et lancer (une seule fois, puis à chaque session)
-Node 20.6 ou plus récent. Dans PowerShell, utilisez `npm.cmd` si `npm` est bloqué.
+Node 22 ou plus récent. Dans PowerShell, utilisez `npm.cmd` si `npm` est bloqué.
 
 1. `npm.cmd install`
-2. `copy .env.example .env`, puis ouvrez `.env` et collez votre token CTS (un nouveau, de préférence)
+2. `copy .env.example .env`
 3. **Mode développement** : `npm.cmd run dev` puis ouvrez http://localhost:5173 (la page se recharge à chaque modification)
 4. **Mode "production"** : `npm.cmd run build` puis `npm.cmd start`, et ouvrez http://localhost:3000
 
-Mode démo sans API : ajoutez `?mock` à l'adresse.
-
 ## Application Android (APK)
-L'APK est l'application Kumm dans un habillage Android (Capacitor). Elle ne contient **pas** le jeton CTS : elle parle à *votre serveur Kumm* (celui de ce projet), qui garde le jeton. Il faut donc un serveur joignable depuis le téléphone.
+L'APK est l'application Kumm dans un habillage Android (Capacitor). Elle ne contient **pas** le jeton CTS : elle parle à *votre serveur Kumm* (celui de ce projet), qui garde le jeton. Il faut un serveur joignable depuis le téléphone et compatible avec le GTFS de cette version. Les API d’une instance privée (`WEB_LOGIN`) exigent une session web. L’APK de diffusion anonyme utilise une instance publique avec quotas.
 
 ### 1. Dire à l'APK où est le serveur
 Éditez `web/.env.android` (une seule ligne) :
 - **Test chez vous** (PC et téléphone sur le même Wi-Fi) : `VITE_API_BASE=http://192.168.1.25:3000` avec l'adresse de votre PC (commande `ipconfig`, ligne « Adresse IPv4 »). Lancez le serveur avec `npm.cmd run build` puis `npm.cmd start`, et autorisez le port 3000 dans le pare-feu Windows si demandé.
-- **Partout** : hébergez le serveur en ligne (le `Dockerfile` fourni convient à la plupart des hébergeurs ; donnez le jeton dans la variable `CTS_TOKEN` chez l'hébergeur), puis `VITE_API_BASE=https://kumm.mondomaine.fr`. Avec un serveur en https, mettez `allowMixedContent: false` dans `capacitor.config.ts` et `usesCleartextTraffic="false"` dans `android/app/src/main/AndroidManifest.xml`.
+- **Partout** : hébergez le serveur en ligne (le `Dockerfile` fourni convient à la plupart des hébergeurs ), puis `VITE_API_BASE=https://kumm.mondomaine.fr`. Avec un serveur en https, mettez `allowMixedContent: false` dans `capacitor.config.ts` et `usesCleartextTraffic="false"` dans `android/app/src/main/AndroidManifest.xml`.
 
 ### 2. Compiler l'APK
 **Avec Android Studio** (gratuit, développeur.android.com/studio ; il contient le JDK 21 nécessaire) :
 1. `npm.cmd install`
-2. `npm.cmd run build:android` (compile la page et la copie dans le projet Android)
+2. `npx cap add android` (une fois), puis `node scripts/prepare-android.mjs play 170` et `npm.cmd run build:android` (compile la page et la copie dans le projet Android)
 3. `npm.cmd run android:open` (ouvre le projet dans Android Studio ; premier chargement : plusieurs minutes)
 4. Menu **Build → Build Bundle(s) / APK(s) → Build APK(s)**. Le fichier est `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-**Sans rien installer, avec GitHub** : mettez le projet (sans `.env`) dans un dépôt GitHub, créez la variable `KUMM_API_BASE` (Settings → Secrets and variables → Actions → Variables), puis onglet Actions → « APK Android » → Run workflow. L'APK est dans les fichiers produits (« kumm-apk »).
+**Sans rien installer, avec GitHub** : mettez le projet (sans `.env`) dans un dépôt GitHub, créez la variable `KUMM_API_BASE` (Settings → Secrets and variables → Actions → Variables), puis onglet Actions → « APK Android » → Run workflow. Les fichiers de revue sont dans l’artefact « kumm-android-review ». Le profil Play fournit un APK de test et un AAB non signé. Voir [Préparation Google Play](docs/GOOGLE-PLAY.md).
 
 ### 3. Installer sur le téléphone
 Copiez `app-debug.apk` sur le téléphone, ouvrez-le et autorisez « installer des applications inconnues » quand Android le demande. Au premier lancement, acceptez la localisation.
 
 ### Alertes trafic (notifications push, Firebase)
-Réglages → « Alertes trafic » : une notification pour chaque nouvelle perturbation sur les lignes choisies (option : travaux et changements prévus).
+Après réactivation autorisée des perturbations, Réglages → « Alertes trafic » active les notifications pour les lignes choisies.
 - **Serveur** (`server/alerts.ts`) : surveille les infos trafic chaque minute et envoie les nouvelles perturbations par Firebase Cloud Messaging aux téléphones abonnés (`POST /api/alerts`). Clé du compte de service Firebase dans `secrets/firebase.json` sur le serveur (jamais dans le dépôt ni dans l'image) ; abonnements gardés dans le volume Docker `kumm_state`. État visible dans `/health` (rubrique `alertes`).
 - **Application** : secret GitHub `GOOGLE_SERVICES_JSON` (contenu du fichier `google-services.json`) pour compiler l'APK avec Firebase ; sans lui, l'option est indiquée comme indisponible.
 - **Version web** : notifications du navigateur, seulement tant que la page est ouverte.
@@ -79,7 +77,7 @@ Android n'accepte une mise à jour que si elle est signée avec **la même clé*
 Le numéro de version Android augmente à chaque compilation. Sans ces secrets, l'APK est signé « debug » et il faut désinstaller l'ancienne version avant d'installer la nouvelle.
 **Gardez une copie de la clé et du mot de passe hors de GitHub** (gestionnaire de mots de passe) : une clé perdue oblige tous les utilisateurs à désinstaller l'application, et ne se remplace pas. Ne la mettez jamais dans le dépôt (`*.jks` est exclu par `.gitignore`).
 
-Notes : pour le Play Store il faudra un fichier `.aab` (même clé). À chaque modification du code : `npm.cmd run build:android`, puis recompiler. Le bouton « retour » d'Android ferme le guidage, une fiche, puis revient à l'accueil.
+Pour Google Play, utiliser le [profil Play et la clé d’importation](docs/GOOGLE-PLAY.md). À chaque modification du code : `npm.cmd run build:android`, puis recompiler. Le bouton « retour » d'Android ferme le guidage, une fiche, puis revient à l'accueil.
 
 ## Widgets de l'écran d'accueil (Android)
 Sept widgets, à ajouter par un appui long sur l'écran d'accueil → Widgets → Kumm :
@@ -111,14 +109,15 @@ Si une station de tram s'affiche comme un bus, ajoutez son nom dans `TRAM_STATIO
     __kumm.STOPS.filter(s => __kumm.kindOfStop(s)==="bus" && s.lines.some(l => /^[A-F]$/.test(l))).map(s => s.name)
 
 ## La carte « À proximité »
-Avec les vraies données, c'est une vraie carte OpenStreetMap (zoom et déplacement au doigt ou à la souris) : chaque arrêt est placé à ses coordonnées réelles. Seuls les repères visibles à l'écran sont dessinés (300 arrêts au plus). Le bouton cible recentre sur votre position. En mode démo (`?mock`), un dessin schématique est conservé.
+Avec les vraies données, c'est une vraie carte OpenStreetMap (zoom et déplacement au doigt ou à la souris) : chaque arrêt est placé à ses coordonnées réelles. Seuls les repères visibles à l'écran sont dessinés (300 arrêts au plus). Le bouton cible recentre sur votre position.
 Si la zone reste grise avec un message « Fond de carte indisponible », votre réseau n'atteint pas `tile.openstreetmap.org` : les arrêts restent affichés mais sans fond.
 Les fonds de carte viennent des serveurs publics d'OpenStreetMap, faits pour un usage modéré : pour une vraie mise en ligne, il faudra un fournisseur de tuiles dédié.
 
 ## Sources des données (tout est référencé ici)
 | Donnée | Source |
 |---|---|
-| Arrêts, lignes, passages en direct | API CTS (`api.cts-strasbourg.eu`, SIRI Lite) |
+| Arrêts, lignes et horaires théoriques | GTFS officiel CTS / Eurométropole de Strasbourg, Licence Ouverte 2.0 |
+| Temps réel CTS, si autorisé et activé | API CTS SIRI Lite |
 | Parkings relais (12) : positions, capacités | Eurométropole de Strasbourg, open data (data.strasbourg.eu : « parkings » et « occupation en temps réel des parkings », Licence Ouverte) ; liste des 12 sites confirmée par la page « Park-and-Ride » de cts-strasbourg.eu |
 | Places libres des P+R | jeu « occupation-parkings-temps-reel » (mise à jour toutes les 3 minutes) |
 | Stations Vélhop + vélos disponibles | flux GBFS `gbfs.nextbike.net/maps/gbfs/v2/nextbike_ae/fr/` (jeu « VLS Vélhop Strasbourg » sur transport.data.gouv.fr, Licence Ouverte 2.0) |

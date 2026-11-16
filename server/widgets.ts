@@ -8,6 +8,8 @@
  *   /api/widget/poi?id=velhop-…|pr-…  vélos ou places disponibles
  * Les heures sont en millisecondes ; le widget les affiche en heure de passage (« 18:44 »).
  */
+import { CTS_LIVE } from "./config.js";
+import { scheduledNearby, scheduledVisits } from "./schedule.js";
 import type { CtsResult } from "./cts.js";
 import type { TrafficMessage } from "./messages.js";
 import { nearestWithDepartures, upcomingFor } from "./realtime.js";
@@ -57,17 +59,22 @@ export async function widgetData(
   const now = Date.now(), q = url.searchParams;
   if (name === "stop") {
     const refs = list(q.get("refs"), 40), sncf = q.get("sncf") ?? "";
-    const v = refs.length ? upcomingFor(refs, now) : [];
+    const theoretical = !CTS_LIVE && q.get("gtfs") === "1";
+    const v = theoretical ? scheduledVisits(refs, now, 150) : CTS_LIVE && refs.length ? upcomingFor(refs, now) : [];
     if (v === null && !sncf) return json({ erreur: "Passages momentanément indisponibles" }, 503);
     // directions choisies pour ce widget (« ligne|destination », séparées par ~) ; sinon toutes
     const only = (q.get("only") ?? "").split("~").filter(Boolean).slice(0, 20);
     const all = [...group(v ?? [], 40), ...(sncf ? trains(sncf) : [])].filter(g => !only.length || only.includes(g.l + "|" + g.d));
     const deps = all.sort((a, b) => a.t[0] - b.t[0]).slice(0, 6);
-    return json({ now, deps });
+    return json({ now, deps, scheduled: theoretical && deps.some(d => d.l !== "TER") });
   }
   if (name === "nearby") {
     const lat = Number(q.get("lat")), lon = Number(q.get("lon"));
     if (!(Math.abs(lat - 48.58) < 0.6 && Math.abs(lon - 7.75) < 0.8)) return json({ erreur: "Position hors de l'Eurométropole" }, 400);
+    if (!CTS_LIVE) {
+      const s = q.get("gtfs") === "1" ? scheduledNearby(lat, lon, now) : null;
+      return json(s ? { now, name: s.name, dist: s.dist, deps: group(s.visits, 4), scheduled: true } : { now, deps: [] });
+    }
     const s = nearestWithDepartures(lat, lon, now);
     if (!s) return json({ now, deps: [] });
     return json({ now, name: s.name, dist: s.dist, deps: group(upcomingFor(s.codes, now) ?? [], 4) });

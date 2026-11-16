@@ -167,7 +167,7 @@ Activation et premier passage :
 sudo systemctl daemon-reload && sudo systemctl enable --now kumm-update.timer && sudo systemctl start kumm-update.service
 journalctl -u kumm-update -n 20 --no-pager     # « APK : version … disponible »
 ```
-Le dépôt est privé : le serveur s'y connecte avec une clé de déploiement en lecture seule (`ssh-keygen -t ed25519 -f ~/.ssh/kumm_deploy -N ""`, clé publique ajoutée dans GitHub → Settings → Deploy keys, et `~/.ssh/config` : `Host github.com` / `IdentityFile ~/.ssh/kumm_deploy` / `IdentitiesOnly yes`), puis `git clone git@github.com:evergreen-stack/Kumm-server.git ~/kumm`.
+Le dépôt est privé : le serveur s'y connecte avec une clé de déploiement en lecture seule (`ssh-keygen -t ed25519 -f ~/.ssh/kumm_deploy -N ""`, clé publique ajoutée dans GitHub → Settings → Deploy keys, et `~/.ssh/config` : `Host github.com` / `IdentityFile ~/.ssh/kumm_deploy` / `IdentitiesOnly yes`), puis `git clone git@github.com:Qoats/Kumm.git ~/kumm`.
 Publier une version pour les téléphones : Actions → « APK Android » → Run workflow (case « Proposer cette version aux téléphones » cochée).
 Vérification : `https://app.kumm.fr/app/latest.json`, ou la partie `apk` de `/health`.
 

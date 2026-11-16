@@ -5,6 +5,7 @@
  */
 import { lastUpdateOf, snapshot } from "./realtime.js";
 import { driftOf } from "./drift.js";
+import { scheduledCourses } from "./schedule.js";
 import type { Course } from "./realtime.js";
 import type { StopPos } from "./ride.js";
 import { pathBetween } from "./shapes.js";
@@ -187,8 +188,9 @@ function heading(a: { lat: number; lon: number }, b: { lat: number; lon: number 
  */
 export function allCourses(now = Date.now()): { courses: Course[]; stopPos: StopPos; at: number | null } {
   const snap = snapshot(now), ter = terCourses(now);
-  const stopPos: StopPos = { get: code => snap?.stopPos.get(code) ?? ter.stopPos.get(code) };
-  return { courses: [...(snap?.courses ?? []), ...ter.courses], stopPos, at: snap?.at ?? null };
+  const cts = snap ?? scheduledCourses(now);
+  const stopPos: StopPos = { get: code => cts?.stopPos.get(code) ?? ter.stopPos.get(code) };
+  return { courses: [...(cts?.courses ?? []), ...ter.courses], stopPos, at: snap?.at ?? null };
 }
 
 export function vehiclesAt(now = Date.now()): { now: number; at: number | null; vehicles: Vehicle[] } {
@@ -217,10 +219,13 @@ export function vehiclesAt(now = Date.now()): { now: number; at: number | null; 
     if (shared && where) {
       const k = where.k, s0 = calls[k], s1 = calls[k + 1];
       const expected = s0.dep + where.f * (s1.arr - s0.dep);                    // heure estimée par la CTS à cet endroit
+      const lat = Math.round((s0.p.lat + (s1.p.lat - s0.p.lat) * where.f) * 1000) / 1000;
+      const lon = Math.round((s0.p.lon + (s1.p.lon - s0.p.lon) * where.f) * 1000) / 1000;
+      const t = Math.floor(shared.t / 10_000) * 10_000;
       const shift = shared.t - expected;                                         // en retard sur l'estimation de la CTS si > 0
       const aimed = s0.aim !== undefined && s1.aim !== undefined ? s0.aim + where.f * (s1.aim - s0.aim) : null;
       out.push({
-        id: c.id, line: c.line, dest: c.dest, rt: true, m: c.mode, a: [shared.lat, shared.lon, shared.t], b: [shared.lat, shared.lon, shared.t],
+        id: c.id, line: c.line, dest: c.dest, rt: true, m: c.mode, a: [lat, lon, t], b: [lat, lon, t],
         h: heading(s0.p, s1.p), g: true,
         ...(shared.speed !== null ? { s: Math.round(shared.speed * 3.6) } : {}),
         // écart avec l'horaire prévu s'il est publié, sinon avec l'horaire annoncé par la CTS (celui des écrans en station)

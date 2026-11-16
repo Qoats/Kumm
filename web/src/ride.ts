@@ -5,7 +5,7 @@
  * toutes les 10 s, sans aucun identifiant, et améliore la position et les horaires de ce véhicule pour tout le monde.
  * Le partage s'arrête au terminus, si la personne quitte le trajet, après 60 min, ou quand l'application passe en arrière-plan.
  */
-import { appHeaders, url } from "./config";
+import { url } from "./config";
 import { lineLabel } from "./data";
 import { S, render, toast } from "./store";
 import { VEHICLES, refreshVehicles, vehicleHeading, vehiclePos } from "./vehicles";
@@ -59,6 +59,7 @@ function onPosition(pos: GeolocationPosition): void {
   let best: { id: string; d: number } | null = null;
   for (const v of VEHICLES.values()) {
     if (v.w || refused.has(v.id)) continue;
+    if (v.id.startsWith("gtfs:")) continue;
     const [la, lo] = vehiclePos(v), d = meters(here, { lat: la, lon: lo });
     if (d > NEAR_M || (dir !== null && angleGap(dir, vehicleHeading(v)) > 75)) continue;
     if (!best || d < best.d) best = { id: v.id, d };
@@ -127,7 +128,7 @@ function share(here: { lat: number; lon: number; t: number }, speed: number | nu
   if (Date.now() - s.lastSent < SEND_EVERY) return;
   s.lastSent = Date.now();
   fetch(url("/api/ride"), {
-    method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ trip: s.id, lat: here.lat, lon: here.lon, ...(speed !== null && speed >= 0 ? { speed } : {}) })
   }).then(r => {
     if (r.status === 404) return stopSharing("Terminus atteint : partage du trajet terminé, merci !");

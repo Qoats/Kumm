@@ -9,7 +9,7 @@
  * le suivi se fait d'après les horaires, tant que la page est ouverte, et la position est partagée comme avec ride.ts.
  */
 import { Capacitor, registerPlugin } from "@capacitor/core";
-import { API_BASE, APP_KEY, appHeaders, url } from "./config";
+import { API_BASE, url } from "./config";
 import { COLORS, lineLabel } from "./data";
 import { S, render, toast } from "./store";
 import { endSharingQuietly, shareAboard } from "./ride";
@@ -41,7 +41,7 @@ const Trip = registerPlugin<KummTripPlugin>("KummTrip");
 
 async function fetchTrip(q: string): Promise<TripDetail | null> {
   try {
-    const r = await fetch(url("/api/trip?" + q), { headers: appHeaders() });
+    const r = await fetch(url("/api/trip?" + q));
     return r.ok ? (await r.json()) as TripDetail : null;
   } catch { return null; }
 }
@@ -91,7 +91,7 @@ async function startJourney(d: TripDetail, board: number, alight: number): Promi
   if (NATIVE) {
     try {
       const r = await Trip.start({
-        base: API_BASE, key: APP_KEY, id: d.id, line: lineLabel(d.line), dest: d.dest, n: d.n, color: COLORS[lineLabel(d.line)] ?? "#136342",
+        base: API_BASE, id: d.id, line: lineLabel(d.line), dest: d.dest, n: d.n, color: COLORS[lineLabel(d.line)] ?? "#136342",
         board, alight, calls: d.calls.map(c => ({ name: c.name, lat: c.lat, lon: c.lon, arr: c.arr }))
       });
       if (!r.notifications) toast("Notifications refusées : les alertes s'afficheront seulement dans l'application");

@@ -55,7 +55,7 @@ public class TripService extends Service implements LocationListener {
     /** État lu par l'application (KummTrip.status) pour son bandeau */
     static volatile JSONObject status = null;
 
-    private String base = "", key = "", id = "", line = "", dest = "", tripCode = "";
+    private String base = "", id = "", line = "", dest = "", tripCode = "";
     private int color = 0xFF136342;
     private double[] lat, lon;
     private String[] names;
@@ -104,7 +104,7 @@ public class TripService extends Service implements LocationListener {
     }
 
     private void load(JSONObject t) throws Exception {
-        base = t.optString("base", ""); key = t.optString("key", "");
+        base = t.optString("base", "");
         id = t.getString("id"); line = t.optString("line", ""); dest = t.optString("dest", ""); tripCode = t.optString("n", "");
         try { color = Color.parseColor(t.optString("color", "#136342")); } catch (Exception ignored) { }
         JSONArray cs = t.getJSONArray("calls");
@@ -276,7 +276,6 @@ public class TripService extends Service implements LocationListener {
         HttpURLConnection h = (HttpURLConnection) new URL(base + path).openConnection();
         h.setRequestMethod(method); h.setConnectTimeout(8000); h.setReadTimeout(10_000);
         h.setRequestProperty("Origin", "https://localhost");
-        if (!key.isEmpty()) h.setRequestProperty("X-App-Key", key);
         return h;
     }
 

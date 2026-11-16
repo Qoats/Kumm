@@ -4,10 +4,6 @@ services:
   kumm:
     build:
       context: .
-      # APP_KEY (optionnelle) est intégrée à l'application web à la compilation ;
-      # mettez-la dans le .env du serveur (variable docker compose la lit automatiquement).
-      args:
-        APP_KEY: "${APP_KEY:-}"
     restart: unless-stopped
     env_file: .env              # CTS_TOKEN et réglages : jamais dans l'image ni dans GitHub
     environment:

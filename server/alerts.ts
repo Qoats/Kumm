@@ -42,7 +42,7 @@ function saveSoon(): void {
     saveTimer = null;
     try {
       fs.mkdirSync(STATE_DIR, { recursive: true });
-      const write = (file: string, data: unknown): void => { fs.writeFileSync(file + ".tmp", JSON.stringify(data)); fs.renameSync(file + ".tmp", file); };
+      const write = (file: string, data: unknown): void => { fs.writeFileSync(file + ".tmp", JSON.stringify(data), { mode: 0o600 }); fs.renameSync(file + ".tmp", file); };
       write(SUBS_FILE, Object.fromEntries(subs));
       write(SEEN_FILE, [...seen]);
     } catch (e) { console.warn("Alertes : état non enregistré :", e instanceof Error ? e.message : e); }

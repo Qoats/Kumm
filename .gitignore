@@ -1,10 +1,17 @@
 # Secrets : ne jamais publier
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.production.example
+!web/.env.android
 *.keystore
 *.jks
 *.pem
+*.p12
+*.pfx
+*.key
+*.apk
+*.aab
 local.properties
 google-services.json
 secrets/
@@ -14,4 +21,4 @@ apk/
 # Fichiers générés
 node_modules
 dist
-android/app/release/
+/android/

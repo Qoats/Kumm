@@ -1,171 +1,134 @@
-# Compile l'APK Android de Kumm sur les serveurs de GitHub (rien à installer sur votre PC).
-# Utilisation : onglet « Actions » du dépôt → « APK Android » → « Run workflow ».
-# Avant : indiquez l'adresse de votre serveur, soit dans le fichier web/.env.android,
-#         soit dans Settings → Secrets and variables → Actions → Variables → KUMM_API_BASE.
-# Signature (pour installer chaque version par-dessus la précédente) : secrets KUMM_KEYSTORE_B64 et KUMM_KEYSTORE_PASSWORD.
-# Alertes trafic (Firebase) : secret GOOGLE_SERVICES_JSON.
-# Mise à jour dans l'application : l'APK signé est publié sur la branche « apk », que le serveur distribue (deploy/kumm-update.sh).
+# Builds de revue et de diffusion, sans envoi vers Google Play.
 name: APK Android
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
+      profil:
+        description: "Play (APK de test + AAB) ou sideload (APK autonome)"
+        type: choice
+        options: [play, sideload]
+        default: play
       publier:
-        description: "Proposer cette version aux téléphones (mise à jour dans l'application)"
+        description: "Publier un APK sideload signé sur la branche apk"
         type: boolean
-        default: true
+        default: false
+
+permissions:
+  contents: read
 
 jobs:
   apk:
-    permissions:
-      contents: write   # publication de l'APK sur la branche « apk »
-    # Version fixée : « ubuntu-latest » passe à Ubuntu 26 depuis le 19 octobre 2026
     runs-on: ubuntu-24.04
+    env:
+      PROFILE: ${{ inputs.profil || 'play' }}
+      VITE_API_BASE: ${{ vars.KUMM_API_BASE || 'https://app.kumm.fr' }}
+      VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v6
-
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-
-      - name: Adresse du serveur
-        run: |
-          if [ -n "${{ vars.KUMM_API_BASE }}" ]; then
-            echo "VITE_API_BASE=${{ vars.KUMM_API_BASE }}" > web/.env.android
-          fi
-          # clé d'application (secret KUMM_APP_KEY, identique à APP_KEY sur le serveur) : exigée par le serveur pour l'API de l'APK
-          if [ -n "${{ secrets.KUMM_APP_KEY }}" ]; then
-            sed -i "/^VITE_APP_KEY=/d" web/.env.android
-            echo "VITE_APP_KEY=${{ secrets.KUMM_APP_KEY }}" >> web/.env.android
-          else
-            echo "::warning::Pas de secret KUMM_APP_KEY : l'API du serveur n'est protégée que par la limite de requêtes."
-          fi
-          grep -v "^VITE_APP_KEY=" web/.env.android
-          if grep -q "votre-serveur.example" web/.env.android; then
-            echo "::error::Renseignez l'adresse de votre serveur : variable KUMM_API_BASE, ou fichier web/.env.android."
-            exit 1
-          fi
-
       - run: npm ci
-
-      # Le projet Android (dossier android/) n'est pas dans le dépôt : il est créé ici à partir de capacitor.config.ts
-      # Alertes trafic (Firebase) : avec le secret GOOGLE_SERVICES_JSON (contenu du fichier google-services.json de la
-      # console Firebase), l'application reçoit les notifications push ; sans lui, l'option est indiquée comme indisponible.
+      - run: npm run check:secrets
+      - run: npm run typecheck
+      - run: npm test
       - name: Projet Android
         env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GOOGLE_SERVICES_JSON: ${{ github.event_name == 'workflow_dispatch' && secrets.GOOGLE_SERVICES_JSON || '' }}
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then export VITE_PUSH=1; echo "Firebase : configuré"; else echo "::warning::Pas de secret GOOGLE_SERVICES_JSON : alertes trafic indisponibles dans cet APK."; fi
-          npx vite build --mode android
-          if [ ! -d android ]; then npx cap add android; fi
-          # google-services.json : vérifié avant la compilation (copier-coller depuis un téléphone : guillemets typographiques,
-          # morceau manquant…) ; on accepte aussi le fichier encodé en base64. Le contenu n'est jamais affiché.
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then node -e '
-            const raw = (process.env.GOOGLE_SERVICES_JSON || "").replace(/^\uFEFF/, "").trim().replace(/^```(json)?/, "").replace(/```$/, "").trim();
-            const tries = [raw, raw.replace(/[\u201C\u201D\u00AB\u00BB]/g, "\""), (() => { try { return Buffer.from(raw, "base64").toString("utf8"); } catch { return ""; } })()];
-            let j = null;
-            for (const t of tries) { try { const v = JSON.parse(t); if (v && v.project_info) { j = v; break; } } catch {} }
-            if (!j) {
-              console.log("::error::Le secret GOOGLE_SERVICES_JSON n est pas un fichier google-services.json valide : longueur " + raw.length +
-                ", commence par " + JSON.stringify(raw.slice(0, 1)) + ", finit par " + JSON.stringify(raw.slice(-1)) +
-                ", contient project_info : " + raw.includes("project_info") + ", contient fr.kumm.app : " + raw.includes("fr.kumm.app") +
-                (raw.includes("private_key") ? " ; ATTENTION : il contient une clé privée (clé du serveur ?) : ce n est pas le bon fichier, supprimez ce secret." : ""));
-              process.exit(1);
-            }
-            const pkgs = (j.client || []).map(c => c.client_info && c.client_info.android_client_info && c.client_info.android_client_info.package_name);
-            if (!pkgs.includes("fr.kumm.app")) { console.log("::error::google-services.json ne contient pas l application fr.kumm.app (trouvé : " + pkgs.join(", ") + ")"); process.exit(1); }
-            require("fs").writeFileSync("android/app/google-services.json", JSON.stringify(j, null, 2));
-            console.log("google-services.json valide (projet " + j.project_info.project_id + ")");
-          '; fi
-          # icône et écran de démarrage Kumm (au lieu de ceux de Capacitor) ; fond vert de l'écran de démarrage (Android 12+), puis thème de l'application
-          # (MainActivity garde l'écran de démarrage jusqu'à ce que la page soit dessinée)
-          cp -r android-res/. android/app/src/main/res/
-          # modules natifs (mise à jour de l'APK, widgets de l'écran d'accueil), enregistrés dans MainActivity
-          cp android-src/*.java android/app/src/main/java/fr/kumm/app/
-          STYLES=android/app/src/main/res/values/styles.xml
-          grep -q windowSplashScreenBackground "$STYLES" || sed -i 's|<item name="android:background">@drawable/splash</item>|<item name="android:background">@drawable/splash</item>\n        <item name="windowSplashScreenBackground">#136342</item>\n        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>|' "$STYLES"
-          # position (« À proximité », « Ma position », guidage) et icône blanche des notifications dans la barre d'état
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          grep -q "ACCESS_FINE_LOCATION" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />|' "$MANIFEST"
-          # trajet suivi (TripService) : service au premier plan avec la position, notifications (Android 13+), vibration
-          grep -q "FOREGROUND_SERVICE_LOCATION" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.VIBRATE" />|' "$MANIFEST"
-          grep -q "REQUEST_INSTALL_PACKAGES" "$MANIFEST" || sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />|' "$MANIFEST"
-          # widgets de l'écran d'accueil et service du trajet suivi : déclarés juste avant </application>
-          grep -q "StopWidget" "$MANIFEST" || python3 -c 'import sys; m=open(sys.argv[1]).read(); open(sys.argv[1],"w").write(m.replace("</application>", open(sys.argv[2]).read() + "    </application>", 1))' "$MANIFEST" android-src/widgets-manifest.xml
-          grep -q "default_notification_icon" "$MANIFEST" || sed -i 's|</application>|    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_kumm" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="alertes" />\n    </application>|' "$MANIFEST"
-          npx cap sync android
-
-      # Numéro de version : versionCode croissant (numéro d'exécution du workflow), versionName = version de package.json.
-      # Android n'installe une mise à jour par-dessus l'ancienne que si la signature est la même et le versionCode plus grand.
-      - name: Numéro de version
+          node -e 'const u = new URL(process.env.VITE_API_BASE); if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) throw Error("Adresse publique HTTPS requise")'
+          if [ "$PROFILE" = sideload ]; then export VITE_SIDELOAD_UPDATES=1; fi
+          npx cap add android
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            node scripts/firebase-android.mjs
+            export VITE_PUSH=1
+          fi
+          node scripts/prepare-android.mjs "$PROFILE" "$VERSION_CODE"
+          npm run build:android
+      - name: APK de test et bundle Play
+        working-directory: android
         run: |
-          V=$(node -p "require('./package.json').version")
-          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"$V\"/" android/app/build.gradle
-          grep -E "versionCode|versionName" android/app/build.gradle
-
-      # Durcissement de l'APK de production (sans effet sur l'APK de test) :
-      # - R8 : réduit et obscurcit le code Java (noms de classes et méthodes illisibles, code mort supprimé) ; ressources inutiles retirées ;
-      # - sauvegarde Android désactivée : les données de l'application ne sortent pas du téléphone par adb backup ni par la sauvegarde cloud ;
-      # - le code web de l'application est déjà minifié par Vite, sans fichier de correspondance (sourcemap) publié.
-      # Aucun obscurcissement ne rend un APK réellement illisible : ne mettez jamais de secret dans l'application (le jeton CTS reste sur le serveur).
-      - name: Durcir l'APK
+          ./gradlew assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../kumm-test.apk
+          if [ "$PROFILE" = play ]; then
+            ./gradlew bundleRelease
+            cp app/build/outputs/bundle/release/app-release.aab ../kumm-play-unsigned.aab
+          fi
+      - name: Vérifier les fichiers générés
         run: |
-          G=android/app/build.gradle
-          sed -i "s/minifyEnabled false/minifyEnabled true/" "$G"
-          sed -i "s/minifyEnabled true/minifyEnabled true\n            shrinkResources true/" "$G"
-          grep -n -E "minifyEnabled|shrinkResources" "$G"
-          grep -q "shrinkResources true" "$G" || { echo "::error::Impossible d'activer R8 dans build.gradle"; exit 1; }
-          cat android-src/proguard-kumm.pro >> android/app/proguard-rules.pro
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          sed -i 's|android:allowBackup="true"|android:allowBackup="false"|' "$MANIFEST"
-          grep -n "allowBackup" "$MANIFEST"
-
-      # Signature : avec la clé de l'application (secrets KUMM_KEYSTORE_B64 et KUMM_KEYSTORE_PASSWORD, voir README),
-      # chaque nouvelle version s'installe par-dessus l'ancienne. Sans ces secrets : APK de test (debug), à désinstaller avant mise à jour.
-      - name: Compiler l'APK
+          python3 scripts/check-android-package.py kumm-test.apk
+          if [ "$PROFILE" = play ]; then
+            python3 scripts/check-android-package.py kumm-play-unsigned.aab
+            ANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+            "$ANALYZER" manifest permissions kumm-test.apk > "${RUNNER_TEMP}/kumm-permissions"
+            ! grep -q REQUEST_INSTALL_PACKAGES "${RUNNER_TEMP}/kumm-permissions"
+            test "$( "$ANALYZER" manifest target-sdk kumm-test.apk)" -ge 36
+          fi
+      - uses: actions/upload-artifact@v6
+        with:
+          name: kumm-android-review
+          path: |
+            kumm-test.apk
+            kumm-play-unsigned.aab
+          if-no-files-found: error
+      - name: Signer l’APK sideload pour diffusion
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.profil == 'sideload' && inputs.publier
         working-directory: android
         env:
           KS_B64: ${{ secrets.KUMM_KEYSTORE_B64 }}
           KS_PASS: ${{ secrets.KUMM_KEYSTORE_PASSWORD }}
         run: |
-          chmod +x gradlew
-          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
-            ./gradlew assembleRelease
-            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/kumm.jks"
-            BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-            "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/aligne.apk"
-            "$BT/apksigner" sign --ks "$RUNNER_TEMP/kumm.jks" --ks-type PKCS12 --ks-pass env:KS_PASS --ks-key-alias kumm --out ../kumm.apk "$RUNNER_TEMP/aligne.apk"
-            rm -f "$RUNNER_TEMP/kumm.jks"
-            "$BT/apksigner" verify --print-certs ../kumm.apk | grep -E "SHA-256|DN" | head -2
-            echo "SIGNED=1" >> "$GITHUB_ENV"
-          else
-            echo "::warning::Pas de clé de signature (secrets KUMM_KEYSTORE_B64 et KUMM_KEYSTORE_PASSWORD) : APK de test, à désinstaller avant chaque nouvelle version."
-            ./gradlew assembleDebug
-            cp app/build/outputs/apk/debug/app-debug.apk ../kumm.apk
-          fi
-
+          test -n "$KS_B64" && test -n "$KS_PASS"
+          ./gradlew assembleRelease
+          umask 077
+          trap 'rm -f "$RUNNER_TEMP/kumm.jks"' EXIT
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/kumm.jks"
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/aligne.apk"
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/kumm.jks" --ks-type PKCS12 --ks-pass env:KS_PASS --ks-key-alias kumm --out ../kumm.apk "$RUNNER_TEMP/aligne.apk"
+          "$BT/apksigner" verify ../kumm.apk
+          python3 ../scripts/check-android-package.py ../kumm.apk
       - uses: actions/upload-artifact@v6
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.profil == 'sideload' && inputs.publier
         with:
-          name: kumm-apk
+          name: kumm-apk-sideload-signe
           path: kumm.apk
+          if-no-files-found: error
 
-      # Un seul commit sur la branche « apk », remplacé à chaque version : l'historique du dépôt ne grossit pas.
-      # Seul un APK signé est publié (un APK de test ne pourrait pas s'installer par-dessus).
-      - name: Publier pour les mises à jour dans l'application
-        if: env.SIGNED == '1' && inputs.publier
+  publier:
+    needs: apk
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.profil == 'sideload' && inputs.publier
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          name: kumm-apk-sideload-signe
+          path: ${{ runner.temp }}/kumm-publication
+      - name: Publier pour les mises à jour hors Play
         env:
-          PUSH_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          VERSION_CODE: ${{ github.run_number }}
         run: |
           V=$(node -p "require('./package.json').version")
-          D="$RUNNER_TEMP/apk"; mkdir -p "$D"; cp kumm.apk "$D/"
-          printf '{"version":"%s","code":%s,"size":%s,"sha256":"%s","date":"%s"}\n' "$V" "${{ github.run_number }}" "$(stat -c%s kumm.apk)" "$(sha256sum kumm.apk | cut -d' ' -f1)" "$(date -u +%FT%TZ)" > "$D/latest.json"
-          cat "$D/latest.json"
-          cd "$D" && git init -q -b apk && git add kumm.apk latest.json
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "APK $V (version ${{ github.run_number }})"
-          git push -q -f "$PUSH_URL" apk
+          D="$RUNNER_TEMP/kumm-publication"
+          APK="$D/kumm.apk"
+          printf '{"version":"%s","code":%s,"size":%s,"sha256":"%s","date":"%s"}\n' "$V" "$VERSION_CODE" "$(stat -c%s "$APK")" "$(sha256sum "$APK" | cut -d' ' -f1)" "$(date -u +%FT%TZ)" > "$D/latest.json"
+          git worktree add --detach "$RUNNER_TEMP/kumm-apk-tree" origin/apk || {
+            git fetch origin apk
+            git worktree add --detach "$RUNNER_TEMP/kumm-apk-tree" FETCH_HEAD
+          }
+          cp "$APK" "$D/latest.json" "$RUNNER_TEMP/kumm-apk-tree/"
+          git -C "$RUNNER_TEMP/kumm-apk-tree" add kumm.apk latest.json
+          git -C "$RUNNER_TEMP/kumm-apk-tree" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "APK $V (version $VERSION_CODE)"
+          git -C "$RUNNER_TEMP/kumm-apk-tree" push origin HEAD:refs/heads/apk

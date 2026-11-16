@@ -5,21 +5,21 @@ import { fileURLToPath } from "node:url";
 
 const num = (v: string | undefined, d: number): number => { const n = Number(v); return v !== undefined && v !== "" && Number.isFinite(n) ? n : d; };
 
-export const TOKEN = process.env.CTS_TOKEN ?? "";
+export const CTS_LIVE = process.env.CTS_MODE === "live";
+export const CTS_TRAFFIC = CTS_LIVE && process.env.CTS_TRAFFIC === "1";
+export const TOKEN = CTS_LIVE ? (process.env.CTS_TOKEN ?? "").trim() : "";
 export const AUTH = "Basic " + Buffer.from(TOKEN + ":").toString("base64");
 export const BASE = process.env.CTS_BASE ?? "https://api.cts-strasbourg.eu/v1/siri/2.0";
 export const ROOT = process.env.CTS_ROOT ?? "https://api.cts-strasbourg.eu/v1";
 /** Identifiant du demandeur exigé par le protocole SIRI (n'importe quel nom court) */
 export const REQUESTOR = process.env.CTS_REQUESTOR ?? "kumm";
 export const PORT = num(process.env.PORT, 3000);
-/** Clé d'application : si définie, /api, /geo et /poi exigent l'en-tête X-App-Key (l'application l'envoie ; vide = aucune vérification). Une clé dans l'APK reste extractible : cela bloque les appels extérieurs simples, pas un attaquant déterminé. */
-export const APP_KEY = process.env.APP_KEY ?? "";
 
 /* protection et capacité */
 export const LIMIT = num(process.env.RATE_LIMIT_PER_MIN, 600);          // API, adresses, trajets, parkings… par adresse (0 = aucune limite)
 export const TILE_LIMIT = num(process.env.TILE_LIMIT_PER_MIN, 1500);    // tuiles de carte
 export const TRUST_PROXY = process.env.TRUST_PROXY === "1";             // derrière un hébergeur : lit la vraie adresse dans X-Forwarded-For
-export const ENABLE_DIAG = process.env.ENABLE_DIAG === "1";             // page /diag (jamais sur un serveur public)
+export const ENABLE_DIAG = CTS_LIVE && process.env.ENABLE_DIAG === "1";             // page /diag (jamais sur un serveur public)
 export const CACHE_MAX = num(process.env.CACHE_MAX_ENTRIES, 4000);      // réponses gardées en mémoire
 export const STALE_REALTIME_S = num(process.env.STALE_REALTIME_S, 120); // en panne, on ressert les passages « temps réel » au plus 2 min
 /** Passages de tout le réseau rechargés toutes les N secondes (la CTS indique 20 s au minimum) ; 0 = désactivé, appel arrêt par arrêt */

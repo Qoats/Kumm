@@ -18,7 +18,7 @@ export function describeError(e: unknown): string {
 
 /* Au plus UPSTREAM_PARALLEL requêtes en même temps par file ; les autres attendent leur tour.
    Deux files séparées : un calcul d'itinéraire lent ne bloque pas les passages en direct de la CTS. */
-import { CTS_BUDGET_PER_MIN, UPSTREAM_PARALLEL, UPSTREAM_QUEUE_MAX } from "./config.js";
+import { CTS_BUDGET_PER_MIN, CTS_LIVE, CTS_TRAFFIC, TOKEN, UPSTREAM_PARALLEL, UPSTREAM_QUEUE_MAX } from "./config.js";
 import { stats } from "./stats.js";
 
 export type Pool = "cts" | "ext";
@@ -51,7 +51,7 @@ export function fetchRetry(url: string, headers: Record<string, string>, pool: P
       const ctl = new AbortController();
       const to = setTimeout(() => ctl.abort(), 8000);
       try {
-        const r = await fetch(url, { headers, signal: ctl.signal });
+        const r = await fetch(url, { headers, signal: ctl.signal, redirect: pool === "cts" ? "error" : "follow" });
         if (r.status >= 500 && i === 0) { await sleep(500); continue; }
         return { status: r.status, type: r.headers.get("content-type") ?? "application/json", body: await r.text() };
       } finally {
@@ -82,6 +82,9 @@ const callTimes: number[] = [];
 export const ctsCallsLastMinute = (): number => { const lim = Date.now() - 60_000; while (callTimes.length && callTimes[0] < lim) callTimes.shift(); return callTimes.length; };
 
 export async function fetchCts(base: string, auth: string, name: string, search: string): Promise<CtsResult> {
+  if (!CTS_LIVE || !TOKEN || (name === "general-message" && !CTS_TRAFFIC)) {
+    return { status: 503, type: "application/json", body: JSON.stringify({ error: "Données CTS désactivées" }) };
+  }
   const p = ctsPaused();
   if (p.paused) throw new Error(`CTS en pause ${p.seconds} s après une erreur : ${p.why}`);
   if (CTS_BUDGET_PER_MIN > 0 && ctsCallsLastMinute() >= CTS_BUDGET_PER_MIN) {

@@ -2,7 +2,7 @@
  * Météo du centre de Strasbourg (Open-Meteo, relayée par notre serveur : aucune position n'est transmise) : température,
  * pluie maintenant et dans les 2 prochaines heures. Sert à conseiller le tram plutôt que le vélo quand il pleut.
  */
-import { appHeaders, url } from "./config";
+import { url } from "./config";
 
 export interface Weather { temp: number; code: number; rainNow: boolean; snow: boolean; /** début de la pluie prévue (ms), si elle n'a pas déjà commencé */ rainAt?: number }
 let W: Weather | null = null, at = 0, loading = false;
@@ -14,7 +14,7 @@ const SNOW = (c: number): boolean => (c >= 71 && c <= 77) || c === 85 || c === 8
 export function weather(done: () => void): Weather | null {
   if (!loading && Date.now() - at > 600_000) {
     loading = true;
-    fetch(url("/geo/weather"), { headers: appHeaders() })
+    fetch(url("/geo/weather"))
       .then(r => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
       .then((j: { current?: { temperature_2m?: number; precipitation?: number; weather_code?: number }; minutely_15?: { time?: string[]; precipitation?: number[]; precipitation_probability?: (number | null)[] } }) => {
         const c = j.current ?? {}, code = c.weather_code ?? 0, m = j.minutely_15 ?? {};

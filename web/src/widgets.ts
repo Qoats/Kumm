@@ -7,7 +7,7 @@
  */
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { PluginListenerHandle } from "@capacitor/core";
-import { API_BASE, APP_KEY } from "./config";
+import { API_BASE, CONFIG } from "./config";
 import { COLORS, TEXT_COLORS } from "./data";
 import { THEME_TOKENS } from "./themes";
 import { S, STOPS, USER, render, stopById } from "./store";
@@ -53,7 +53,7 @@ export function syncWidgets(): void {
     const favLines = [...new Set(S.fav.flatMap(id => stopById(id)?.lines ?? []))].filter(l => l !== "TER");
     const lines = S.alerts.lines.length ? S.alerts.lines : favLines;
     const data: Record<string, unknown> = {
-      base: API_BASE, key: APP_KEY, colors: COLORS, text: TEXT_COLORS, lines, theme: widgetTheme(),
+      base: CONFIG.SERVER_READY ? API_BASE : "", traffic: CONFIG.CTS_TRAFFIC, colors: COLORS, text: TEXT_COLORS, lines, theme: widgetTheme(),
       ...(S.locOn ? { pos: { lat: Math.round(USER.lat * 1e3) / 1e3, lon: Math.round(USER.lon * 1e3) / 1e3 } } : {})
     };
     const key = JSON.stringify(data);

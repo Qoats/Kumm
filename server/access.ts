@@ -2,7 +2,7 @@
  * Accès privé à l'application web (bêta sur invitation) : avec WEB_LOGIN défini, le navigateur doit se connecter
  * (identifiant + mot de passe) avant d'afficher l'application ou d'utiliser l'API.
  * - comptes : WEB_LOGIN="nom:motdepasse,autre:motdepasse" dans le .env du serveur (jamais dans le dépôt) ;
- * - l'APK Android n'a rien à saisir : ses requêtes viennent de son navigateur interne (origine https://localhost) ;
+ * - le mode privé exige la même session pour toutes les routes protégées ;
  * - session : cookie signé (HMAC), valable 30 jours ; changer le mot de passe d'un compte déconnecte ses sessions.
  * Sans WEB_LOGIN, tout reste ouvert (développement, ou publication publique).
  */
@@ -11,7 +11,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { APP_KEY, ORIGINS } from "./config.js";
 import { clientIp } from "./limit.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +26,7 @@ for (const part of (process.env.WEB_LOGIN ?? "").split(",")) {
   const i = part.indexOf(":");
   if (i > 0 && part.slice(i + 1)) accounts.set(part.slice(0, i).trim().toLowerCase(), part.slice(i + 1).trim());
 }
+if (process.env.WEB_LOGIN?.trim() && !accounts.size) throw new Error("WEB_LOGIN ne contient aucun compte valide");
 export const WEB_PRIVATE = accounts.size > 0;
 
 /** Clé de signature des sessions : gardée dans state/ pour que les sessions survivent aux mises à jour */
@@ -58,35 +58,20 @@ function cookieUser(req: IncomingMessage): string | null {
   return user;
 }
 
-/** Comparaison à temps constant : le temps de réponse ne révèle pas la clé, caractère par caractère */
-export function keyMatches(sent: unknown): boolean {
-  const a = Buffer.from(String(sent ?? "")), b = Buffer.from(APP_KEY);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
-if (WEB_PRIVATE && !APP_KEY) console.warn("Accès privé : APP_KEY n'est pas défini, l'APK est reconnu à son seul en-tête Origin (falsifiable). Définissez APP_KEY (serveur) et VITE_APP_KEY (APK).");
-
-/** Requête de l'APK Android.
- *  - API (/api, /geo, /poi) : avec APP_KEY défini, la clé X-App-Key est exigée (Origin et Referer sont falsifiables par n'importe quel client, donc jamais suffisants) ;
- *  - tuiles : un <img> ne peut pas envoyer d'en-tête, on se fie à Origin/Referer (données publiques, limitées par adresse) ;
- *  - tout le reste (pages, fichiers) : jamais sans connexion, l'APK les charge localement. */
-function fromApp(req: IncomingMessage, p: string): boolean {
-  const service = p.startsWith("/api/") || p.startsWith("/geo/") || p.startsWith("/poi/");
-  if (service && APP_KEY) return keyMatches(req.headers["x-app-key"]);
-  if (!service && !p.startsWith("/tiles/")) return false;
-  const o = req.headers.origin;
-  if (typeof o === "string" && ORIGINS.includes(o)) return true;
-  const ref = req.headers.referer;
-  if (typeof ref === "string") { try { return ORIGINS.includes(new URL(ref).origin); } catch { return false; } }
-  return false;
-}
-
 /** Ce chemin est-il accessible sans connexion ? (page de connexion, supervision, mises à jour de l'APK) */
-const OPEN = (p: string): boolean => p === "/connexion" || p === "/health" || p.startsWith("/app/") || p === "/favicon.svg" || p === "/robots.txt";
+const OPEN = (p: string): boolean => p === "/connexion" || p === "/health" || p === "/api/kumm-mode" || p === "/app/latest.json" || p === "/app/kumm.apk" || p === "/favicon.svg" || p === "/robots.txt";
 
 /** true : la requête peut continuer ; false : la réponse (page de connexion ou 401) a déjà été envoyée */
 export function allowed(req: IncomingMessage, res: ServerResponse, p: string): boolean {
-  if (!WEB_PRIVATE || OPEN(p) || fromApp(req, p) || cookieUser(req)) return true;
+  if (p === "/diag" && (!WEB_PRIVATE || !cookieUser(req))) {
+    res.writeHead(404, { "Cache-Control": "no-store" });
+    res.end();
+    return false;
+  }
+  if (!WEB_PRIVATE || OPEN(p) || cookieUser(req)) {
+    if (WEB_PRIVATE && !OPEN(p)) res.setHeader("Cache-Control", "private, no-store");
+    return true;
+  }
   const isPage = req.method === "GET" && (p === "/" || p.endsWith(".html") || !p.includes("."));
   if (isPage && !p.startsWith("/api/") && !p.startsWith("/geo/") && !p.startsWith("/poi/") && !p.startsWith("/tiles/")) {
     res.writeHead(302, { Location: "/connexion", "Cache-Control": "no-store" });

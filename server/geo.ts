@@ -1,5 +1,7 @@
 /** Relais vers les services d'adresses (BAN) et de marche à pied (OSRM, profil « foot »). */
 
+import { CTS_LIVE } from "./config.js";
+
 // Base Adresse Nationale : l'ancienne adresse api-adresse.data.gouv.fr ne répond plus, le service est sur la Géoplateforme de l'IGN
 const ADDR = process.env.GEO_ADDRESS_BASE ?? "https://data.geopf.fr/geocodage/search";
 const WALK = process.env.GEO_WALK_BASE ?? "https://routing.openstreetmap.de/routed-foot/route/v1/foot";
@@ -35,6 +37,7 @@ export function geoUpstream(url: URL): GeoUpstream | null {
     u.searchParams.set("numItineraries", "5");
     u.searchParams.set("language", "fr");
     u.searchParams.set("detailedTransfers", "false");
+    if (!CTS_LIVE) u.searchParams.set("realtimeMode", "OFF");
     if (time) u.searchParams.set("time", time);
     if (arrive) u.searchParams.set("arriveBy", "true");
     // sans escaliers : correspondances et accès aux quais par ascenseurs et rampes (profil fauteuil roulant de MOTIS)
@@ -44,26 +47,12 @@ export function geoUpstream(url: URL): GeoUpstream | null {
 /** Météo (Open-Meteo, CC BY 4.0) : température, pluie et code du temps maintenant, pluie par quart d'heure sur 2 h */
 const WEATHER = process.env.WEATHER_URL ?? "https://api.open-meteo.com/v1/forecast?latitude=48.58&longitude=7.75&current=temperature_2m,precipitation,weather_code&minutely_15=precipitation,precipitation_probability&forecast_minutely_15=8&timezone=Europe%2FParis";
 
-/** Horaires théoriques d'un arrêt CTS à une date et une heure données (Transitous : données ouvertes GTFS de la CTS) */
-const CTS_FEED = "fr-donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts_";
-const QUAY = /^[A-Z0-9]{2,12}_[0-9A-Z]{1,4}$/i;
-function stopTimes(url: URL): GeoUpstream | null {
-  const stop = url.searchParams.get("stop") ?? "", time = url.searchParams.get("time") ?? "";
-  if (!QUAY.test(stop) || !ISO_TIME.test(time)) return null;
-  const u = new URL(TRANSIT.replace(/\/plan$/, "/stoptimes"));
-  u.searchParams.set("stopId", CTS_FEED + stop);
-  u.searchParams.set("time", time);
-  u.searchParams.set("n", "80");
-  return { url: u.toString(), ttl: 3600, stale: 86400 };
-}
-
 /** Construit la requête OSRM (piéton ou vélo) à partir de coordonnées validées */
 function osrm(base: string, from: string, to: string, alternatives: boolean): string | null {
   const [fa, fo] = from.split(","), [ta, tn] = to.split(",");
   return `${base}/${fo},${fa};${tn},${ta}?overview=full&geometries=geojson&steps=true&alternatives=${alternatives}`;
 }
 
-  if (url.pathname === "/geo/stoptimes") return stopTimes(url);
   // météo du centre de Strasbourg (aucune position de l'utilisateur n'est transmise) : maintenant et les 2 prochaines heures
   if (url.pathname === "/geo/weather") return { url: WEATHER, ttl: 600, stale: 3600 };
   if (url.pathname === "/geo/walk") {

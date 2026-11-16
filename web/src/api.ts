@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import type { Departure, Poi, PoiKind, Stop } from "../../shared/types";
 import type { AnnotatedStopPoint, SiriStopMonitoring, SiriStopPoints } from "../../shared/cts-api";
-import { appHeaders, CONFIG, url } from "./config";
+import { CONFIG, url } from "./config";
 import { DIRS, isTram, kindOfStop } from "./data";
 import { isHubName, stopKey } from "./network";
 import { STRASBOURG_VILLE, TER_STATIONS } from "../../shared/ter";
@@ -27,7 +27,7 @@ let pausedUntil = 0;
 export const OFFLINE: { on: boolean; at: number } = { on: false, at: 0 };
 let offlineChanged: () => void = () => {};
 export const onOfflineChange = (fn: () => void): void => { offlineChanged = fn; };
-const PER_STOP = /^\/(stop-monitoring|trains)\?/;
+const PER_STOP = /^\/(stop-monitoring|gtfs\/departures|trains)\?/;
 function remember(path: string, data: unknown): void {
   try {
     localStorage.setItem("off:" + path, JSON.stringify({ t: Date.now(), d: data }));
@@ -71,7 +71,7 @@ async function getOnline<T>(path: string): Promise<T> {
     const ctl = new AbortController();
     const to = setTimeout(() => ctl.abort(), 9000);
     try {
-      const r = await fetch(CONFIG.CTS_BASE + path, { signal: ctl.signal, headers: appHeaders() });
+      const r = await fetch(CONFIG.CTS_BASE + path, { signal: ctl.signal });
       // version web privée : session expirée → page de connexion
       if (r.status === 401 && !Capacitor.isNativePlatform()) { location.href = "/connexion"; }
       if (r.status === 429) pausedUntil = Date.now() + Math.min(60, Number(r.headers.get("Retry-After")) || 30) * 1000;
@@ -132,7 +132,7 @@ async function fetchDepartures(stop: Stop): Promise<Departure[]> {
   }
   for (const ref of candidates) {
     try {
-      const j = await get<SiriStopMonitoring>("/stop-monitoring?MonitoringRef=" + encodeURIComponent(ref));
+      const j = await get<SiriStopMonitoring>((CONFIG.CTS_REALTIME ? "/stop-monitoring" : "/gtfs/departures") + "?MonitoringRef=" + encodeURIComponent(ref));
       answered = true;
       let n = 0;
       for (const dl of j.ServiceDelivery?.StopMonitoringDelivery ?? []) {
@@ -185,7 +185,10 @@ const caps = (t: string): number => (t.match(/\p{Lu}/gu) ?? []).length;
 
 export async function loadStops(): Promise<Stop[]> {
   // gares TER suivies par le serveur (tout le Grand Est) ; sans réponse, celles connues de l'application
-  const [j, ter] = await Promise.all([get<SiriStopPoints>("/stoppoints-discovery"),
+  const [j, ter] = await Promise.all([get<SiriStopPoints>(CONFIG.CTS_REALTIME ? "/stoppoints-discovery" : "/gtfs/stops").catch(e => {
+    if (CONFIG.CTS_REALTIME || e instanceof HttpError && e.status === 401) throw e;
+    return { StopPointsDelivery: {} } as SiriStopPoints;
+  }),
     get<{ items?: TerStation[] }>("/ter-stations").then(x => x.items?.length ? x.items : TER_STATIONS, () => TER_STATIONS)]);
   interface Group { id: string; name: string; codes: Set<string>; quays: string[]; pos: { code: string; lat: number; lon: number }[]; lat: number; lon: number; n: number; lines: Set<string> }
   const by: Record<string, Group> = {};
@@ -227,7 +230,7 @@ export const quayOf = (stop: Stop): string | undefined => [stop.id, ...(stop.ref
 export async function plannedDepartures(stop: Stop, at: number): Promise<PlannedDeparture[]> {
   const q = quayOf(stop);
   if (!q) throw new Error("Horaires prévus indisponibles pour cet arrêt");
-  const r = await fetch(url(`/geo/stoptimes?stop=${encodeURIComponent(q)}&time=${encodeURIComponent(new Date(at).toISOString())}`), { headers: appHeaders() });
+  const r = await fetch(url(`/geo/stoptimes?stop=${encodeURIComponent(q)}&time=${encodeURIComponent(new Date(at).toISOString())}`));
   if (!r.ok) throw new Error("Horaires prévus indisponibles pour le moment");
   const j = (await r.json()) as { stopTimes?: { routeShortName?: string; headsign?: string; place?: { departure?: string; scheduledDeparture?: string }; cancelled?: boolean }[] };
   return (j.stopTimes ?? []).filter(x => !x.cancelled && x.routeShortName && x.place)
@@ -307,7 +310,7 @@ export function placeOnTramQuays(stops: Stop[], modes: Record<string, string>): 
 
 /** Mode (tram, bus, TER) et nom public de chaque ligne, d'après lines-discovery */
 export async function loadLineInfo(): Promise<LineInfo> {
-  return parseLineInfo(await get<unknown>("/lines-discovery"));
+  return parseLineInfo(await get<unknown>(CONFIG.CTS_REALTIME ? "/lines-discovery" : "/gtfs/lines"));
 }
 
 /** Infos trafic en cours (incidents et travaux), déjà en texte brut */
@@ -321,7 +324,7 @@ export async function loadPois(): Promise<Poi[]> {
   const sources: { path: string; kind: PoiKind }[] = [{ path: "/poi/pr", kind: "pr" }, { path: "/poi/velhop", kind: "velhop" }];
   await Promise.all(sources.map(async s => {
     try {
-      const r = await fetch(url(s.path), { headers: appHeaders() });
+      const r = await fetch(url(s.path));
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = (await r.json()) as { items?: { id: string; name: string; lat: number; lon: number; info?: string }[] };
       for (const p of j.items ?? []) out.push({ id: p.id, kind: s.kind, name: p.name, lat: p.lat, lon: p.lon, x: 0, y: 0, info: p.info });
@@ -341,7 +344,7 @@ export function ensureForecast(id: string, done: () => void): void {
   if ((r && Date.now() - r.at < (r.failed ? 60_000 : 300_000)) || forecastLoading.has(id)) return;
   forecastLoading.add(id);
   const pr = id.startsWith("pr-");
-  fetch(url((pr ? "/poi/pr-forecast?id=" : "/poi/velhop-forecast?id=") + encodeURIComponent(id)), { headers: appHeaders() })
+  fetch(url((pr ? "/poi/pr-forecast?id=" : "/poi/velhop-forecast?id=") + encodeURIComponent(id)))
     .then(async r => {
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = (await r.json()) as { points: (BikePoint & { free: number; total: number; full: number })[] };
@@ -368,7 +371,7 @@ export function ensureReports(stop: string, done: () => void, force = false): vo
   const r = REPORTS[stop];
   if ((!force && r && Date.now() - r.at < 60_000) || reportsLoading.has(stop)) return;
   reportsLoading.add(stop);
-  fetch(url(`/api/reports?stop=${encodeURIComponent(stop)}&device=${deviceId()}`), { headers: appHeaders(), cache: "no-store" })
+  fetch(url(`/api/reports?stop=${encodeURIComponent(stop)}`), { headers: { "X-Kumm-Device": deviceId() }, cache: "no-store" })
     .then(x => (x.ok ? x.json() : Promise.reject(new Error("HTTP " + x.status))))
     .then((j: { items?: Report[] }) => { REPORTS[stop] = { at: Date.now(), items: j.items ?? [] }; })
     .catch(() => { REPORTS[stop] ??= { at: Date.now(), items: [] }; })
@@ -376,13 +379,14 @@ export function ensureReports(stop: string, done: () => void, force = false): vo
 }
 /** Nouveau signalement, ou réponse à un signalement (« toujours vrai » : yes, « c'est réglé » : no) */
 export async function sendReport(stop: string, kind: string, vote?: "yes" | "no"): Promise<string> {
-  const r = await fetch(url("/api/report"), { method: "POST", headers: { ...appHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ stop, kind, device: deviceId(), ...(vote ? { vote } : {}) }) });
+  const r = await fetch(url("/api/report"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stop, kind, device: deviceId(), ...(vote ? { vote } : {}) }) });
   const j = (await r.json().catch(() => ({}))) as { message?: string };
   if (!r.ok) throw new Error(j.message ?? "Envoi impossible");
   return j.message ?? "Merci";
 }
 
 /* ---------- données de démonstration ---------- */
+
 function seed(str: string): number {
   let h = 0;
   for (const c of str) h = (h * 31 + c.charCodeAt(0)) >>> 0;
