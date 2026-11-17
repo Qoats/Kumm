@@ -36,7 +36,7 @@ Kumm (« viens » en alsacien) est une application Android indépendante pour le
 
 **Mises à jour.** Quand une nouvelle version est publiée sur GitHub, Kumm vous la propose au démarrage : *Télécharger et installer*, *Plus tard* ou *Ignorer cette version*. Rien n'est téléchargé sans votre accord, et le fichier est vérifié (empreinte et signature) avant l'installation.
 
-Une version web existe aussi sur [app.kumm.fr](https://app.kumm.fr).
+Une version web existe aussi sur [app.kumm.fr](https://app.kumm.fr) : mêmes calculs dans le navigateur, mêmes horaires ouverts, sans compte ni serveur.
 
 ## Comment ça marche
 
@@ -60,8 +60,8 @@ Les fonctions qui exigent vraiment le temps réel (informations trafic, ponctual
 
 | Donnée | Source |
 |---|---|
-| Arrêts, lignes et horaires CTS | CTS / Eurométropole de Strasbourg, [Licence Ouverte 2.0](https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts) |
-| Gares et horaires TER | SNCF, données ouvertes |
+| Arrêts, lignes et horaires CTS | CTS / Eurométropole de Strasbourg, données ouvertes sur [transport.data.gouv.fr](https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts), [Licence Ouverte 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/) |
+| Gares et horaires TER | SNCF, données ouvertes sur [transport.data.gouv.fr](https://transport.data.gouv.fr/datasets/horaires-sncf) (ODbL) |
 | Fonds de carte, tracés des lignes, voies ferrées, cheminements | © contributeurs OpenStreetMap ([ODbL](https://www.openstreetmap.org/copyright)) |
 | Adresses | Base Adresse Nationale, via la Géoplateforme de l'IGN |
 | Parkings relais | Eurométropole de Strasbourg, open data |
@@ -79,6 +79,7 @@ npm test           # tests
 ```
 
 - Architecture Android autonome, tests et recette : [`docs/ANDROID-AUTONOME.md`](docs/ANDROID-AUTONOME.md)
+- Hébergement du site sur GitHub Pages (kumm.fr, app.kumm.fr), DNS et données ouvertes : [`docs/GITHUB-PAGES.md`](docs/GITHUB-PAGES.md)
 - Notes de développement, données et exploitation du serveur : [`docs/DEVELOPPEMENT.md`](docs/DEVELOPPEMENT.md)
 - Politique de confidentialité : [`docs/POLITIQUE-CONFIDENTIALITE.md`](docs/POLITIQUE-CONFIDENTIALITE.md)
 

@@ -1,0 +1,61 @@
+# Site web statique sur GitHub Pages (app.kumm.fr) : l'application et les horaires ouverts, sans serveur.
+# Les horaires (GTFS CTS et SNCF) sont copiés chaque jour depuis le portail officiel transport.data.gouv.fr
+# (scripts/fetch-open-data.mjs) et servis avec le site. Aucune API CTS, aucun jeton, aucun temps réel.
+#
+# Le déploiement ne se fait que si la variable de dépôt PAGES_ENABLED vaut « true » (voir docs/GITHUB-PAGES.md) :
+# tant qu'elle n'existe pas, le site actuel (VPS) n'est pas touché.
+name: Site web (GitHub Pages)
+
+on:
+  pull_request:
+    paths: [web/**, shared/**, data/**, scripts/fetch-open-data.mjs, package.json, package-lock.json, vite.config.ts, .github/workflows/pages.yml]
+  push:
+    branches: [main]
+    paths: [web/**, shared/**, data/**, scripts/fetch-open-data.mjs, package.json, package-lock.json, vite.config.ts, .github/workflows/pages.yml]
+  schedule:
+    - cron: "37 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  construction:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # Application + horaires. Échoue (et n'écrase donc pas le site en ligne) si une archive manque ou est invalide.
+      - run: npm run build:pages
+      - name: Domaine et page d'erreur
+        run: |
+          printf 'app.kumm.fr\n' > dist/pages/CNAME
+          cp dist/pages/index.html dist/pages/404.html
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          path: dist/pages
+
+  deploiement:
+    needs: construction
+    if: github.event_name != 'pull_request' && vars.PAGES_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

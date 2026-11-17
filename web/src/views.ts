@@ -1,4 +1,4 @@
-import { AUTONOMOUS, syncLabel } from "./local";
+import { AUTONOMOUS, STATIC_SITE, syncLabel } from "./local";
 import type { Place, Poi, Stop, StopDeparture } from "../../shared/types";
 import { CONTREMARQUE_TER, TER_STATIONS_EMS } from "../../shared/ter";
 import type { PlannedDeparture } from "./api";
@@ -1175,9 +1175,9 @@ export function overlaySettings(): string {
       <div class="src" style="margin-top:10px"><a href="https://kumm.fr/mentions-legales.html" target="_blank" rel="noopener">Mentions légales</a> · <a href="https://kumm.fr/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></div></div>
     <button class="ghost" data-act="replayOnb">Revoir la présentation</button>
     ${AUTONOMOUS ? `<p>Horaires théoriques · CTS / SNCF</p><p>Dernière synchronisation : ${esc(syncLabel())}</p><button class="ghost" data-act="syncGtfs">Actualiser les données horaires</button><p>Passages en temps réel, retards, avances, suppressions, perturbations et météo en direct : Bientôt disponible.</p><p>Les fonds de carte et recherches d’adresses nécessitent Internet.</p>` : ""}
-    ${CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher des mises à jour</button>` : `<a href="https://play.google.com/store/apps/details?id=fr.kumm.app" target="_blank" rel="noopener">Mises à jour Google Play</a>`}
-    <a href="https://github.com/Qoats/Kumm/releases" target="_blank" rel="noopener">Releases GitHub</a>
+    ${STATIC_SITE ? "" : CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher des mises à jour</button>` : `<a href="https://play.google.com/store/apps/details?id=fr.kumm.app" target="_blank" rel="noopener">Mises à jour Google Play</a>`}
+    <a href="https://github.com/Qoats/Kumm/releases" target="_blank" rel="noopener">${STATIC_SITE ? "Télécharger l’application Android (GitHub)" : "Releases GitHub"}</a>
     <button class="ghost" data-reset="1">Rétablir les réglages d’origine</button>
-    ${NATIVE ? "" : `<a class="ghost" href="/deconnexion" style="display:block;text-align:center;text-decoration:none;margin-top:10px">Se déconnecter</a>`}
+    ${NATIVE || STATIC_SITE ? "" : `<a class="ghost" href="/deconnexion" style="display:block;text-align:center;text-decoration:none;margin-top:10px">Se déconnecter</a>`}
   </div></main></div>`;
 }
