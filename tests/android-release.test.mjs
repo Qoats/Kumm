@@ -21,6 +21,10 @@ test("publication Android compatible, croissante et signée", () => {
   assert.throws(() => makeRelease({ ...input, badging: input.badging.replace("131", "130") }), /ne correspond pas/);
   assert.throws(() => makeRelease({ ...input, newSignature: signature("b") }), /certificat diffère/);
   assert.throws(() => makeRelease({ ...input, oldSignature: "" }), /certificat diffère/);
+  // apksigner récent : « Signer (minSdkVersion=…) » au lieu de « Signer #1 »
+  const ranged = Hex => `Signer (minSdkVersion=24, maxSdkVersion=2147483647) certificate SHA-256 digest: ${Hex.repeat(64)}`;
+  assert.equal(makeRelease({ ...input, newSignature: ranged("a") }).code, 131);
+  assert.throws(() => makeRelease({ ...input, newSignature: ranged("b") }), /certificat diffère/);
   // migration volontaire : seulement avec l’autorisation explicite, et jamais pour un APK non signé
   assert.equal(makeRelease({ ...input, newSignature: signature("b"), allowCertificateChange: true }).code, 131);
   assert.throws(() => makeRelease({ ...input, newSignature: "", allowCertificateChange: true }), /pas signé/);

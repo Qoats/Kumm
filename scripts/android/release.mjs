@@ -3,7 +3,8 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 
 function signers(report) {
-  return [...new Set([...report.matchAll(/^Signer #\d+ certificate SHA-256 digest:\s*([\da-f]{64})\s*$/gim)]
+  // apksigner écrit « Signer #1 » pour un APK v1/v2 et « Signer (minSdkVersion=24, maxSdkVersion=…) » pour un APK v3 récent
+  return [...new Set([...report.matchAll(/^Signer (?:#\d+|\([^)]*\)) certificate SHA-256 digest:\s*([\da-f]{64})\s*$/gim)]
     .map(m => m[1].toLowerCase()))].sort();
 }
 
@@ -19,6 +20,8 @@ export function makeRelease({ apk, code, previous, badging, oldSignature, newSig
     throw new Error("Le paquet ou le code Android ne correspond pas à la publication");
   }
   const oldKeys = signers(oldSignature), newKeys = signers(newSignature);
+  // Les empreintes de certificat sont publiques : elles sont affichées pour comprendre un refus.
+  console.log(`Certificat de l’APK distribué : ${oldKeys.join(",") || "aucun lu"} ; candidat : ${newKeys.join(",") || "aucun lu"}`);
   if (!newKeys.length) throw new Error("L’APK candidat n’est pas signé");
   if (!allowCertificateChange && (!oldKeys.length || oldKeys.join(",") !== newKeys.join(","))) {
     throw new Error("Le certificat diffère de celui de l’APK actuellement distribué");
