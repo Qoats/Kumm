@@ -35,6 +35,8 @@ jobs:
       - run: npm run typecheck
       # Construit l'application web et télécharge les horaires ouverts, comme le fera le dépôt de l'application.
       - run: npm run build:pages
+      # Garde-fou : une construction sans le mode statique (VITE_STATIC=1) afficherait l'ancienne interface sans horaires.
+      - run: grep -rlq "data/manifest.json" dist/pages/assets || { echo "Construction sans le mode statique"; exit 1; }
 
   presentation:
     if: github.event_name != 'pull_request' && vars.PAGES_ENABLED == 'true'

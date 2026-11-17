@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 
 const files = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" }).split("\0").filter(Boolean);
 const sensitive = /(?:^|\/)(?:\.env(?:\.[^/]*)?|.*\.(?:keystore|jks|pem|p12|pfx|key|zip|apk|aab)|local\.properties|\.envrc|\.npmrc|google-services\.json|session-key)$/i;
-const examples = new Set([".env.example", ".env.production.example", "web/.env.android"]);
+const examples = new Set([".env.example", ".env.production.example", "web/.env.android", "web/.env.pages"]);
 const textFile = /(?:^|\/)(?:Dockerfile|Caddyfile|\.env[^/]*)$|\.(?:ts|js|mjs|json|md|txt|csv|yml|yaml|html|xml|sh|properties|gradle|py)$/i;
 const direct = /^[ \t]*(?:export[ \t]+)?([A-Z0-9_]*(?:CTS_TOKEN|SNCF_TOKEN|API_KEY|APP_KEY|PASSWORD|CLIENT_SECRET))\s*=\s*["']?([^\s"'#]+)/i;
 const privateMaterial = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{60,})\b/i;
