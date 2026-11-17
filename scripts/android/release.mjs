@@ -7,7 +7,8 @@ function signers(report) {
     .map(m => m[1].toLowerCase()))].sort();
 }
 
-export function makeRelease({ apk, code, previous, badging, oldSignature, newSignature, now = new Date() }) {
+/** allowCertificateChange : migration volontaire et unique vers une nouvelle clé (les utilisateurs devront réinstaller) ; jamais par défaut */
+export function makeRelease({ apk, code, previous, badging, oldSignature, newSignature, allowCertificateChange = false, now = new Date() }) {
   const nextCode = Number(code);
   if (!Number.isSafeInteger(previous.code) || previous.code < 1 ||
       !Number.isSafeInteger(nextCode) || nextCode <= previous.code || nextCode > 2_100_000_000) {
@@ -18,8 +19,12 @@ export function makeRelease({ apk, code, previous, badging, oldSignature, newSig
     throw new Error("Le paquet ou le code Android ne correspond pas à la publication");
   }
   const oldKeys = signers(oldSignature), newKeys = signers(newSignature);
-  if (!oldKeys.length || oldKeys.join(",") !== newKeys.join(",")) {
+  if (!newKeys.length) throw new Error("L’APK candidat n’est pas signé");
+  if (!allowCertificateChange && (!oldKeys.length || oldKeys.join(",") !== newKeys.join(","))) {
     throw new Error("Le certificat diffère de celui de l’APK actuellement distribué");
+  }
+  if (allowCertificateChange && oldKeys.join(",") !== newKeys.join(",")) {
+    console.warn(`MIGRATION DE SIGNATURE : ${oldKeys.join(",") || "aucun"} -> ${newKeys.join(",")}`);
   }
   if (!apk.length) throw new Error("APK vide");
   return {
@@ -33,7 +38,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const read = name => fs.readFileSync(name, "utf8");
   const release = makeRelease({
     apk: fs.readFileSync(apk), code, previous: JSON.parse(read(previous)),
-    badging: read(badging), oldSignature: read(oldSignature), newSignature: read(newSignature)
+    badging: read(badging), oldSignature: read(oldSignature), newSignature: read(newSignature),
+    allowCertificateChange: process.env.KUMM_ALLOW_CERT_CHANGE === "1"
   });
   fs.writeFileSync(output, JSON.stringify(release) + "\n");
 }
