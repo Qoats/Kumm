@@ -14,7 +14,8 @@ Version proposée : 0.53.0. Même application Capacitor, identifiant `fr.kumm.ap
 | `/tiles/*` | Tuiles OSM directement, attribution conservée, pas de téléchargement massif |
 | `/geo/address`, `/geo/walk`, `/geo/bike` | IGN / routage OSM directement ; nécessitent Internet |
 | `/poi/pr`, `/poi/velhop` | P+R de référence existants ; informations statiques GBFS en direct puis conservées sur le téléphone |
-| `/api/vehicles`, `/trip`, `/ride`, `/messages`, `/stats`, `/reports`, alertes et prévisions de disponibilité | Écrans, commandes et ressources conservés ; « Bientôt disponible », pas d’appel au serveur ou à SIRI |
+| `/api/vehicles` | Calculé sur le téléphone (`web/src/local-vehicles.ts`, dans le worker GTFS) : positions théoriques d’après les courses GTFS CTS et TER, tracés `data/shapes.json` et `data/rail.json`, attente aux terminus ; l’interface anime ensuite chaque véhicule (accélération, croisière, freinage). Aucun horaire ajouté, aucun appel réseau |
+| `/trip`, `/ride`, `/messages`, `/stats`, `/reports`, alertes et prévisions de disponibilité | Écrans, commandes et ressources conservés ; « Bientôt disponible », pas d’appel au serveur ou à SIRI |
 | `/geo/weather` | Aucune donnée météo en direct en mode autonome |
 | `/api/widget/*` | SQLite native, utilisable quand l’application est fermée ; fonctions temps réel indisponibles |
 | `/app/latest.json`, `/app/kumm.apk`, contrôle de version obligatoire | GitHub Releases stables, manifeste et APK de la même release ; report et refus possibles |
@@ -91,3 +92,11 @@ Avant une diffusion : recette sur un appareil Android avec l’APK réellement s
 - Contrôle des secrets, syntaxe YAML du workflow, `git diff --check` et test de sécurité de l’ancien canal VPS : réussis.
 
 Aucune release n’a été créée ou publiée pendant ces essais. Aucun VPS n’a été utilisé ni déployé. La branche distante `apk` est conservée. Les validations de production sur téléphone et la parité d’accessibilité décrites ci-dessus restent à terminer ; ces résultats ne les remplacent pas.
+
+## Correctif des régressions (restauration de l’interface)
+
+- Carte : les trams, bus et trains théoriques circulent à nouveau sur leur tracé, sont suivis au toucher et rafraîchis toutes les 30 secondes ; les tracés et rails sont partagés avec le serveur (`shared/shapes-core.ts`, `shared/rail-core.ts`).
+- Accueil Android : seules les tuiles « Info trafic » et « Vélhop » sont masquées (API indisponibles). Les autres fonctions réellement temps réel (ponctualité, signalements, alertes, disponibilités, suivi de trajet) restent « Bientôt disponible ».
+- Premier lancement : la synchronisation native publie les archives dès qu’elles sont téléchargées et validées ; la copie SQLite des widgets (import lent de tous les horaires) est reconstruite ensuite en arrière-plan. Tant que les horaires ne sont pas chargés, un bandeau indique la progression ou l’erreur exacte, avec « Réessayer » (sans lui, l’application retombait silencieusement sur 66 gares TER).
+- Itinéraires sans escaliers : « Bientôt disponible » (accessibilité des correspondances non vérifiable sans données), lignes directes proposées.
+- Vérification : `node scripts/check-android-ui.mjs cts.zip sncf.zip` (avec `npx vite`) parcourt l’interface avec les archives officielles : accueil, ligne et sens, arrêt, favori après rechargement, recherche, carte et véhicules animés, suivi, itinéraire, « Bientôt disponible ».

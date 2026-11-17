@@ -263,8 +263,7 @@ export function screenHome(): string {
     ${noelTile()}
     ${placeTile("home")}${placeTile("work")}
     ${favs || `<button class="tile w tile-empty" data-act="favs"><h2>${ic("star")}Vos arrêts</h2><p>Ajoutez vos arrêts favoris : leurs prochains passages s’afficheront ici</p></button>`}
-    ${trafficTile()}
-    ${bikeTile()}
+    ${AUTONOMOUS ? "" : trafficTile() + bikeTile()}
     <div class="tile w tile-lines"><h2>${ic("tram")}Toutes les lignes</h2><div class="chips">${networkLines().map(chipAlert).join("")}</div></div>
     ${svc.map(([label, icon, to], i) => {
       // nombre impair : la dernière tuile prend toute la largeur
@@ -344,7 +343,6 @@ export function screenNearby(): string {
     <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
       <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
       ${S.follow ? followPanel(S.follow) : `<h2 class="shead"${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h2>
-      ${AUTONOMOUS && S.sheet !== 0 ? `<p class="src" style="margin:0 18px 10px">Suivi des véhicules : Bientôt disponible</p>` : ""}
       <div class="seg pills">
         <button data-f="all" class="${S.filter === "all" ? "on" : ""}">Tout</button>
         <button data-f="tram" class="${S.filter === "tram" ? "on" : ""}">${ic("tram")}Tram</button>
@@ -556,7 +554,9 @@ function tripResults(): string {
   }
   if (t.transit.status === "loading") return calculating;
   const why = t.transit.status === "error"
-    ? `Calculateur d'itinéraires injoignable (${esc(t.transit.error ?? "")}) : seules les lignes directes sont proposées.`
+    ? (AUTONOMOUS && S.prefs.stepFree
+      ? "Itinéraires sans escaliers : Bientôt disponible (l’accessibilité des correspondances n’est pas vérifiable hors ligne). Seules les lignes directes sont proposées."
+      : `Calculateur d'itinéraires injoignable (${esc(t.transit.error ?? "")}) : seules les lignes directes sont proposées.`)
     : "Aucun trajet en transports trouvé : voici les lignes directes proches.";
   return `<small class="src" style="display:block;margin-bottom:10px">${why}</small>` + (t.fallback ?? calculating);
 }

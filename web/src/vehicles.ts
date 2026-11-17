@@ -1,4 +1,4 @@
-import { AUTONOMOUS } from "./local";
+import { AUTONOMOUS, localQuery } from "./local";
 /**
  * Trams et bus en circulation : position estimée par le serveur d'après les horaires temps réel (/api/vehicles),
  * puis animée ici seconde par seconde entre l'arrêt quitté et le suivant.
@@ -45,17 +45,17 @@ export const VEHICLES = new Map<string, Vehicle>();
 /** écart entre l'horloge du serveur et celle du téléphone (ms) */
 let skew = 0;
 let lastFetch = 0, loading = false;
-const REFRESH_MS = 20_000;
+/** Positions du serveur : toutes les 20 s ; en mode autonome (calcul local sur les horaires), toutes les 30 s comme les passages */
+const REFRESH_MS = AUTONOMOUS ? 30_000 : 20_000;
 
 /** Heure « serveur » : les positions restent justes même si l'horloge du téléphone est décalée */
 export const serverNow = (): number => Date.now() + skew;
 
 /** Recharge les positions si les dernières ont plus de 20 s ; rappelle onUpdate quand elles arrivent */
 export function refreshVehicles(onUpdate: () => void): void {
-  if (AUTONOMOUS || CONFIG.USE_MOCK || !CONFIG.SERVER_READY || loading || Date.now() - lastFetch < REFRESH_MS) return;
+  if (CONFIG.USE_MOCK || !CONFIG.SERVER_READY || loading || Date.now() - lastFetch < REFRESH_MS) return;
   loading = true;
-  fetch(url("/api/vehicles"))
-    .then(r => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
+  (AUTONOMOUS ? localQuery<{ now: number; vehicles?: Vehicle[] }>("/api/vehicles") : fetch(url("/api/vehicles")).then(r => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))))
     .then((j: { now: number; vehicles?: Vehicle[] }) => {
       skew = j.now - Date.now();
       keepContinuity(new Map(VEHICLES), j.vehicles ?? [], serverNow());

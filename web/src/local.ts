@@ -4,12 +4,18 @@ type Source = "cts" | "ter";
 interface Status { checked: number; revision: string; etag?: string; modified?: string; error?: string; expired?: boolean; validUntil?: string }
 const Gtfs = registerPlugin<{ sync(o: { manual: boolean }): Promise<Record<Source, Status>>; read(o: { source: Source }): Promise<{ data: string }> }>("KummGtfs");
 export let LOCAL_STATUS: Partial<Record<Source, Status>> = {};
+/** État visible du chargement des horaires : l'écran affiche un bandeau tant que la liste d'arrêts est vide */
+export const LOCAL_STATE: { phase: "idle" | "loading" | "error"; error?: string; since: number } = { phase: "idle", since: 0 };
+function setState(phase: "idle" | "loading" | "error", error?: string): void {
+  LOCAL_STATE.phase = phase; LOCAL_STATE.error = error; LOCAL_STATE.since = Date.now();
+  window.dispatchEvent(new Event("kumm:gtfs-state"));
+}
 let worker: Worker | undefined, seq = 0;
 const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
 function rpc<T>(data: object): Promise<T> {
   worker ??= new Worker(new URL("./local-worker.ts", import.meta.url), { type: "module" });
   worker.onmessage = e => { const p = pending.get(e.data.id); if (!p) return; pending.delete(e.data.id); e.data.error ? p.reject(Error(e.data.error)) : p.resolve(e.data.result); };
-  worker.onerror = () => { for (const p of pending.values()) p.reject(Error("Lecture GTFS interrompue")); pending.clear(); worker?.terminate(); worker = undefined; };
+  worker.onerror = () => { setState("error", "Lecture des horaires interrompue (mémoire du téléphone ?)"); for (const p of pending.values()) p.reject(Error("Lecture GTFS interrompue")); pending.clear(); worker?.terminate(); worker = undefined; };
   return new Promise((resolve, reject) => { const id = ++seq; pending.set(id, { resolve, reject }); worker!.postMessage({ id, ...data }); });
 }
 export const localQuery = <T>(path: string): Promise<T> => rpc<T>({ method: "query", path });
@@ -24,6 +30,7 @@ export function syncLocal(manual = true): Promise<void> {
   if (syncing) return syncing;
   if (Date.now() < retryAt) return Promise.reject(Error("Nouvel essai dans une minute"));
   return syncing = (async () => {
+    setState("loading");
     LOCAL_STATUS = await rpc({ method: "status" });
     const errors: string[] = [];
     let changed = false;
@@ -43,8 +50,10 @@ export function syncLocal(manual = true): Promise<void> {
     LOCAL_STATUS = await rpc({ method: "status" });
     if (changed) window.dispatchEvent(new Event("kumm:gtfs"));
     if (errors.length) { retryAt = Date.now() + 60_000; throw Error(errors.join(" · ")); }
+    setState("idle");
 
-  })().finally(() => { syncing = undefined; });
+  })().catch(e => { setState(Object.keys(LOCAL_STATUS).length ? "idle" : "error", String(e instanceof Error ? e.message : e)); throw e; })
+    .finally(() => { syncing = undefined; });
 }
 export function syncLabel(): string {
   return (["cts", "ter"] as Source[]).map(s => {

@@ -1,6 +1,8 @@
 /** GTFS parsing and queries stay off the UI thread. No network access in this worker. */
 import { planLocal } from "./local-planner";
 import { createSchedule } from "./local-schedule";
+import { buildChains, vehiclesAt } from "./local-vehicles";
+import type { LocalCourse } from "./local-vehicles";
 const feeds = { cts: createSchedule(), ter: createSchedule(true) };
 type Source = keyof typeof feeds;
 interface Saved { bytes: Uint8Array; checked: number; etag?: string; modified?: string; revision: string }
@@ -23,6 +25,7 @@ async function stored(source: Source, value?: Saved): Promise<Saved | undefined>
 const ready = Promise.all((Object.keys(feeds) as Source[]).map(async s => {
   const v = await stored(s); if (v) { try { await feeds[s].load(v.bytes); state[s] = v; } catch (e) { console.warn("Archive locale illisible", s, e); } }
 }));
+const chainCache = new WeakMap<object, Map<string, LocalCourse>>();
 const uic = (id: string): string => id.match(/\d{8}/)?.[0] ?? id;
 async function request(path: string): Promise<unknown> {
   const u = new URL(path, "https://localhost"), p = u.pathname.replace(/^\/api/, ""), q = u.searchParams;
@@ -36,6 +39,16 @@ async function request(path: string): Promise<unknown> {
     const courses = [...(a?.courses ?? []), ...(b?.courses ?? [])];
     const positions = new Map([...(a?.stopPos ?? []), ...(b?.stopPos ?? [])]);
     return planLocal(courses, positions, point(q.get("from")), point(q.get("to")), time, arrive);
+  }
+  if (p === "/vehicles") {
+    // Positions théoriques calculées sur le téléphone : CTS (avec la fin des courses récentes, pour l'attente au terminus) et TER.
+    const now = Date.now();
+    const a = c.scheduledCourses(now, 2 * 3600_000, 40 * 60_000), b = t.scheduledCourses(now, 30 * 60_000);
+    const courses = [...(a?.courses ?? []), ...(b?.courses ?? []).map(x => ({ ...x, line: "TER", mode: "ter" }))] as LocalCourse[];
+    let chains = chainCache.get(a?.courses ?? []);
+    if (!chains) { chains = buildChains((a?.courses ?? []) as LocalCourse[]); chainCache.set(a?.courses ?? [], chains); }
+    const positions = new Map([...(a?.stopPos ?? []), ...(b?.stopPos ?? [])]);
+    return { now, at: null, vehicles: vehiclesAt(now, courses, positions, chains) };
   }
   if (p === "/gtfs/stops") return c.scheduledStops();
   if (p === "/gtfs/lines") return c.scheduledLines();

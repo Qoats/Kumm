@@ -14,7 +14,10 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipFile;
 
 /** Official schedule archives in private app storage. No Kumm server or SIRI API. */
@@ -27,6 +30,9 @@ public class KummGtfs extends Plugin {
         "https://eu.ftp.opendatasoft.com/sncf/plandata/Export_OpenData_SNCF_GTFS_NewTripId.zip"
     };
     private static final long DAY = 86400000L;
+    /** Sources whose widget database is still to be rebuilt: done in the background so the app gets its archives at once. */
+    private static final Set<String> PENDING = ConcurrentHashMap.newKeySet();
+    private static final AtomicBoolean PREPARING = new AtomicBoolean();
     private static SharedPreferences prefs(Context c) { return c.getSharedPreferences("official-gtfs", Context.MODE_PRIVATE); }
     private static File directory(Context c) throws IOException {
         File d = new File(c.getFilesDir(), "gtfs");
@@ -42,7 +48,7 @@ public class KummGtfs extends Plugin {
     @Override public void load() { schedule(getContext()); }
     @PluginMethod public void sync(PluginCall call) {
         new Thread(() -> {
-            try { call.resolve(synchronize(getContext(), Boolean.TRUE.equals(call.getBoolean("manual", false)))); }
+            try { call.resolve(synchronize(getContext(), Boolean.TRUE.equals(call.getBoolean("manual", false)), true)); }
             catch (Exception e) { call.reject(e.getMessage()); }
         }, "kumm-gtfs").start();
     }
@@ -65,16 +71,19 @@ public class KummGtfs extends Plugin {
             }
         }, "kumm-gtfs-read").start();
     }
-    static JSObject synchronize(Context c, boolean manual) throws Exception {
+    static JSObject synchronize(Context c, boolean manual) throws Exception { return synchronize(c, manual, false); }
+    /** deferWidgets: the SQLite copy for widgets (slow import of every stop time) is rebuilt after the archives are published. */
+    static JSObject synchronize(Context c, boolean manual, boolean deferWidgets) throws Exception {
+        JSObject result;
         synchronized (LOCK) {
-            JSObject result = new JSObject();
+            result = new JSObject();
             for (int i = 0; i < SOURCES.length; i++) {
                 if (Thread.currentThread().isInterrupted()) throw new IOException("Synchronisation interrompue");
                 String s = SOURCES[i]; SharedPreferences p = prefs(c);
                 long now = System.currentTimeMillis(), checked = p.getLong(s + ".checked", 0);
                 String error = now < p.getLong(s + ".retry", 0) ? "Nouvel essai après la limite du fournisseur" : "";
                 if ((manual || now - checked >= DAY) && now >= p.getLong(s + ".retry", 0)) {
-                    try { download(c, s, URLS[i]); }
+                    try { download(c, s, URLS[i], deferWidgets); }
                     catch (Exception e) {
                         error = e.getMessage();
                         p.edit().putLong(s + ".retry", Math.max(p.getLong(s + ".retry", 0), now + 60000)).commit();
@@ -88,10 +97,41 @@ public class KummGtfs extends Plugin {
                 status.put("error", error);
                 result.put(s, status);
             }
-            return result;
         }
+        if (deferWidgets) {
+            // widget database out of date (never built, or the process stopped before the end): rebuild it in the background
+            SharedPreferences p = prefs(c);
+            for (String s : SOURCES) { String r = p.getString(s + ".revision", ""); if (!r.isEmpty() && !r.equals(p.getString(s + ".dbrevision", ""))) PENDING.add(s); }
+            if (!PENDING.isEmpty()) prepareWidgetsInBackground(c);
+        }
+        return result;
     }
-    private static void download(Context c, String source, String address) throws Exception {
+    private static void download(Context c, String source, String address) throws Exception { download(c, source, address, false); }
+    private static void prepareWidgetsInBackground(Context c) {
+        if (!PREPARING.compareAndSet(false, true)) return;
+        Context app = c.getApplicationContext();
+        new Thread(() -> {
+            try {
+                while (!PENDING.isEmpty()) {
+                    for (String source : SOURCES) {
+                        if (!PENDING.remove(source)) continue;
+                        try {
+                            SharedPreferences p = prefs(app);
+                            String revision = p.getString(source + ".revision", "");
+                            File zip = new File(directory(app), source + "-" + revision + ".zip");
+                            if (revision.isEmpty() || !zip.isFile()) continue;
+                            String database = "timetable-" + UUID.randomUUID() + ".db";
+                            LocalTimetable.prepare(app, source, zip, database);
+                            p.edit().putString("database", database).putString(source + ".dbrevision", revision).commit();
+                            File[] databases = app.getDatabasePath(database).getParentFile().listFiles();
+                            if (databases != null) for (File file : databases) if (file.getName().startsWith("timetable-") && file.getName().endsWith(".db") && !file.getName().startsWith(database)) file.delete();
+                        } catch (Exception ignored) { /* Widgets keep their previous data; the app itself reads the archives. */ }
+                    }
+                }
+            } finally { PREPARING.set(false); }
+        }, "kumm-gtfs-widgets").start();
+    }
+    private static void download(Context c, String source, String address, boolean deferWidgets) throws Exception {
         SharedPreferences p = prefs(c);
         HttpURLConnection h = (HttpURLConnection) new URL(address).openConnection();
         h.setConnectTimeout(15000); h.setReadTimeout(120000);
@@ -139,15 +179,20 @@ public class KummGtfs extends Plugin {
             if (Thread.currentThread().isInterrupted()) throw new IOException("Synchronisation interrompue");
             String revision = UUID.randomUUID().toString();
             String database = "timetable-" + revision + ".db";
-            LocalTimetable.prepare(c, source, candidate, database);
+            if (!deferWidgets) LocalTimetable.prepare(c, source, candidate, database);
             File next = new File(directory(c), source + "-" + revision + ".zip");
             if (!candidate.renameTo(next)) throw new IOException("Écriture GTFS impossible");
             if (Thread.currentThread().isInterrupted()) throw new IOException("Synchronisation interrompue");
-            if (!p.edit().putString("database", database).putString(source + ".revision", revision).putLong(source + ".checked", System.currentTimeMillis())
+            if (deferWidgets) PENDING.add(source);
+            android.content.SharedPreferences.Editor published = p.edit();
+            if (!deferWidgets) published.putString("database", database);
+            if (!published.putString(source + ".revision", revision).putLong(source + ".checked", System.currentTimeMillis())
                 .putString(source + ".etag", h.getHeaderField("ETag")).putString(source + ".modified", h.getHeaderField("Last-Modified"))
                 .putLong(source + ".retry", 0).commit()) throw new IOException("Écriture des métadonnées impossible");
-            File[] databases = c.getDatabasePath(database).getParentFile().listFiles();
-            if (databases != null) for (File file : databases) if (file.getName().startsWith("timetable-") && file.getName().endsWith(".db") && !file.getName().equals(database)) file.delete();
+            if (!deferWidgets) {
+                File[] databases = c.getDatabasePath(database).getParentFile().listFiles();
+                if (databases != null) for (File file : databases) if (file.getName().startsWith("timetable-") && file.getName().endsWith(".db") && !file.getName().equals(database)) file.delete();
+            }
             File[] oldFiles = directory(c).listFiles();
             if (oldFiles != null) for (File f : oldFiles) if (f.getName().startsWith(source + "-") && !f.equals(next)) f.delete();
         } finally { candidate.delete(); h.disconnect(); }
