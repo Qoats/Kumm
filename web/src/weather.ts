@@ -1,3 +1,4 @@
+import { AUTONOMOUS } from "./local";
 /**
  * Météo du centre de Strasbourg (Open-Meteo, relayée par notre serveur : aucune position n'est transmise) : température,
  * pluie maintenant et dans les 2 prochaines heures. Sert à conseiller le tram plutôt que le vélo quand il pleut.
@@ -12,6 +13,7 @@ const SNOW = (c: number): boolean => (c >= 71 && c <= 77) || c === 85 || c === 8
 
 /** Dernière météo connue (null au début) ; la recharge si elle date de plus de 10 min, puis rappelle done */
 export function weather(done: () => void): Weather | null {
+  if (AUTONOMOUS) return null;
   if (!loading && Date.now() - at > 600_000) {
     loading = true;
     fetch(url("/geo/weather"))

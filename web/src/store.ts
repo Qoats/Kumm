@@ -8,8 +8,7 @@ import type { AlertPrefs } from "./alerts";
 import type { Prefs } from "./themes";
 import type { Journey } from "./journey";
 import type { Layer } from "./kinds";
-import { CONFIG } from "./config";
-import { CENTER, KX, KY, MOCK_POIS, MOCK_STOPS } from "./data";
+import { CENTER, KX, KY } from "./data";
 
 export type Tab = "home" | "search" | "lines" | "nearby" | "trips";
 export type Filter = "all" | "bus" | "tram" | "ter";
@@ -96,8 +95,8 @@ export interface UpdatePage {
   err?: string;
 }
 
-export const STOPS: Stop[] = CONFIG.USE_MOCK ? [...MOCK_STOPS] : [];
-export const POIS: Poi[] = CONFIG.USE_MOCK ? [...MOCK_POIS] : [];
+export const STOPS: Stop[] = [];
+export const POIS: Poi[] = [];
 export const USER = { ...CENTER };
 
 /** Place un arrêt sur la carte schématique, centrée sur la position de l'utilisateur */

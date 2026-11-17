@@ -87,6 +87,7 @@ public class TripService extends Service implements LocationListener {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (!KummFeatures.REALTIME) { stopForeground(true); stopSelf(); return START_NOT_STICKY; }
         if (intent != null && ACTION_STOP.equals(intent.getAction())) { finish(null); return START_NOT_STICKY; }
         if (intent == null || !intent.hasExtra(EXTRA_TRIP)) { stopSelf(); return START_NOT_STICKY; }
         try { load(new JSONObject(intent.getStringExtra(EXTRA_TRIP))); }

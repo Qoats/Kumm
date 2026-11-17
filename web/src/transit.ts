@@ -1,3 +1,4 @@
+import { AUTONOMOUS, localQuery } from "./local";
 import type { MotisItinerary, MotisLeg, MotisPlan } from "../../shared/geo-api";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
@@ -113,7 +114,9 @@ export interface TripTime { at: number; arrive: boolean }
 export async function fetchTransit(from: LL, to: LL, when?: TripTime): Promise<Journey[]> {
   const t = when ? `&time=${encodeURIComponent(new Date(when.at).toISOString())}${when.arrive ? "&arrive=1" : ""}` : "";
   const sf = S.prefs.stepFree ? "&stepfree=1" : "";
-  const r = await fetch(url(`/geo/transit?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}${t}${sf}`));
+  const path = `/geo/transit?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}${t}${sf}`;
+  if (AUTONOMOUS) return parseJourneys(await localQuery(path));
+  const r = await fetch(url(path));
   if (!r.ok) {
     const detail = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 140);
     throw new Error(`erreur ${r.status}${detail ? " : " + detail : ""}`);

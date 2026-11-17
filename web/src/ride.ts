@@ -1,3 +1,4 @@
+import { AUTONOMOUS } from "./local";
 /**
  * « Êtes-vous dans le C6 ? » : quand l'application est ouverte et que la position est autorisée, Kumm compare la position
  * du téléphone à celle des trams et bus en circulation. Si la personne se déplace avec le même véhicule pendant au moins
@@ -127,6 +128,7 @@ function share(here: { lat: number; lon: number; t: number }, speed: number | nu
   if (Date.now() - s.started > MAX_SHARE) return stopSharing("Partage du trajet terminé (1 h)");
   if (Date.now() - s.lastSent < SEND_EVERY) return;
   s.lastSent = Date.now();
+  if (AUTONOMOUS) return;
   fetch(url("/api/ride"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ trip: s.id, lat: here.lat, lon: here.lon, ...(speed !== null && speed >= 0 ? { speed } : {}) })

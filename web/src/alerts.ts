@@ -1,3 +1,4 @@
+import { AUTONOMOUS } from "./local";
 /**
  * Alertes trafic : notification pour chaque nouvelle perturbation sur les lignes suivies.
  * - Application Android : notifications push (Firebase). Le téléphone s'enregistre auprès de Firebase, puis envoie
@@ -41,6 +42,7 @@ const pushModule = () => import("@capacitor/push-notifications");
 
 /** Demande l'autorisation d'afficher des notifications ; true si accordée */
 export async function askPermission(): Promise<boolean> {
+  if (AUTONOMOUS) return false;
   try {
     if (NATIVE) {
       if (!PUSH_READY) return false;
@@ -78,8 +80,9 @@ async function sendSubscription(body: Record<string, unknown>): Promise<void> {
 
 /** Applique les réglages : abonnement au serveur (application) ; seen : messages en cours à ne pas annoncer (web) */
 export async function syncAlerts(p: AlertPrefs, seen?: string[]): Promise<void> {
+  if (AUTONOMOUS) throw Error("Bientôt disponible");
   if (seen) { try { localStorage.setItem(SEEN, JSON.stringify(seen)); } catch { /* ignoré */ } }
-  if (!NATIVE || !PUSH_READY) return;
+  if (AUTONOMOUS || !NATIVE || !PUSH_READY) return;
   if (p.enabled) await sendSubscription({ token: await pushToken(), enabled: true, works: p.works, lines: p.lines });
   else {
     const saved = localStorage.getItem(TOKEN_KEY);
@@ -106,7 +109,7 @@ export function checkAlerts(p: AlertPrefs, messages: TrafficMsg[]): void {
 
 /** Notification touchée (application fermée ou ouverte) : ouvrir les infos trafic */
 export function onAlertTap(open: () => void): void {
-  if (!NATIVE || !PUSH_READY) return;
+  if (AUTONOMOUS || !NATIVE || !PUSH_READY) return;
   // alerte avant un passage (data.arrival) : l'application s'ouvre simplement, sans aller aux infos trafic
   void pushModule().then(m => m.PushNotifications.addListener("pushNotificationActionPerformed", a => { if (!a.notification.data?.arrival) open(); })).catch(() => {});
 }
@@ -134,6 +137,7 @@ function saveArrivals(list: ArrivalAlert[]): void {
  * application fermée. Version web : notification du navigateur à l'heure prévue, tant que la page reste ouverte.
  */
 export async function addArrival(a: ArrivalAlert, onWebFire: (a: ArrivalAlert) => void): Promise<void> {
+  if (AUTONOMOUS) throw Error("Bientôt disponible");
   if (!(await askPermission())) throw new Error("Notifications refusées : autorisez-les pour Kumm dans les réglages du téléphone");
   if (NATIVE) {
     if (!PUSH_READY) throw new Error("Notifications indisponibles dans cette version de l'application");
@@ -154,6 +158,7 @@ export async function addArrival(a: ArrivalAlert, onWebFire: (a: ArrivalAlert) =
 }
 
 export async function removeArrival(a: ArrivalAlert): Promise<void> {
+  if (AUTONOMOUS) return;
   if (NATIVE) {
     const saved = localStorage.getItem(TOKEN_KEY);
     if (!PUSH_READY || !saved) throw new Error("Notifications indisponibles");
