@@ -16,13 +16,17 @@ interface Updater {
 // objet de l'extension : utilisé directement, jamais renvoyé par une fonction async (il répond aussi à « then »)
 const Updater = registerPlugin<Updater>("KummUpdater");
 
-export const CAN_UPDATE = import.meta.env["VITE_SIDELOAD_UPDATES"] === "1" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android" && Capacitor.isPluginAvailable("KummUpdater");
+const ANDROID = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+/** Version Google Play : aucune installation depuis l'application, seulement un renvoi vers la fiche du Play Store */
+export const PLAY_UPDATES = import.meta.env["VITE_PLAY_UPDATES"] === "1" && ANDROID;
+export const PLAY_URL = "https://play.google.com/store/apps/details?id=fr.kumm.app";
+export const CAN_UPDATE = PLAY_UPDATES || (import.meta.env["VITE_SIDELOAD_UPDATES"] === "1" && ANDROID && Capacitor.isPluginAvailable("KummUpdater"));
 
 /** Version plus récente que celle installée, null si à jour ; « unpublished » : le serveur n'a encore aucun APK à distribuer */
 export async function checkUpdate(manual = false): Promise<Release | null | "unpublished"> {
   if (!CAN_UPDATE) return null;
   if (!manual && Date.now() - Number(localStorage.getItem("release-checked") ?? 0) < 86400000) return null;
-  if ((await Updater.source()).play) { if (manual) throw Error("Utilisez Google Play pour mettre Kumm à jour"); return null; }
+  if (!PLAY_UPDATES && (await Updater.source()).play) { if (manual) throw Error("Utilisez Google Play pour mettre Kumm à jour"); return null; }
   const info = await App.getInfo();
   const r = await CapacitorHttp.get({ url: "https://api.github.com/repos/Qoats/Kumm/releases/latest", headers: { Accept: "application/vnd.github+json" }, connectTimeout: 10000, readTimeout: 15000 });
   if (r.status === 404) { localStorage.setItem("release-checked", String(Date.now())); return "unpublished"; }
@@ -30,13 +34,13 @@ export async function checkUpdate(manual = false): Promise<Release | null | "unp
   const release = r.data as { draft?: boolean; prerelease?: boolean; assets?: { name: string; browser_download_url: string }[] };
   if (release.draft || release.prerelease) return null;
   const asset = (name: string) => release.assets?.find(a => a.name === name)?.browser_download_url;
-  const manifest = asset("latest.json"), apkUrl = asset("kumm.apk");
+  const manifest = asset("latest.json"), apkUrl = PLAY_UPDATES ? "" : asset("kumm.apk") ?? "";
   const official = (v: string | undefined): v is string => !!v && /^https:\/\/github\.com\/Qoats\/Kumm\/releases\/download\/[^/]+\/(latest\.json|kumm\.apk)$/.test(v);
-  if (!official(manifest) || !official(apkUrl)) return "unpublished";
+  if (!official(manifest) || (!PLAY_UPDATES && !official(apkUrl))) return "unpublished";
   const m = await CapacitorHttp.get({ url: manifest, connectTimeout: 10000, readTimeout: 15000 });
   if (m.status !== 200) throw Error("Manifeste GitHub indisponible");
   const j = (typeof m.data === "string" ? JSON.parse(m.data) : m.data) as Release;
-  if (typeof j.version !== "string" || !Number.isSafeInteger(j.code) || j.code < 1 || j.code > 2_100_000_000 || !/^[0-9a-f]{64}$/.test(j.sha256) || !Number.isSafeInteger(j.size) || j.size <= 0) throw Error("Manifeste invalide");
+  if (typeof j.version !== "string" || !Number.isSafeInteger(j.code) || j.code < 1 || j.code > 2_100_000_000 || (!PLAY_UPDATES && (!/^[0-9a-f]{64}$/.test(j.sha256) || !Number.isSafeInteger(j.size) || j.size <= 0))) throw Error("Manifeste invalide");
   localStorage.setItem("release-checked", String(Date.now()));
   return j.code > Number(info.build) ? { ...j, apkUrl } : null;
 }
@@ -62,10 +66,12 @@ export function updateView(p: { rel: Release | null; phase: "ready" | "down" | "
   const web = !Capacitor.isNativePlatform();
   const title = p.rel ? "Mise à jour disponible" : "Mises à jour";
   const text = p.rel
-    ? `La version ${escText(p.rel.version)} de Kumm est disponible. Vous pouvez l’installer maintenant ou continuer avec votre version actuelle.`
+    ? PLAY_UPDATES
+      ? `La version ${escText(p.rel.version)} de Kumm est disponible sur Google Play. Vous pouvez la mettre à jour maintenant ou continuer avec votre version actuelle.`
+      : `La version ${escText(p.rel.version)} de Kumm est disponible. Vous pouvez l’installer maintenant ou continuer avec votre version actuelle.`
     : web
       ? "Une nouvelle version de Kumm est en ligne. Rechargez la page pour l’utiliser."
-      : "Consultez les dernières versions de Kumm sur GitHub.";
+      : PLAY_UPDATES ? "Consultez la fiche de Kumm sur Google Play." : "Consultez les dernières versions de Kumm sur GitHub.";
   let status = "", actions = "";
   if (p.phase === "down") {
     status = `<div class="upd-bar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p.pct}%"></i></div>
@@ -77,7 +83,9 @@ export function updateView(p: { rel: Release | null; phase: "ready" | "down" | "
     const label = p.phase === "error" ? "Réessayer" : p.phase === "launched" ? "Relancer l’installation" : "Télécharger et installer";
     actions = web
       ? `<button class="onb-main" data-upd="reload">Recharger</button>`
-      : `${p.rel ? `<button class="onb-main" data-upd="go">${label}</button>` : ""}<button class="onb-sec" data-upd="later">Plus tard</button><button class="onb-sec" data-upd="ignore">Ignorer cette version</button>
+      : PLAY_UPDATES
+        ? `<button class="onb-main" data-upd="play">Ouvrir Google Play</button><button class="onb-sec" data-upd="later">Plus tard</button><button class="onb-sec" data-upd="ignore">Ignorer cette version</button>`
+        : `${p.rel ? `<button class="onb-main" data-upd="go">${label}</button>` : ""}<button class="onb-sec" data-upd="later">Plus tard</button><button class="onb-sec" data-upd="ignore">Ignorer cette version</button>
         ${p.phase === "launched" || p.phase === "error" ? `<a class="upd-alt" href="https://github.com/Qoats/Kumm/releases" target="_blank" rel="noopener">Télécharger l’APK avec le navigateur</a>` : ""}`;
   }
   return `<div class="onb upd" role="dialog" aria-modal="true" aria-label="${title}">
@@ -86,7 +94,7 @@ export function updateView(p: { rel: Release | null; phase: "ready" | "down" | "
       <div class="onb-logo">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>'}</div>
       <h1>${title}</h1>
       <p>${text}</p>
-      <div class="upd-ver"><span>Version installée <b>${escText(current)}</b></span>${p.rel ? `<span>Nouvelle version <b>${escText(p.rel.version)}</b> · ${mo(p.rel.size)}</span>` : ""}</div>
+      <div class="upd-ver"><span>Version installée <b>${escText(current)}</b></span>${p.rel ? `<span>Nouvelle version <b>${escText(p.rel.version)}</b>${p.rel.size > 0 ? ` · ${mo(p.rel.size)}` : ""}</span>` : ""}</div>
       ${status}
     </div>
     <div class="onb-actions">${actions}</div></div>`;

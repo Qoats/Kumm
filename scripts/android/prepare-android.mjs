@@ -28,9 +28,8 @@ write(app + "/src/main/res/values/styles.xml", text => text.includes("windowSpla
 
 write(app + "/src/main/AndroidManifest.xml", text => {
   const permissions = [
-    "RECEIVE_BOOT_COMPLETED", "ACCESS_NETWORK_STATE", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "FOREGROUND_SERVICE",
-    "FOREGROUND_SERVICE_LOCATION", "FOREGROUND_SERVICE_DATA_SYNC", "POST_NOTIFICATIONS", "VIBRATE",
-    ...(sideload ? ["REQUEST_INSTALL_PACKAGES"] : [])
+    "RECEIVE_BOOT_COMPLETED", "ACCESS_NETWORK_STATE", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "VIBRATE",
+    ...(sideload ? ["FOREGROUND_SERVICE", "FOREGROUND_SERVICE_LOCATION", "FOREGROUND_SERVICE_DATA_SYNC", "POST_NOTIFICATIONS", "REQUEST_INSTALL_PACKAGES"] : [])
   ];
   for (const permission of permissions) {
     if (!text.includes(`android.permission.${permission}"`)) {
@@ -39,7 +38,16 @@ write(app + "/src/main/AndroidManifest.xml", text => {
   }
   if (!sideload) text = text.replace(/^[\t ]*<uses-permission android:name="android\.permission\.REQUEST_INSTALL_PACKAGES"\s*\/>\r?\n/gm, "");
   if (!text.includes(".GtfsJob")) text = text.replace("</application>", '<service android:name=".GtfsJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />\n    </application>');
-  if (!text.includes("StopWidget")) text = text.replace("</application>", read("android-src/widgets-manifest.xml") + "    </application>");
+  if (!text.includes("StopWidget")) {
+    let widgets = read("android-src/widgets-manifest.xml");
+    if (!sideload) {
+      // Play : pas de widgets « trafic » ni « Vélhop » (données temps réel indisponibles) ni de service de suivi
+      widgets = widgets.replace(/<receiver android:name="\.(?:TrafficWidget|BikeWidget)"[\s\S]*?<\/receiver>\s*/g, "")
+        .replace(/<!-- alertes de descente[^>]*-->\s*<service android:name="\.TripService"[^>]*\/>\s*/, "");
+      if (/TripService|TrafficWidget|BikeWidget/.test(widgets.replace(/<!--[\s\S]*?-->/g, ""))) throw new Error("Profil play : composants à retirer encore présents");
+    }
+    text = text.replace("</application>", widgets + "    </application>");
+  }
   if (!text.includes("default_notification_icon")) {
     text = text.replace("</application>", '    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_kumm" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="alertes" />\n    </application>');
   }
