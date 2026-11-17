@@ -68,7 +68,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
     case "features":
       body = `<h1>Ce que vous pouvez faire</h1>
         ${AUTONOMOUS ? row(ic("clock"), "Horaires théoriques", "Les prochains départs officiels, conservés sur le téléphone et recalculés toutes les 30 secondes.") : ""}${row(ic("clock"), "Passages en direct", AUTONOMOUS ? "Bientôt disponible" : "Les prochains départs à chaque arrêt, en temps réel.")}
-        ${row(ic("pin"), "Carte", AUTONOMOUS ? "Les arrêts autour de vous. Suivi des véhicules : Bientôt disponible." : "Les arrêts autour de vous et les trams et bus en circulation.")}
+        ${row(ic("pin"), "Carte", "Les arrêts autour de vous et les trams et bus en circulation, positions estimées d’après les horaires.")}
         ${row(ic("route"), "Itinéraires", "Cherchez un arrêt, une adresse ou un lieu, touchez « Naviguer » : en transports, à pied ou à vélo, avec le guidage.")}
         ${row(ic("mail"), "Infos trafic", AUTONOMOUS ? "Bientôt disponible" : "Les perturbations et travaux en cours sur le réseau.")}
         ${row(ic("bike"), "Vélhop et parkings relais", AUTONOMOUS ? "Les emplacements des stations et parkings. Disponibilités : Bientôt disponible." : "Les vélos et les places disponibles.")}`;
@@ -89,7 +89,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
       body = `<h1>Où trouver quoi</h1>
         ${row(ic("sliders"), "Réglages", "En haut de l’accueil : thème, alertes trafic, version de l’application, mentions légales.")}
         ${row(ic("heart"), "Favoris", "Touchez le cœur sur la fiche d’un arrêt pour voir ses passages dès l’accueil.")}
-        ${row(ic("mail"), "Infos trafic", AUTONOMOUS ? "En haut de l’accueil. Bientôt disponible." : "En haut de l’accueil, toutes les perturbations en cours.")}
+        ${row(ic("mail"), "Infos trafic", AUTONOMOUS ? "Bientôt disponible." : "En haut de l’accueil, toutes les perturbations en cours.")}
         ${row(ic("pin"), "Carte", "En bas de l’écran : la carte, les arrêts et les départs autour de vous.")}
         ${row(ic("search"), "Recherche et « Naviguer »", "En bas de l’écran : un arrêt, une adresse ou un lieu, puis « Naviguer » pour choisir l’itinéraire et l’heure.")}`;
       actions = next();

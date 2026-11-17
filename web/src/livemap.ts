@@ -5,6 +5,7 @@ import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { markerIcon } from "./markers";
 import { makeBaseLayer, wantsDarkMap } from "./tiles";
+import { AUTONOMOUS } from "./local";
 import { POIS, S, STOPS, USER, render, toast } from "./store";
 import { COLORS, lineLabel, lineText } from "./data";
 import { esc } from "./util";
@@ -47,7 +48,9 @@ function useBaseLayer(m: L.Map): void {
     if (!tilesLoaded && tileErrors >= 3 && !note && host) {
       note = document.createElement("div");
       note.className = "lm-note";
-      note.textContent = "Fond de carte indisponible : le serveur n'arrive pas à joindre OpenStreetMap. Les arrêts restent affichés.";
+      note.textContent = AUTONOMOUS
+        ? "Fond de carte indisponible hors connexion. Les arrêts et les véhicules restent affichés."
+        : "Fond de carte indisponible : le serveur n'arrive pas à joindre OpenStreetMap. Les arrêts restent affichés.";
       host.appendChild(note);
     }
   });

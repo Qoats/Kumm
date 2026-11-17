@@ -79,3 +79,27 @@ test('worker persists the last valid archive and rejects corrupt synchronization
   const stored=await new Promise(r=>{const req=db.transaction('feeds').objectStore('feeds').get('cts');req.onsuccess=()=>r(req.result);});
   assert.equal(stored.revision,'first'); assert.deepEqual(stored.bytes,archive); db.close();
 });
+test('local vehicle engine: positions follow the official timetable, with layover chains and no invented trips', async () => {
+  const { vehiclesAt, buildChains, tripCode } = await import('../web/src/local-vehicles.ts');
+  const f = createSchedule(); await f.load(archive);
+  const day = time('2026-11-17T12:00:00+01:00');
+  const stopPos = new Map([['ABC_01', { lat: 48.58, lon: 7.75 }], ['END_01', { lat: 48.59, lon: 7.76 }]]);
+  const t = (hm) => time(`2026-11-17T${hm}:00+01:00`);
+  const out = { id: 'out', line: 'A', dest: 'Terminus', mode: 'tram', aimed: t('12:00'), calls: [
+    { code: 'ABC_01', name: 'Origine', arr: t('12:00'), dep: t('12:00') }, { code: 'END_01', name: 'Terminus', arr: t('12:10'), dep: t('12:10') }] };
+  const back = { id: 'back', line: 'A', dest: 'Origine', mode: 'tram', aimed: t('12:20'), calls: [
+    { code: 'END_01', name: 'Terminus', arr: t('12:20'), dep: t('12:20') }, { code: 'ABC_01', name: 'Origine', arr: t('12:30'), dep: t('12:30') }] };
+  const chains = buildChains([out, back]);
+  assert.equal(chains.get('back').id, 'out', 'the vehicle arriving at the terminus makes the return trip');
+  const at = (hm) => vehiclesAt(t(hm), [out, back], stopPos, chains);
+  assert.equal(at('11:55').length, 0, 'nothing runs before the first departure');
+  const mid = at('12:05');
+  assert.equal(mid.length, 1); assert.equal(mid[0].id, 'out');
+  assert.ok(mid[0].a[2] < t('12:05') && t('12:05') < mid[0].b[2], 'moving between two scheduled stops');
+  assert.deepEqual(mid[0].next[0], ['Terminus', t('12:10')]);
+  const wait = at('12:15');
+  assert.equal(wait.length, 1); assert.equal(wait[0].id, 'back'); assert.equal(wait[0].w, true, 'waits at the terminus until its scheduled departure');
+  assert.equal(at('12:31').length, 0, 'finished trips disappear');
+  assert.match(tripCode(out), /^ori\w*a\d{6}1200$/);
+  assert.equal(f.scheduledCourses(day).courses.every(c => c.realTime === false), true);
+});

@@ -2,7 +2,7 @@ import { unzipSync, Unzip, UnzipInflate } from "fflate";
 import type { AnnotatedStopPoint, SiriStopMonitoring } from "../../shared/cts-api";
 interface WidgetVisit { time: number; line: string; dest: string; rt: boolean; stopName: string; num: string; route: string }
 interface LineRoute { dest: string; from: string; codes: string[]; names: string[]; share: number }
-interface Course { id: string; line: string; dest: string; mode: string; realTime: boolean; aimed: number; dir: string; calls: { code: string; name: string; arr: number; dep: number; board: boolean; alight: boolean }[] }
+interface Course { id: string; line: string; dest: string; mode: string; realTime: boolean; aimed: number; dir: string; num?: string; calls: { code: string; name: string; arr: number; dep: number; board: boolean; alight: boolean }[] }
 const paris = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 function parisParts(t: number): Record<string, number> {
   return Object.fromEntries(paris.formatToParts(new Date(t)).filter(p => p.type !== "literal").map(p => [p.type, Number(p.value)]));
@@ -253,22 +253,23 @@ const scheduledQuayModes = () => {
   return Object.fromEntries((feed?.stops ?? []).map(s => [s.StopPointRef, (s.Lines ?? []).some(l => modes.get(String(l)) === "tram") ? "tram" : "bus"]));
 };
 
-let courseCache: { feed: Feed; at: number; horizon: number; courses: Course[] } | null = null;
-function scheduledCourses(now: number, horizon = 2 * HOUR): { courses: Course[]; stopPos: Feed["positions"] } | null {
+let courseCache: { feed: Feed; at: number; horizon: number; back: number; courses: Course[] } | null = null;
+/** Courses en cours ou à venir ; `back` : jusqu'à quand une course terminée reste dans la liste (attente au terminus) */
+function scheduledCourses(now: number, horizon = 2 * HOUR, back = 60_000): { courses: Course[]; stopPos: Feed["positions"] } | null {
   const f = feed;
   if (!f) return null;
-  if (courseCache?.feed === f && courseCache.horizon === horizon && Math.abs(now - courseCache.at) < 15_000) return { courses: courseCache.courses, stopPos: f.positions };
+  if (courseCache?.feed === f && courseCache.horizon === horizon && courseCache.back === back && Math.abs(now - courseCache.at) < 15_000) return { courses: courseCache.courses, stopPos: f.positions };
   const out: Course[] = [], dates = days(now, f.lookback, 1);
   for (const trip of f.trips.values()) for (const d of dates) {
     const first = d.base + trip.calls[0].dep * 1000, last = d.base + trip.calls.at(-1)!.arr * 1000;
-    if (first > now + horizon || last < now - 60_000 || !isActive(trip.service, d)) continue;
+    if (first > now + horizon || last < now - back || !isActive(trip.service, d)) continue;
     out.push({
       id: `gtfs:${d.date}:${trip.id}`, line: trip.route.code, dest: trip.dest, mode: isTram(trip.route) ? "tram" : trip.route.type === 2 || trip.route.type >= 100 && trip.route.type < 200 ? "rail" : "bus",
-      realTime: false, aimed: first, dir: trip.direction,
+      realTime: false, aimed: first, dir: trip.direction, ...(trip.num ? { num: trip.num } : {}),
       calls: trip.calls.map(c => ({ code: c.stop.id, name: c.stop.name, arr: d.base + c.arr * 1000, dep: d.base + c.dep * 1000, board: c.board, alight: c.alight }))
     });
   }
-  courseCache = { feed: f, at: now, horizon, courses: out };
+  courseCache = { feed: f, at: now, horizon, back, courses: out };
   return { courses: out, stopPos: f.positions };
 }
 
