@@ -6,7 +6,7 @@ public class GtfsJob extends JobService {
     private Thread task;
     @Override public boolean onStartJob(JobParameters parameters) {
         task = new Thread(() -> {
-            try { KummGtfs.synchronize(getApplicationContext(), false); }
+            try { KummGtfs.synchronize(getApplicationContext(), false, true); }
             catch (Exception ignored) { /* Last valid local schedules remain available. */ }
             jobFinished(parameters, false);
         }, "kumm-gtfs-periodic"); task.start();

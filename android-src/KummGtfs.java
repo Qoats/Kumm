@@ -98,7 +98,12 @@ public class KummGtfs extends Plugin {
                 result.put(s, status);
             }
         }
-        if (deferWidgets && !PENDING.isEmpty()) prepareWidgetsInBackground(c);
+        if (deferWidgets) {
+            // widget database out of date (never built, or the process stopped before the end): rebuild it in the background
+            SharedPreferences p = prefs(c);
+            for (String s : SOURCES) { String r = p.getString(s + ".revision", ""); if (!r.isEmpty() && !r.equals(p.getString(s + ".dbrevision", ""))) PENDING.add(s); }
+            if (!PENDING.isEmpty()) prepareWidgetsInBackground(c);
+        }
         return result;
     }
     private static void download(Context c, String source, String address) throws Exception { download(c, source, address, false); }
@@ -117,7 +122,7 @@ public class KummGtfs extends Plugin {
                             if (revision.isEmpty() || !zip.isFile()) continue;
                             String database = "timetable-" + UUID.randomUUID() + ".db";
                             LocalTimetable.prepare(app, source, zip, database);
-                            p.edit().putString("database", database).commit();
+                            p.edit().putString("database", database).putString(source + ".dbrevision", revision).commit();
                             File[] databases = app.getDatabasePath(database).getParentFile().listFiles();
                             if (databases != null) for (File file : databases) if (file.getName().startsWith("timetable-") && file.getName().endsWith(".db") && !file.getName().startsWith(database)) file.delete();
                         } catch (Exception ignored) { /* Widgets keep their previous data; the app itself reads the archives. */ }
