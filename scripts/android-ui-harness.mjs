@@ -4,12 +4,12 @@
 import fs from "node:fs";
 import { chromium } from "@playwright/test";
 
-export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewport = { width: 390, height: 844 }, headless = true, clockAt, failSync = false } = {}) {
+export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewport = { width: 390, height: 844 }, headless = true, clockAt, failSync = false, tiles = false, scale = 1 } = {}) {
   cts ??= process.env.GTFS_CTS; ter ??= process.env.GTFS_TER;
   if (!cts || !ter) throw Error("GTFS_CTS et GTFS_TER (archives officielles) sont requis");
   const bytes = { cts: fs.readFileSync(cts).toString("base64"), ter: fs.readFileSync(ter).toString("base64") };
   const browser = await chromium.launch({ headless });
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({ viewport, deviceScaleFactor: scale });
   const forbidden = [], errors = [], consoleErrors = [];
   await context.exposeFunction("__native", async (plugin, method, options) => {
     if (plugin === "KummGtfs") {
@@ -46,7 +46,7 @@ export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewpo
   await context.route("**/*", async route => {
     const u = new URL(route.request().url());
     if (u.origin === base && /^\/(api|geo|poi|tiles|health|app)(\/|$)/.test(u.pathname)) { forbidden.push(u.pathname); return route.abort(); }
-    if (/tile\.openstreetmap\.org|openfreemap|geopf|routing\.openstreetmap/.test(u.host)) return route.abort(); // pas d'Internet dans le harnais
+    if (!tiles && /tile\.openstreetmap\.org|openfreemap|geopf|routing\.openstreetmap/.test(u.host)) return route.abort(); // pas d'Internet dans le harnais (sauf captures d'écran : tiles)
     return route.continue();
   });
   if (clockAt) await page.clock.install({ time: clockAt });
