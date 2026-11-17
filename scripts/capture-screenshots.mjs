@@ -19,6 +19,9 @@ async function run(scheme) {
   // name : fichier du README (clair seulement), site : nom de l'image de la vitrine
   const shot = async (name, site) => {
     await page.waitForTimeout(800);
+    // le site n'affiche ni infos trafic ni Vélhop ni ponctualité : les captures non plus
+    await page.addStyleTag({ content: '[data-act="msgs"]{display:none!important}' });
+    await page.evaluate(() => { for (const b of document.querySelectorAll("button, a, div")) if (b.children.length < 4 && /^Ponctualité$/.test((b.textContent ?? "").trim()) && b.closest("[data-go], button")) (b.closest("[data-go], button")).style.visibility = "hidden"; });
     if (scheme === "light" && name) await page.screenshot({ path: docs + name, type: "png" });
     if (site) await page.screenshot({ path: `${vitrine}${site}-${suffix}.jpg`, type: "jpeg", quality: 84 });
     console.log(scheme, name ?? "", site ?? "");
