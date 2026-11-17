@@ -246,14 +246,14 @@ function syncVehicles(): void {
       m.getElement()?.classList.toggle("vwaiting", !!v.w);
       m.getElement()?.classList.toggle("vshared", !!v.g);
       m.getElement()?.classList.toggle("vstall", !!v.x);
-      m.getElement()?.classList.toggle("vapprox", !!v.u || (!v.rt && v.m !== "ter"));
+      m.getElement()?.classList.toggle("vapprox", !!v.u || (!AUTONOMOUS && !v.rt && v.m !== "ter"));
       vehMarkers.set(v.id, m);
     } else {
       m.setLatLng(p);
       m.getElement()?.classList.toggle("vwaiting", !!v.w);   // en attente au terminus, puis en route
       m.getElement()?.classList.toggle("vshared", !!v.g);    // position partagée par un voyageur à bord
       m.getElement()?.classList.toggle("vstall", !!v.x);     // immobilisé (panne, accident, bouchon)
-      m.getElement()?.classList.toggle("vapprox", !!v.u || (!v.rt && v.m !== "ter"));    // horaires figés par la CTS : position approximative
+      m.getElement()?.classList.toggle("vapprox", !!v.u || (!AUTONOMOUS && !v.rt && v.m !== "ter"));    // horaires figés par la CTS : position approximative
       // la flèche suit les virages du tracé, sans recréer l'icône
       const arrow = m.getElement()?.querySelector<HTMLElement>(".va");
       if (arrow) arrow.style.transform = `rotate(${h}deg)`;

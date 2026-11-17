@@ -71,6 +71,7 @@ try {
   const after = await pos();
   assert.ok(after.some((t, i) => t && t !== before[i]), "au moins un véhicule avance");
   const moving = ids[after.findIndex((t, i) => t && t !== before[i])];
+  assert.equal(await page.locator(".vm.vapprox").count(), 0, "pas de cadre « approximatif » sur les véhicules théoriques");
   ok(`carte : ${veh.n} véhicules théoriques (${veh.trams} trams, ${veh.bus} bus, ${veh.withPath} sur un tracé), animés`);
 
   // 6. Suivi d'un véhicule
