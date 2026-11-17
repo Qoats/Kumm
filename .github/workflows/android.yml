@@ -77,7 +77,7 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON: ${{ github.event_name == 'workflow_dispatch' && secrets.GOOGLE_SERVICES_JSON || '' }}
         run: |
-          if [ "$PROFILE" = sideload ]; then export VITE_SIDELOAD_UPDATES=1; fi
+          if [ "$PROFILE" = sideload ]; then export VITE_SIDELOAD_UPDATES=1; else export VITE_PLAY_UPDATES=1; fi
           npx cap add android
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             node scripts/android/firebase-android.mjs
@@ -103,7 +103,30 @@ jobs:
             "$ANALYZER" manifest permissions kumm-test.apk > "${RUNNER_TEMP}/kumm-permissions"
             ! grep -q REQUEST_INSTALL_PACKAGES "${RUNNER_TEMP}/kumm-permissions"
             test "$( "$ANALYZER" manifest target-sdk kumm-test.apk)" -ge 36
+            # la version Play ne déclare ni service de premier plan, ni notifications, ni widgets trafic / Vélhop
+            ! grep -Eq 'FOREGROUND_SERVICE|POST_NOTIFICATIONS' "${RUNNER_TEMP}/kumm-permissions"
+            "$ANALYZER" manifest print kumm-test.apk > "${RUNNER_TEMP}/kumm-manifest"
+            ! grep -Eq 'TripService|TrafficWidget|BikeWidget|foregroundServiceType' "${RUNNER_TEMP}/kumm-manifest"
           fi
+      - name: Signer le bundle Play avec la clé d’envoi
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.profil == 'play'
+        env:
+          KS_B64: ${{ secrets.KUMM_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KUMM_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KS_B64" && test -n "$KS_PASS"
+          umask 077
+          trap 'rm -f "$RUNNER_TEMP/kumm.jks"' EXIT
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/kumm.jks"
+          cp kumm-play-unsigned.aab kumm-play.aab
+          jarsigner -keystore "$RUNNER_TEMP/kumm.jks" -storetype PKCS12 -storepass:env KS_PASS -sigalg SHA256withRSA -digestalg SHA-256 kumm-play.aab kumm
+          jarsigner -verify kumm-play.aab
+          python3 scripts/android/check-android-package.py kumm-play.aab
+      - uses: actions/upload-artifact@v6
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.profil == 'play'
+        with:
+          name: kumm-play-aab-signe
+          path: kumm-play.aab
       - uses: actions/upload-artifact@v6
         with:
           name: kumm-android-review

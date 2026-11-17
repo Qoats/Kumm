@@ -66,7 +66,7 @@ import { refreshVehicles } from "./vehicles";
 import { hideSplash } from "./splash";
 import { configureWidget, initWidgets, stopConfig, syncWidgets } from "./widgets";
 import { followFromSearch, showOnMap, mountLiveMap, recenter, refreshMarkers, zoomBy } from "./livemap";
-import { CAN_UPDATE, checkUpdate, installUpdate, updateView } from "./update";
+import { CAN_UPDATE, PLAY_URL, checkUpdate, installUpdate, updateView } from "./update";
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
 import { stopJourney } from "./journey";
 import { answerRide, rideBanner, rideDebug, startRideDetection, stopRideDetection, stopSharing } from "./ride";
@@ -549,7 +549,8 @@ async function startUpdate(rel: Release): Promise<void> {
 }
 
 function updateAction(a: string): void {
-  if (a === "go" && S.upd?.rel) void startUpdate(S.upd.rel);
+  if (a === "play") { window.open(PLAY_URL, "_blank"); S.upd = null; render(); }
+  else if (a === "go" && S.upd?.rel) void startUpdate(S.upd.rel);
   else if (a === "quit" || a === "later") { waitingPermission = null; S.upd = null; render(); }
   else if (a === "ignore" && S.upd?.rel) { waitingPermission = null; localStorage.setItem("ignored-release", String(S.upd.rel.code)); S.upd = null; render(); }
   else if (a === "reload") location.reload();
