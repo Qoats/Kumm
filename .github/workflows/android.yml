@@ -14,6 +14,10 @@ on:
         description: "Préparer une GitHub Release en brouillon avec l’APK signé"
         type: boolean
         default: false
+      nouvelle_signature:
+        description: "Migration unique : accepter une clé de signature différente de l’APK distribué (les utilisateurs devront réinstaller)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -153,6 +157,7 @@ jobs:
         env:
           VERSION_CODE: ${{ github.run_number }}
           GH_TOKEN: ${{ github.token }}
+          KUMM_ALLOW_CERT_CHANGE: ${{ inputs.nouvelle_signature && '1' || '0' }}
         run: |
           D="$RUNNER_TEMP/kumm-publication"
           APK="$D/kumm.apk"
