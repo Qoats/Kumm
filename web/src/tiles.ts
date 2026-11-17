@@ -1,8 +1,9 @@
+import { AUTONOMOUS } from "./local";
 import * as L from "leaflet";
 import { url } from "./config";
 
 /** Tuiles servies par notre serveur (même origine : identifiées, gardées en mémoire, lisibles par le canevas) */
-const TILE_URL = url("/tiles/{z}/{x}/{y}.png");
+const TILE_URL = AUTONOMOUS ? "https://tile.openstreetmap.org/{z}/{x}/{y}.png" : url("/tiles/{z}/{x}/{y}.png");
 
 /**
  * Assombrit une tuile : inverse les couleurs puis fait tourner les teintes de 180° pour retrouver les couleurs

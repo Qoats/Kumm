@@ -4,8 +4,8 @@
 
 - Le profil `play` garde l’identifiant `fr.kumm.app`, cible Android 16 (API 36), retire le programme de mise à jour autonome et sa permission d’installation. Le profil `sideload` conserve la distribution autonome.
 - Avec Node 22.12+, Java 21 et le SDK Android 36, lancer `npm ci`, `npx cap add android` une seule fois, `node scripts/android/prepare-android.mjs play VERSION_CODE`, puis `npm run build:android`. Dans `android`, lancer `./gradlew assembleDebug bundleRelease` (ou `gradlew.bat` sous Windows).
-- L’APK de test est signé avec une clé de débogage. L’AAB est non signé. Fournir à la compilation uniquement l’URL HTTPS publique de l’instance de test (`VITE_API_BASE` ou variable Actions `KUMM_API_BASE`). Cette instance doit servir la même version du serveur et les routes GTFS.
-- Le workflow Actions produit des fichiers de revue. Il ne diffuse un APK autonome que si le profil `sideload` et l’option de publication sont choisis manuellement sur `main`. Le certificat de l’APK sideload doit correspondre à celui déjà distribué et son code de version doit augmenter. La branche `apk` avance alors par un commit ordinaire. L’envoi d’un AAB à Play Console reste une action distincte.
+- L’APK de test est signé avec une clé de débogage. L’AAB est non signé. Aucune URL de serveur Kumm n’est nécessaire. Les données GTFS officielles sont téléchargées directement sur le téléphone. Voir [Android autonome](ANDROID-AUTONOME.md) pour les capacités et limites du calcul local.
+- Le workflow Actions produit des fichiers de revue. Il ne diffuse un APK autonome que si le profil `sideload` et l’option de publication sont choisis manuellement sur `main`. Le certificat de l’APK sideload doit correspondre à celui déjà distribué et son code de version doit augmenter. La préparation crée une GitHub Release en brouillon et ne modifie pas la branche `apk`, conservée comme référence de première migration. L’envoi d’un AAB à Play Console reste une action distincte.
 
 ## Avant une soumission
 

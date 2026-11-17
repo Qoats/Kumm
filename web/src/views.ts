@@ -1,3 +1,4 @@
+import { AUTONOMOUS, syncLabel } from "./local";
 import type { Place, Poi, Stop, StopDeparture } from "../../shared/types";
 import { CONTREMARQUE_TER, TER_STATIONS_EMS } from "../../shared/ter";
 import type { PlannedDeparture } from "./api";
@@ -10,9 +11,8 @@ import { ACCENTS, ACCENT_TOKENS, THEMES, THEME_TOKENS, UIS } from "./themes";
 import type { Accent, Theme, Tokens, Ui } from "./themes";
 import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_OBJETS_TROUVES, KUMM_CONTACT, isIOS } from "./links";
 import type { Layer } from "./kinds";
-import { marker, markerIcon } from "./markers";
+import { markerIcon } from "./markers";
 import { ic, type IconName } from "./icons";
-import { MAPPATHS, mapRoutes } from "./map";
 import { POIS, S, STOPS, USER, mins, render, stopById } from "./store";
 import type { PlaceKey } from "./store";
 import { commuteTo } from "./commute";
@@ -41,7 +41,7 @@ export const lineChip = (l: string, sm = false, alert = false): string => {
 const chipAlert = (l: string): string =>
   `<button class="ln" data-line="${esc(l)}" style="background:${COLORS[l] ?? "#777"};color:${lineText(l)}">${esc(l)}${hasAlert(l) ? '<span class="al" style="color:#fff">!</span>' : ""}</button>`;
 const live = '<span class="live"></span>';
-const theoreticalLabel = () => CONFIG.CTS_REALTIME ? "" : '<small class="src">Horaires théoriques · CTS</small>';
+const theoreticalLabel = () => CONFIG.CTS_REALTIME ? "" : '<small class="src">Horaires théoriques · CTS / SNCF</small>';
 /** Ordre des lignes : trams (A à F), lignes G et H, lignes à lettre et numéro (C1, L1…), puis bus par numéro */
 const lineOrder = (l: string): string =>
   /^[A-F]$/.test(l) ? "0" + l : /^[GH]$/.test(l) ? "1" + l : /^[A-Z]+\d+$/.test(l) ? "2" + l.replace(/\d+/, d => d.padStart(4, "0")) : /^\d+$/.test(l) ? "3" + l.padStart(4, "0") : "4" + l;
@@ -157,7 +157,7 @@ export function overlayBikePick(): string {
 /** Tuile infos trafic : nombre de perturbations et la première */
 function trafficTile(): string {
   if (!MESSAGES.length) {
-    const t = !CONFIG.CTS_TRAFFIC ? "Prochainement disponible" : MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Indisponibles pour le moment" : "Aucune perturbation signalée";
+    const t = !CONFIG.CTS_TRAFFIC ? "Bientôt disponible" : MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Indisponibles pour le moment" : "Aucune perturbation signalée";
     return `<button class="tile tile-ok" data-act="msgs"><h2>${ic("bell")}Info trafic</h2><p class="msg">${t}</p></button>`;
   }
   const m = MESSAGES[0], n = MESSAGES.length;
@@ -274,7 +274,7 @@ export function screenHome(): string {
         : `<a class="${cls}" href="${to}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
     }).join("")}
     <button class="tile-add w" data-act="favs">${ic("plus")}${favStops.length ? "Gérer mes arrêts favoris" : "Ajouter un arrêt favori"}</button>
-    <p class="ver w">Kumm v${VERSION}${CONFIG.USE_MOCK ? " · démonstration : données fictives" : ""}</p>
+    <p class="ver w">Kumm v${VERSION}</p>
   </div>`;
 }
 
@@ -284,9 +284,9 @@ export function favRows(list: StopDeparture[]): string {
   const rows = list.flatMap(({ d }) => d.times.filter(t => t > now - 30000).slice(0, 1).map(t => ({ d, t })))
     .sort((a, b) => a.t - b.t).slice(0, 3);
   if (!rows.length) return '<p class="none">Aucun passage prévu</p>';
-  return (rows.some(({ d }) => d.line !== "TER") ? theoreticalLabel() : "") + rows.map(({ d, t }) => {
+  return theoreticalLabel() + rows.map(({ d, t }) => {
     const m = mins(t);
-    const atPlatform = m < 1 && (CONFIG.CTS_REALTIME || d.line === "TER");
+    const atPlatform = m < 1 && CONFIG.CTS_REALTIME;
     return `<div class="trow">${lineChip(d.line, true)}<b class="dn">${esc(d.dest)}</b><i class="${m < 2 ? "soon" : ""}${atPlatform ? " q" : ""}">${atPlatform ? "À quai" : m + "′"}</i></div>`;
   }).join("");
 }
@@ -332,24 +332,9 @@ export const layerCounts = (): Record<Layer, number> => {
 export function screenNearby(): string {
   // ouvert en grand : le panneau s'arrête sous la recherche et les filtres, sa poignée reste toujours touchable
   const h = S.sheet === 2 ? "calc(100% - 132px - var(--safe-top))" : `calc(${S.sheet === 0 ? "64px" : "42%"} + var(--navh, 0px))`;
-  const inView = (p: { x: number; y: number }): boolean => p.x > -10 && p.x < 370 && p.y > -10 && p.y < 450;
-  const stopPins = STOPS
-    .filter(s => {
-      const k = kindOfStop(s);
-      return S.layers[k] && (S.filter === "all" || S.filter === k);
-    })
-    .filter(inView).slice(0, 90)
-    .map(s => marker(kindOfStop(s), s.x, s.y, `data-stop="${esc(s.id)}"`)).join("");
-  const poiPins = POIS.filter(p => S.layers[p.kind] && inView(p)).slice(0, 120)
-    .map(p => marker(p.kind, p.x, p.y, `data-poi="${esc(p.id)}"`)).join("");
   const counts = layerCounts();
   const chips = LAYERS.map(k => `<button class="lyr ${S.layers[k] ? "on" : ""} ${!CONFIG.USE_MOCK && !counts[k] ? "nodata" : ""}" data-layer="${k}" aria-pressed="${S.layers[k]}">${markerIcon(k, 24)}<span>${KINDS[k].label}</span></button>`).join("");
-  const background = CONFIG.USE_MOCK
-    ? `<svg class="m" viewBox="0 0 360 440" preserveAspectRatio="xMidYMid slice">${MAPPATHS}${S.filter === "bus" ? "" : mapRoutes()}
-      ${stopPins}${poiPins}
-      <circle cx="170" cy="222" r="14" fill="#4A90E2" opacity=".25"><animate attributeName="r" values="8;20;8" dur="2.4s" repeatCount="indefinite"/></circle><circle cx="170" cy="222" r="7" fill="#4A90E2" stroke="#fff" stroke-width="2.500"/>
-    </svg>`
-    : `<div id="livemap-slot"></div><span class="osm" style="bottom:calc(${h} + 4px)">© OpenStreetMap</span>`;
+  const background = `<div id="livemap-slot"></div><span class="osm" style="bottom:calc(${h} + 4px)">© OpenStreetMap</span>`;
   return `<div class="map">
     ${background}
     <button class="msearch" data-tab="search">${ic("search")}<span>Où allez-vous ?</span></button>
@@ -359,6 +344,7 @@ export function screenNearby(): string {
     <div class="sheet${S.sheet === 0 ? " min" : ""}" style="height:${h}">
       <button class="grab" data-act="sheet" aria-label="${S.sheet === 0 ? "Afficher les passages" : "Réduire"}">${ic(S.sheet === 0 ? "up" : "down")}</button>
       ${S.follow ? followPanel(S.follow) : `<h2 class="shead"${S.sheet === 0 ? ' data-act="sheet"' : ""}>À proximité</h2>
+      ${AUTONOMOUS && S.sheet !== 0 ? `<p class="src" style="margin:0 18px 10px">Suivi des véhicules : Bientôt disponible</p>` : ""}
       <div class="seg pills">
         <button data-f="all" class="${S.filter === "all" ? "on" : ""}">Tout</button>
         <button data-f="tram" class="${S.filter === "tram" ? "on" : ""}">${ic("tram")}Tram</button>
@@ -442,6 +428,7 @@ export function overlayPoi(id: string): string {
 
 /** Vélos (station Vélhop) ou places libres (parking relais) attendus dans les 4 prochaines heures, d'après l'habitude du lieu */
 function bikeForecastHtml(id: string, park = false): string {
+  if (AUTONOMOUS) return `<div class="bfc"><h2>${ic("chart")}Prévision et disponibilité</h2><p>Bientôt disponible</p></div>`;
   const f = FORECASTS[id], pts = f?.points?.filter(x => x.t > Date.now() + 60_000) ?? [];
   if (!f || f.failed || !pts.length) return "";
   const where = park ? "ce parking" : "cette station";
@@ -565,7 +552,7 @@ function tripResults(): string {
   if (list.length) {
     const reset = Date.now() - whenResetAt < 90_000 ? `<p class="src treset">L’heure choisie était passée : voici les horaires pour maintenant.</p>` : "";
     const fresh = `<div class="trefresh"><span>${t.transit.status === "loading" ? "Mise à jour des horaires…" : `Horaires de ${hm(t.at)}`}</span><button class="pill" data-act="replan">Actualiser</button></div>`;
-    return reset + fresh + list.map(journeyRow).join("") + `<small class="src">Horaires du réseau et temps réel : Transitous (données ouvertes).${t.transit.status === "error" ? " Mise à jour impossible : derniers trajets connus." : ""}</small>`;
+    return reset + fresh + list.map(journeyRow).join("") + `<small class="src">${AUTONOMOUS ? "Horaires théoriques · CTS / SNCF. Accès et correspondances à pied estimés ; vérifiez le cheminement." : "Horaires du réseau et temps réel : Transitous (données ouvertes)."}${t.transit.status === "error" ? " Mise à jour impossible : derniers trajets connus." : ""}</small>`;
   }
   if (t.transit.status === "loading") return calculating;
   const why = t.transit.status === "error"
@@ -607,21 +594,17 @@ export function whenSheet(): string {
 }
 
 export function screenTrips(): string {
-  const t = S.trip, mock = CONFIG.USE_MOCK;
+  const t = S.trip;
   const pin = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z" fill="#E8402F"/><circle cx="12" cy="10" r="2.6" fill="#fff"/></svg>';
   const form = `<div class="thead">
     <button class="tback" data-act="tabHome" aria-label="Retour">${ic("back")}</button>
     <div class="trail"><i class="tdot"></i><i class="tline"></i>${pin}</div>
     <div class="tinputs">
-      <input id="tfrom" value="${esc(t.fromText)}" placeholder="Départ" autocomplete="off" ${mock ? "readonly" : ""}>
+      <input id="tfrom" value="${esc(t.fromText)}" placeholder="Départ" autocomplete="off">
       <input id="tto" value="${esc(t.toText)}" placeholder="Où voulez-vous aller ?" autocomplete="off">
     </div>
-    <button class="tswap" data-act="swap" aria-label="Inverser départ et destination" ${mock ? "disabled" : ""}>${ic("swap")}</button>
+    <button class="tswap" data-act="swap" aria-label="Inverser départ et destination">${ic("swap")}</button>
   </div>`;
-  if (mock) {
-    const has = t.toText.trim().length > 1;
-    return form + `<div class="pad">${has ? `<div id="trips"></div>` : `<div class="empty" style="font-weight:700;padding-top:90px;font-size:20px">Aucun itinéraire trouvé</div>`}</div>`;
-  }
   if (t.sugg) return form + `<div class="pad">${suggestionsHtml()}</div>`;
   if (!tripReady()) return form + `<div class="empty" style="padding-top:70px">Choisissez un départ (adresse ou « Ma position ») et une destination.</div>`;
   const modes: { id: "transit" | "walk" | "bike"; icon: IconName; label: string }[] = [
@@ -630,20 +613,6 @@ export function screenTrips(): string {
   const whenRow = t.mode !== "transit" ? "" : `<div class="twhen"><button class="twchip" data-act="when">${ic("clock")}<span>${esc(whenLabel(t.when))}</span><b>▾</b></button></div>`;
   const tabs = `<div class="tmodes">${modes.map(m => `<button data-mode="${m.id}" class="${t.mode === m.id ? "on" : ""}" aria-label="${m.label}">${ic(m.icon)}<span>${modeDuration(m.id)}</span></button>`).join("")}</div>`;
   return form + tabs + whenRow + `<div class="tmap"><div id="tripmap-slot"></div><span class="osm">© OpenStreetMap</span></div><div class="pad tlist">${tripList()}</div>`;
-}
-
-/** Résultats d'exemple (mode démo uniquement) */
-export function tripsDemo(): string {
-  const now = new Date(), f = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  const opts = [{ l: ["D"], w: 4, m: 18, c: 0 }, { l: ["A", "C"], w: 6, m: 24, c: 1 }, { l: ["B"], w: 9, m: 27, c: 0 }];
-  const chev = ic("chev", 'width="14" height="14" fill="none" stroke="#888" stroke-width="3"');
-  return opts.map((o, i) => {
-    const dep = new Date(now.getTime() + (3 + i * 6) * 60000), arr = new Date(dep.getTime() + o.m * 60000);
-    return `<div class="trip"><div class="top"><b>${o.m} min</b><span style="color:var(--mute)">${f(dep)} → ${f(arr)}</span></div>
-      <div class="tl"><i style="flex:${o.w};background:#B9BEC4"></i>${o.l.map(l => `<i style="flex:${(o.m - o.w - 3) / o.l.length};background:${COLORS[l]};color:${lineText(l)}">${l}</i>`).join("")}<i style="flex:3;background:#B9BEC4"></i></div>
-      <div class="legs"><small>🚶 ${o.w} min</small>${o.l.map(l => `${chev}${lineChip(l, true)}`).join("")}${chev}<small>🚶 3 min</small></div>
-      <small style="color:var(--mute)">${o.c ? "1 correspondance" : "Direct"}</small></div>`;
-  }).join("") + `<small style="color:var(--mute)">Itinéraires de démonstration.</small>`;
 }
 
 /* ============ ÉCRANS SUPERPOSÉS ============ */
@@ -725,6 +694,7 @@ const BANDS: [string, string][] = [["pm", "Pointe du matin · 6 h - 9 h 30"], ["
 
 /** Page d'une ligne : sa ponctualité sur 30 jours */
 function linePunct(l: string): string {
+  if (AUTONOMOUS) return `<section class="punct"><h2>${ic("chart")}Ponctualité</h2><p>Bientôt disponible</p></section>`;
   const st = STATS[l]?.v as LineStats | undefined;
   if (!st || st.all.n < 20) return "";
   const row = (label: string, p: Punct | undefined): string => !p || p.n < 10 ? "" :
@@ -740,6 +710,7 @@ function linePunct(l: string): string {
 
 /** Ponctualité de tout le réseau, ligne par ligne */
 export function overlayStats(): string {
+  if (AUTONOMOUS) return `<div class="overlay">${bar("Ponctualité")}<main><div class="pad punct flat"><div class="empty">Bientôt disponible</div></div></main></div>`;
   const r = STATS[""], st = r?.v as NetStats | undefined;
   let body: string;
   if (!r) body = `<div class="empty">Chargement…</div>`;
@@ -772,6 +743,7 @@ export const REPORT_KINDS: [string, IconName, string][] = [
 ];
 /** Problèmes signalés par les voyageurs à cet arrêt (montrés une fois confirmés par 2 personnes), et bouton pour en signaler */
 function reportsBlock(stopId: string): string {
+  if (AUTONOMOUS) return `<section class="reps"><div class="sub">Signalements des voyageurs</div><p>Bientôt disponible</p></section>`;
   const o = S.overlay?.k === "stop" ? S.overlay : null, items = REPORTS[stopId]?.items ?? [];
   const ago = (t: number): string => { const m = Math.round((Date.now() - t) / 60_000); return m < 60 ? `depuis ${Math.max(1, m)} min` : `depuis ${Math.round(m / 60)} h`; };
   const rows = items.map(r => {
@@ -788,14 +760,14 @@ function reportsBlock(stopId: string): string {
 /** Fiche d'un arrêt : une seule barre d'actions (y aller, horaires d'un autre moment) au lieu de liens empilés */
 function stopActions(s: Stop): string {
   const o = S.overlay?.k === "stop" ? S.overlay : null;
-  const other = quayOf(s) && o && !o.pick && !o.at;
+  const other = (quayOf(s) || AUTONOMOUS && s.sncf) && o && !o.pick && !o.at;
   return `<div class="sacts${other ? "" : " one"}"><button class="go" data-goto="stop:${esc(s.id)}">${ic("navigate")}Y aller</button>${other ? `<button class="sact2" data-act="stopPick">${ic("clock")}Autre horaire</button>` : ""}</div>`;
 }
 
 /** Fiche d'un arrêt : passer des passages en direct aux horaires prévus d'un autre jour ou d'une autre heure */
 function whenControl(s: Stop): string {
   const o = S.overlay?.k === "stop" ? S.overlay : null;
-  if (!o || !quayOf(s)) return "";
+  if (!o || !(quayOf(s) || AUTONOMOUS && s.sncf)) return "";
   if (o.pick) {
     const d = new Date(o.draft ?? o.at ?? Date.now() + 3600_000), pad = (n: number): string => String(n).padStart(2, "0");
     const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -819,7 +791,7 @@ export function plannedBoard(name: string, list: PlannedDeparture[], at: number)
   }
   if (!rows.size) return '<div class="empty" style="padding:24px">Aucun passage prévu à cette heure</div>';
   const body = [...rows.values()].map(r => `<div class="lb-r" role="button" tabindex="0" data-line="${esc(r.line)}" aria-label="Ligne ${esc(r.line)} vers ${esc(r.dest)}">${lineChip(r.line, true)}<span class="lb-d"><b>${esc(r.dest)}</b><small>${r.t.slice(1, 5).map(hm).join(" · ")}</small></span><span class="lb-m">${hm(r.t[0])}</span></div>`).join("");
-  return `<div class="lboard"><div class="lb-h"><span><small>Horaires théoriques · CTS</small><b>${esc(name)}</b></span></div>${body}</div>`;
+  return `<div class="lboard"><div class="lb-h"><span><small>Horaires théoriques · CTS / SNCF</small><b>${esc(name)}</b></span></div>${body}</div>`;
 }
 
 export function overlayStop(id: string): string {
@@ -836,7 +808,7 @@ export function overlayStop(id: string): string {
 }
 
 export function overlayMsgs(): string {
-  if (!CONFIG.CTS_TRAFFIC) return `<div class="overlay">${bar("Infos trafic")}<main><div class="pad"><div class="empty">Prochainement disponible</div></div></main></div>`;
+  if (!CONFIG.CTS_TRAFFIC) return `<div class="overlay">${bar("Infos trafic")}<main><div class="pad"><div class="empty">Bientôt disponible</div></div></main></div>`;
   const elev = MESSAGES.filter(isElevatorMsg);
   const dis = MESSAGES.filter(m => m.channel === "disruption" && !isElevatorMsg(m)), works = MESSAGES.filter(m => m.channel === "works" && !isElevatorMsg(m));
   const empty = MSG_STATE.status === "loading" ? "Chargement…" : MSG_STATE.status === "error" ? "Infos trafic indisponibles pour le moment." : "Aucune perturbation signalée.";
@@ -846,7 +818,7 @@ export function overlayMsgs(): string {
     ${works.length ? `<div class="sub">Travaux et changements</div>${works.map(m => msgCard(m)).join("")}` : ""}
     ${MESSAGES.length ? "" : `<div class="empty">${empty}</div>`}
     <button class="go" data-act="prefs" style="margin:6px 0 12px">🔔 ${S.alerts.enabled ? "Gérer mes alertes" : "Recevoir une alerte en cas de perturbation"}</button>
-    <small style="color:var(--mute);display:block">${CONFIG.USE_MOCK ? "Messages fictifs (mode démonstration)." : "Source : CTS, infos trafic en temps réel (mises à jour toutes les 5 minutes)."}</small></div></main></div>`;
+    <small style="color:var(--mute);display:block">Source : CTS, infos trafic en temps réel (mises à jour toutes les 5 minutes).</small></div></main></div>`;
 }
 
 const ext = (href: string, label: string, sub: string, icon: IconName): string =>
@@ -868,7 +840,7 @@ export function overlayAccount(): string {
 /** « FAQ / Contact » : questions fréquentes sur Kumm, contact de Kumm, et aide de la CTS pour les titres de transport */
 export function overlayHelp(): string {
   const qa: [string, string][] = [
-    ["Les horaires sont-ils en temps réel ?", !CONFIG.CTS_REALTIME ? "Les horaires CTS sont théoriques, issus du GTFS officiel. Les horaires TER restent distincts." : "Oui quand la CTS ou la SNCF les publient en temps réel (petit signal à côté des minutes) ; sinon ce sont les horaires prévus."],
+    ["Les horaires sont-ils en temps réel ?", !CONFIG.CTS_REALTIME ? "Les horaires CTS et TER sont théoriques, issus des GTFS officiels. Le temps réel est bientôt disponible." : "Oui quand la CTS ou la SNCF les publient en temps réel (petit signal à côté des minutes) ; sinon ce sont les horaires prévus."],
     ["La position des trams, bus et trains est-elle un GPS ?", "Non : elle est estimée d’après les horaires. Quand un voyageur partage son trajet, la position devient réelle pour tout le monde."],
     ["Comment aller quelque part ?", "Cherchez un arrêt, une adresse ou un lieu dans Recherche, puis touchez « Naviguer » : transports, à pied ou à vélo."],
     ["Kumm vend-il des billets ?", "Non. Les titres de transport s’achètent dans l’application officielle de la CTS, en agence ou dans les points de vente."],
@@ -1016,13 +988,13 @@ export function departureBoard(name: string, list: StopDeparture[], max = 16, st
     const m = mins(r.t[0]), n = r.t[1] !== undefined ? mins(r.t[1]) : null;
     // cloche : « prévenez-moi avant ce passage » (délai au choix) ; allumée si une alerte est en cours
     const on = stopId && arrivals().some(a => arrivalKey(a) === `${stopId}|${r.line}|${r.dest}`);
-    const bell = stopId && CONFIG.CTS_REALTIME ? `<button class="lb-bell${on ? " on" : ""}" data-arr="${esc(`${r.line}|${r.dest}|${r.t.slice(0, 3).join(",")}`)}" aria-label="Me prévenir avant le passage">${ic("bell")}</button>` : "";
+    const bell = AUTONOMOUS ? `<button class="lb-bell" disabled title="Bientôt disponible" aria-label="Alerte en temps réel : Bientôt disponible">${ic("bell")}</button>` : stopId && CONFIG.CTS_REALTIME ? `<button class="lb-bell${on ? " on" : ""}" data-arr="${esc(`${r.line}|${r.dest}|${r.t.slice(0, 3).join(",")}`)}" aria-label="Me prévenir avant le passage">${ic("bell")}</button>` : "";
     return `<div class="lb-r" data-line="${esc(r.line)}">${lineChip(r.line, true, hasAlert(r.line))}<span class="lb-d"><b><button class="dlink" data-line="${esc(r.line)}">${esc(r.dest)}</button></b>${r.cx.length ? `<small class="lb-x">Supprimé : ${r.cx.slice(0, 2).map(x => hm(x)).join(", ")}</small>` : n !== null ? `<small>puis ${n} min</small>` : ""}</span>${m < 1 && CONFIG.CTS_REALTIME ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}${bell}</div>`;
   }).join("");
   // forme « Alsace » : un tram ou un bus à quai, ça s'annonce (« Viens, le tram est là ! »)
   const first = list2[0], here = CONFIG.CTS_REALTIME && ELSASS() && mins(first.t[0]) < 1
     ? `<div class="kummbar">${ic("tram")}<span><b>Kumm, dr ${isTram(first.line) ? "Tram" : "Bus"} isch do !</b>${esc(lineLabel(first.line))} vers ${esc(first.dest)}, à quai.</span></div>` : "";
-  return `${here}<div class="lboard"><div class="lb-h"><span><small>${CONFIG.CTS_REALTIME ? "Prochains départs" : "Horaires théoriques · CTS"}</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
+  return `${here}<div class="lboard"><div class="lb-h"><span><small>${CONFIG.CTS_REALTIME ? "Prochains départs" : "Horaires théoriques · CTS / SNCF"}</small><b>${esc(name)}</b></span><span class="lb-clock">${hm(now)}</span></div>${body}</div>`;
 }
 
 /** Tableau des départs d'une gare, comme sur les écrans en gare : heure prévue, retard ou suppression, destination, numéro du train */
@@ -1044,6 +1016,7 @@ const ctmBadge = (small = false): string =>
   `<button class="ctm${small ? " sm" : ""}" data-act="contremarque">${ic("ticket")}Accessible avec Badgéo<sup>*</sup></button>`;
 
 export function trainBoard(list: TrainDeparture[], max = 15, title = "Trains au départ", sub = "Horaires SNCF", stopId?: string, uic?: string): string {
+  if (AUTONOMOUS) sub = "Horaires théoriques · SNCF";
   const now = Date.now();
   const rows = list.filter(t => t.t > now - 60_000).slice(0, max).map(t => {
     const late = !t.cancelled && (t.delay ?? 0) >= 60, m = mins(t.t);
@@ -1054,7 +1027,7 @@ export function trainBoard(list: TrainDeparture[], max = 15, title = "Trains au 
       : t.delay !== undefined ? '<em class="ok">À l’heure</em>' : "";
     return `<div class="lb-r ter${t.cancelled ? " off" : ""}"><span class="ln sm" style="background:#7B1FA2;color:#fff">TER</span>
       <span class="lb-d"><b>${esc(t.dest)}</b><small>${time} · n° ${esc(t.num)}${state ? " · " + state : ""}</small></span>
-      ${t.cancelled ? "" : m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}</div>`;
+      ${t.cancelled ? "" : !AUTONOMOUS && m < 1 ? '<span class="lb-m q">À quai</span>' : `<span class="lb-m">${m}<small>min</small></span>`}</div>`;
   });
   if (!rows.length && title === "Trains au départ") return '<div class="empty" style="padding:24px">Aucun train au départ dans les 4 prochaines heures</div>';
   if (!rows.length) rows.push('<div class="lb-r ter"><span class="lb-d"><small>Aucun train dans les 4 prochaines heures</small></span></div>');
@@ -1194,14 +1167,16 @@ export function overlaySettings(): string {
     <div class="sub">Accessibilité</div>
     <button class="row-switch" data-stepfree="1" role="switch" aria-checked="${!!p.stepFree}"><span>Itinéraires sans escaliers<br><small style="color:var(--mute)">Ascenseurs et rampes pour les correspondances ; les ascenseurs en panne sont signalés sur la fiche des stations</small></span><span class="switch ${p.stepFree ? "on" : ""}"></span></button>
     <div class="sub">Alertes trafic</div>
-    <button class="row-switch" data-alerts="toggle" ${CONFIG.CTS_TRAFFIC ? "" : "disabled"}><span>Me prévenir des perturbations<br><small style="color:var(--mute)">${!CONFIG.CTS_TRAFFIC ? "Prochainement disponible" : NATIVE && !PUSH_READY ? "Indisponible dans cette version de l'application" : "Une notification pour chaque nouvel incident sur les lignes suivies"}</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
+    <button class="row-switch" data-alerts="toggle" ${CONFIG.CTS_TRAFFIC ? "" : "disabled"}><span>Me prévenir des perturbations<br><small style="color:var(--mute)">${!CONFIG.CTS_TRAFFIC ? "Bientôt disponible" : NATIVE && !PUSH_READY ? "Indisponible dans cette version de l'application" : "Une notification pour chaque nouvel incident sur les lignes suivies"}</small></span><span class="switch ${S.alerts.enabled ? "on" : ""}"></span></button>
     ${CONFIG.CTS_TRAFFIC && S.alerts.enabled ? alertSettings() : ""}
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
-      <div class="src">Horaires théoriques et arrêts : CTS / Eurométropole de Strasbourg · Licence Ouverte 2.0 <a href="https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts" target="_blank" rel="noopener noreferrer">Source</a><br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : Transitous (MOTIS)<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires, temps réel) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
+      <div class="src">Horaires théoriques et arrêts : CTS / Eurométropole de Strasbourg · Licence Ouverte 2.0 <a href="https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts" target="_blank" rel="noopener noreferrer">Source</a><br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>Vélhop : flux GBFS nextbike / Eurométropole<br>Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : ${AUTONOMOUS ? "calcul local sur GTFS CTS / SNCF" : "Transitous (MOTIS)"}<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires théoriques) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
       <div class="src" style="margin-top:10px"><a href="https://kumm.fr/mentions-legales.html" target="_blank" rel="noopener">Mentions légales</a> · <a href="https://kumm.fr/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></div></div>
     <button class="ghost" data-act="replayOnb">Revoir la présentation</button>
-    ${CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher une mise à jour</button>` : ""}
+    ${AUTONOMOUS ? `<p>Horaires théoriques · CTS / SNCF</p><p>Dernière synchronisation : ${esc(syncLabel())}</p><button class="ghost" data-act="syncGtfs">Actualiser les données horaires</button><p>Passages en temps réel, retards, avances, suppressions, perturbations et météo en direct : Bientôt disponible.</p><p>Les fonds de carte et recherches d’adresses nécessitent Internet.</p>` : ""}
+    ${CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher des mises à jour</button>` : `<a href="https://play.google.com/store/apps/details?id=fr.kumm.app" target="_blank" rel="noopener">Mises à jour Google Play</a>`}
+    <a href="https://github.com/Qoats/Kumm/releases" target="_blank" rel="noopener">Releases GitHub</a>
     <button class="ghost" data-reset="1">Rétablir les réglages d’origine</button>
     ${NATIVE ? "" : `<a class="ghost" href="/deconnexion" style="display:block;text-align:center;text-decoration:none;margin-top:10px">Se déconnecter</a>`}
   </div></main></div>`;

@@ -1,16 +1,17 @@
+import { AUTONOMOUS, localInit } from "./local";
 /** numéro affiché en bas de l'accueil : sert à vérifier quelle version tourne */
-export const VERSION = "0.52.2";
+export const VERSION = "0.53.0";
 
 /**
  * Adresse du serveur Kumm. Vide sur le web (même adresse que la page).
- * Pour l'APK Android, elle est fixée à la compilation dans web/.env.android (VITE_API_BASE=https://…).
+ * Android utilise les archives locales et ne contacte pas le serveur Kumm.
  */
-export const API_BASE: string = ((import.meta.env["VITE_API_BASE"] as string | undefined) ?? "").replace(/\/+$/, "");
+export const API_BASE: string = (AUTONOMOUS ? "" : ((import.meta.env["VITE_API_BASE"] as string | undefined) ?? "")).replace(/\/+$/, "");
 export const url = (path: string): string => API_BASE + path;
 
 export const CONFIG = {
-  /** ajoutez ?mock à l'adresse pour le mode démo (données fictives) */
-  USE_MOCK: import.meta.env.DEV && new URLSearchParams(location.search).has("mock"),
+  /** Aucun mode de démonstration dans les versions distribuées. */
+  USE_MOCK: false,
   CTS_REALTIME: false,
   CTS_TRAFFIC: false,
   SERVER_READY: false,
@@ -20,6 +21,7 @@ export const CONFIG = {
 
 /** Un serveur plus ancien ou indisponible laisse l’application en horaires théoriques. */
 export async function loadServerMode(): Promise<void> {
+  if (AUTONOMOUS) { await localInit(); CONFIG.SERVER_READY = true; return; }
   if (CONFIG.USE_MOCK) return;
   try {
     const res = await fetch(url("/api/kumm-mode"), { cache: "no-store", signal: AbortSignal.timeout(3500) });

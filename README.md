@@ -19,7 +19,7 @@ Le temps réel est désactivé par défaut. Après autorisation, définir `CTS_M
 - Si un jeton a été publié, même quelques minutes : **supprimez-le sur le portail CTS et générez-en un nouveau**. Effacer le fichier ou le commit ne suffit pas, l'historique reste lisible.
 - Sur GitHub : Settings → Code security → activez *Secret scanning* et *Push protection*.
 - Un serveur public est protégé par une **limite de requêtes par adresse** (`RATE_LIMIT_PER_MIN`, 600 par défaut) et ne relaie qu'une liste fixe de services. La page `/diag` n'existe que si `ENABLE_DIAG=1` : ne l'activez pas sur un serveur public.
-- Un APK contient l'adresse de votre serveur (jamais le jeton) : n'importe qui peut la lire. Publiez votre APK seulement si votre serveur est prêt à être utilisé par d'autres, ou laissez chacun compiler le sien avec sa propre adresse.
+- Android ne contient plus d’adresse de serveur Kumm ni de jeton CTS : les horaires sont lus dans les GTFS officiels enregistrés sur le téléphone.
 
 ## Licences et données
 Le code est sous licence MIT (fichier `LICENSE`). Les données gardent leurs conditions : horaires et arrêts CTS / Eurométropole de Strasbourg (Licence Ouverte 2.0), parkings et Vélhop (Licence Ouverte), cartes et marche à pied © contributeurs OpenStreetMap (ODbL, attribution obligatoire), trajets Transitous. Les tuiles du serveur public d'OpenStreetMap sont réservées à un usage modéré : pour une large diffusion, utilisez un fournisseur de tuiles dédié.
@@ -50,55 +50,31 @@ Node 22.12 ou plus récent. Dans PowerShell, utilisez `npm.cmd` si `npm` est blo
 3. **Mode développement** : `npm.cmd run dev` puis ouvrez http://localhost:5173 (la page se recharge à chaque modification)
 4. **Mode "production"** : `npm.cmd run build` puis `npm.cmd start`, et ouvrez http://localhost:3000
 
-## Application Android (APK)
-L'APK est l'application Kumm dans un habillage Android (Capacitor). Elle ne contient **pas** le jeton CTS : elle parle à *votre serveur Kumm* (celui de ce projet), qui garde le jeton. Il faut un serveur joignable depuis le téléphone et compatible avec le GTFS de cette version. Les API d’une instance privée (`WEB_LOGIN`) exigent une session web. L’APK de diffusion anonyme utilise une instance publique avec quotas.
+## Application Android autonome
 
-### 1. Dire à l'APK où est le serveur
-Éditez `web/.env.android` (une seule ligne) :
-- **Test chez vous** (PC et téléphone sur le même Wi-Fi) : `VITE_API_BASE=http://192.168.1.25:3000` avec l'adresse de votre PC (commande `ipconfig`, ligne « Adresse IPv4 »). Lancez le serveur avec `npm.cmd run build` puis `npm.cmd start`, et autorisez le port 3000 dans le pare-feu Windows si demandé.
-- **Partout** : hébergez le serveur en ligne (le `Dockerfile` fourni convient à la plupart des hébergeurs ), puis `VITE_API_BASE=https://kumm.mondomaine.fr`. Avec un serveur en https, mettez `allowMixedContent: false` dans `capacitor.config.ts` et `usesCleartextTraffic="false"` dans `android/app/src/main/AndroidManifest.xml`.
+L’application conserve l’interface Capacitor, ses thèmes, son identifiant `fr.kumm.app` et ses données utilisateur. Elle télécharge directement les GTFS officiels CTS / SNCF, conserve les horaires théoriques sur le téléphone et les recalcule toutes les 30 secondes au premier plan. Aucune instance Kumm n’est nécessaire. Les fonctions temps réel affichent « Bientôt disponible ».
 
-### 2. Compiler l'APK
-**Avec Android Studio** (gratuit, développeur.android.com/studio ; il contient le JDK 21 nécessaire) :
-1. `npm.cmd install`
-2. `npx cap add android` (une fois), puis `node scripts/android/prepare-android.mjs play 170` et `npm.cmd run build:android` (compile la page et la copie dans le projet Android)
-3. `npm.cmd run android:open` (ouvre le projet dans Android Studio ; premier chargement : plusieurs minutes)
-4. Menu **Build → Build Bundle(s) / APK(s) → Build APK(s)**. Le fichier est `android/app/build/outputs/apk/debug/app-debug.apk`.
+La synchronisation utilise ETag / Last-Modified, un bouton manuel et une tâche Android quotidienne. Les dernières données valides restent disponibles hors connexion. Les fonds de carte, adresses et itinéraires piétons/vélo détaillés utilisent directement leurs services publics avec Internet. Le calcul local des correspondances utilise des cheminements à pied estimés ; la garantie d’accessibilité hors ligne reste à compléter.
 
-**Sans rien installer, avec GitHub** : mettez le projet (sans `.env`) dans un dépôt GitHub, créez la variable `KUMM_API_BASE` (Settings → Secrets and variables → Actions → Variables), puis onglet Actions → « APK Android » → Run workflow. Les fichiers de revue sont dans l’artefact « kumm-android-review ». Le profil Play fournit un APK de test et un AAB non signé. Voir [Préparation Google Play](docs/GOOGLE-PLAY.md).
+Avec Node 22.12+, JDK 21 et SDK Android 36 :
 
-### 3. Installer sur le téléphone
-Copiez `app-debug.apk` sur le téléphone, ouvrez-le et autorisez « installer des applications inconnues » quand Android le demande. Au premier lancement, acceptez la localisation.
+```sh
+npm ci
+npx cap add android
+node scripts/android/prepare-android.mjs play VERSION_CODE
+npm run build:android
+(cd android && ./gradlew testDebugUnitTest assembleDebug bundleRelease)
+```
 
-### Alertes trafic (notifications push, Firebase)
-Après réactivation autorisée des perturbations, Réglages → « Alertes trafic » active les notifications pour les lignes choisies.
-- **Serveur** (`server/alerts.ts`) : surveille les infos trafic chaque minute et envoie les nouvelles perturbations par Firebase Cloud Messaging aux téléphones abonnés (`POST /api/alerts`). Clé du compte de service Firebase dans `secrets/firebase.json` sur le serveur (jamais dans le dépôt ni dans l'image) ; abonnements gardés dans le volume Docker `kumm_state`. État visible dans `/health` (rubrique `alertes`).
-- **Application** : secret GitHub `GOOGLE_SERVICES_JSON` (contenu du fichier `google-services.json`) pour compiler l'APK avec Firebase ; sans lui, l'option est indiquée comme indisponible.
-- **Version web** : notifications du navigateur, seulement tant que la page est ouverte.
-Mise en place pas à pas : `docs/DEPLOIEMENT-VPS.md`, section « Alertes trafic ».
+`VERSION_CODE` doit être supérieur à celui de l’installation existante. Les fichiers debug servent aux tests ; ils ne remplacent pas une version de diffusion signée avec une autre clé. Pour une compilation sideload, choisir `sideload` et définir `VITE_SIDELOAD_UPDATES=1` pendant `npm run build:android`.
 
-### Icône et écran de démarrage
-Les icônes Android (toutes tailles, icône adaptative Android 8+) et l'écran de démarrage sont dans `android-res/`, dessinés d'après le logo par `python3 scripts/android/build-android-icons.py` (Pillow). Le workflow les copie dans le projet Android ; en local, après `npx cap add android` : `cp -r android-res/. android/app/src/main/res/`.
+Le workflow « APK Android » produit APK de revue et AAB Play non signé. La préparation manuelle d’une diffusion sideload sur `main` réutilise les secrets de signature existants et crée une **GitHub Release en brouillon**. Les mises à jour sont facultatives : accepter, reporter ou ignorer. Les installations Play utilisent Google Play. La branche `apk` est conservée comme référence de première migration.
 
-### Signature : installer chaque version par-dessus la précédente
-Android n'accepte une mise à jour que si elle est signée avec **la même clé** que la version installée. Le workflow « APK Android » signe l'APK avec la clé de l'application si ces deux secrets existent (Settings → Secrets and variables → Actions → **Secrets** → New repository secret) :
-- `KUMM_KEYSTORE_B64` : le fichier de clé `kumm-release.jks` encodé en base64 (sur Linux : `base64 -w0 kumm-release.jks`) ;
-- `KUMM_KEYSTORE_PASSWORD` : son mot de passe (alias de la clé : `kumm`).
-Le numéro de version Android augmente à chaque compilation. Sans ces secrets, l'APK est signé « debug » et il faut désinstaller l'ancienne version avant d'installer la nouvelle.
-**Gardez une copie de la clé et du mot de passe hors de GitHub** (gestionnaire de mots de passe) : une clé perdue oblige tous les utilisateurs à désinstaller l'application, et ne se remplace pas. Ne la mettez jamais dans le dépôt (`*.jks` est exclu par `.gitignore`).
+Architecture, sources, tests et recette avant diffusion : [Android autonome](docs/ANDROID-AUTONOME.md). Préparation Play : [Google Play](docs/GOOGLE-PLAY.md).
 
-Pour Google Play, utiliser le [profil Play et la clé d’importation](docs/GOOGLE-PLAY.md). À chaque modification du code : `npm.cmd run build:android`, puis recompiler. Le bouton « retour » d'Android ferme le guidage, une fiche, puis revient à l'accueil.
+## Widgets de l’écran d’accueil Android
 
-## Widgets de l'écran d'accueil (Android)
-Sept widgets, à ajouter par un appui long sur l'écran d'accueil → Widgets → Kumm :
-arrêt favori (4×2), mon trajet (2×2 et 1×1), arrêt le plus proche (4×2), infos trafic (4×1), Vélhop / P+R (2×2), raccourcis (4×1).
-- Code natif : `android-src/WidgetCore.java` (données et dessin), `KummWidget.java` et une petite classe par widget ; mises en
-  page et aperçus dans `android-res/` ; déclarés dans le manifeste par le workflow (`android-src/widgets-manifest.xml`).
-- Données : `/api/widget/stop`, `/nearby`, `/traffic`, `/poi` (`server/widgets.ts`), tirées de la mémoire du serveur.
-- L'application leur transmet l'adresse du serveur, les couleurs des lignes, les lignes suivies et la dernière position
-  (`web/src/widgets.ts`, module `KummWidgets`). Un widget à régler ouvre Kumm sur l'écran de choix (arrêt, ligne, station).
-- Android ne met à jour un widget que toutes les 30 min : les passages sont donc affichés en heure (« 18:44 »), et
-  actualisés aussi par le bouton ↻, à l'ouverture et à la fermeture de Kumm.
+Les sept widgets et leurs ressources restent présents : arrêt favori, trajet grand/petit, arrêt proche, trafic, Vélhop / P+R et raccourcis. Les horaires sont lus dans une base SQLite locale, même application fermée. Les fonctions nécessitant du temps réel indiquent « Bientôt disponible ». Les couleurs, réglages et choix d’arrêt sont conservés. Android actualise les widgets selon ses contraintes ; le bouton ↻ recalcule les passages localement.
 
 ## Logo et installation sur téléphone
 Le logo est un « K » dessiné comme une ligne de plan de transport (barre blanche, branches jaune et bleue), avec un rond d'arrêt à chaque extrémité (« Kumm » = « viens » en alsacien). Fichiers dans `web/public/` : `favicon.svg` (logo vectoriel, modifiable), `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`, `manifest.webmanifest`. Une variante rouge / bleu / violet est fournie à part. Dans l'en-tête, le logo est l'icône `kumm` de `web/src/icons.ts` (il prend la couleur du thème).

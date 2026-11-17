@@ -1,8 +1,10 @@
+import { localPois } from "./local-services";
+import { AUTONOMOUS, localQuery } from "./local";
 import { Capacitor } from "@capacitor/core";
 import type { Departure, Poi, PoiKind, Stop } from "../../shared/types";
 import type { AnnotatedStopPoint, SiriStopMonitoring, SiriStopPoints } from "../../shared/cts-api";
 import { CONFIG, url } from "./config";
-import { DIRS, isTram, kindOfStop } from "./data";
+import { kindOfStop } from "./data";
 import { isHubName, stopKey } from "./network";
 import { STRASBOURG_VILLE, TER_STATIONS } from "../../shared/ter";
 import type { TerStation } from "../../shared/ter";
@@ -50,6 +52,7 @@ function setOffline(on: boolean, at = 0): void {
 }
 
 async function get<T>(path: string): Promise<T> {
+  if (AUTONOMOUS) return localQuery<T>("/api" + path);
   try {
     const d = await getOnline<T>(path);
     remember(path, d); setOffline(false);
@@ -97,6 +100,7 @@ async function getOnline<T>(path: string): Promise<T> {
  * Deux demandes simultanées pour le même arrêt partagent aussi la même réponse.
  */
 const DEPS_TTL = 20_000;
+export function clearDepartureCache(): void { depsCache.clear(); }
 const depsCache = new Map<string, { t: number; p: Promise<Departure[]>; dbg?: { last: unknown[]; info: unknown } }>();
 
 export function nextDepartures(stop: Stop): Promise<Departure[]> {
@@ -117,7 +121,7 @@ export function nextDepartures(stop: Stop): Promise<Departure[]> {
 
 /** Prochains passages à un arrêt : on essaie le code de l'arrêt, puis ceux de ses quais, jusqu'à obtenir des passages */
 async function fetchDepartures(stop: Stop): Promise<Departure[]> {
-  if (CONFIG.USE_MOCK) return mockDepartures(stop);
+
   const candidates = [...new Set(stop.refs ?? [stop.id])];
   const map: Record<string, Departure> = {};
   debug.last = [];
@@ -228,9 +232,14 @@ export const quayOf = (stop: Stop): string | undefined => [stop.id, ...(stop.ref
 
 /** Horaires prévus à un arrêt à partir d'une date et d'une heure (jusqu'à 80 passages) */
 export async function plannedDepartures(stop: Stop, at: number): Promise<PlannedDeparture[]> {
+  if (AUTONOMOUS && stop.sncf && !quayOf(stop)) {
+    const j = await localQuery<{ trains: TrainDeparture[] }>(`/api/trains?gare=${encodeURIComponent(stop.sncf)}&at=${at}`);
+    return j.trains.map(t => ({ line: "TER", dest: t.dest, t: t.t }));
+  }
   const q = quayOf(stop);
   if (!q) throw new Error("Horaires prévus indisponibles pour cet arrêt");
-  const r = await fetch(url(`/geo/stoptimes?stop=${encodeURIComponent(q)}&time=${encodeURIComponent(new Date(at).toISOString())}`));
+  const path = `/geo/stoptimes?stop=${encodeURIComponent(q)}&time=${encodeURIComponent(new Date(at).toISOString())}`;
+  const r = AUTONOMOUS ? new Response(JSON.stringify(await localQuery(path))) : await fetch(url(path));
   if (!r.ok) throw new Error("Horaires prévus indisponibles pour le moment");
   const j = (await r.json()) as { stopTimes?: { routeShortName?: string; headsign?: string; place?: { departure?: string; scheduledDeparture?: string }; cancelled?: boolean }[] };
   return (j.stopTimes ?? []).filter(x => !x.cancelled && x.routeShortName && x.place)
@@ -271,6 +280,7 @@ export interface LineStats { since: string | null; days: number; line: string; a
 export const STATS: Record<string, { at: number; v?: NetStats | LineStats; failed?: boolean }> = {};
 const statsLoading = new Set<string>();
 export function ensureStats(line: string, done: () => void): void {
+  if (AUTONOMOUS) return;
   const r = STATS[line];
   if ((r && Date.now() - r.at < (r.failed ? 30_000 : 300_000)) || statsLoading.has(line)) return;
   statsLoading.add(line);
@@ -320,6 +330,7 @@ export async function loadMessages(): Promise<TrafficMsg[]> {
 
 /** Stations Vélhop et parkings relais : sources ouvertes, relayées par notre serveur */
 export async function loadPois(): Promise<Poi[]> {
+  if (AUTONOMOUS) return localPois();
   const out: Poi[] = [];
   const sources: { path: string; kind: PoiKind }[] = [{ path: "/poi/pr", kind: "pr" }, { path: "/poi/velhop", kind: "velhop" }];
   await Promise.all(sources.map(async s => {
@@ -340,6 +351,7 @@ export interface BikePoint { t: number; bikes: number; docks: number; empty: num
 export const FORECASTS: Record<string, { at: number; points?: BikePoint[]; failed?: boolean }> = {};
 const forecastLoading = new Set<string>();
 export function ensureForecast(id: string, done: () => void): void {
+  if (AUTONOMOUS) return;
   const r = FORECASTS[id];
   if ((r && Date.now() - r.at < (r.failed ? 60_000 : 300_000)) || forecastLoading.has(id)) return;
   forecastLoading.add(id);
@@ -368,6 +380,7 @@ function deviceId(): string {
 export const REPORTS: Record<string, { at: number; items: Report[] }> = {};
 const reportsLoading = new Set<string>();
 export function ensureReports(stop: string, done: () => void, force = false): void {
+  if (AUTONOMOUS) return;
   const r = REPORTS[stop];
   if ((!force && r && Date.now() - r.at < 60_000) || reportsLoading.has(stop)) return;
   reportsLoading.add(stop);
@@ -379,30 +392,9 @@ export function ensureReports(stop: string, done: () => void, force = false): vo
 }
 /** Nouveau signalement, ou réponse à un signalement (« toujours vrai » : yes, « c'est réglé » : no) */
 export async function sendReport(stop: string, kind: string, vote?: "yes" | "no"): Promise<string> {
+  if (AUTONOMOUS) throw Error("Bientôt disponible");
   const r = await fetch(url("/api/report"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stop, kind, device: deviceId(), ...(vote ? { vote } : {}) }) });
   const j = (await r.json().catch(() => ({}))) as { message?: string };
   if (!r.ok) throw new Error(j.message ?? "Envoi impossible");
   return j.message ?? "Merci";
-}
-
-/* ---------- données de démonstration ---------- */
-
-function seed(str: string): number {
-  let h = 0;
-  for (const c of str) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h;
-}
-
-function mockDepartures(stop: Stop): Departure[] {
-  const now = Date.now(), out: Departure[] = [];
-  for (const l of stop.lines) {
-    const dirs = (DIRS[l] ?? ["", ""]).filter((d, i, a) => a.indexOf(d) === i);
-    dirs.forEach((dest, i) => {
-      const s = seed(stop.id + l + i), freq = isTram(l) ? 6 + (s % 5) : 9 + (s % 7);
-      const phase = now % (freq * 60000);
-      const t0 = now + (((s % freq) * 60000 - phase + freq * 60000) % (freq * 60000));
-      out.push({ line: l, dest, times: [t0, t0 + freq * 60000, t0 + 2 * freq * 60000] });
-    });
-  }
-  return out;
 }

@@ -11,7 +11,7 @@ on:
         options: [play, sideload]
         default: play
       publier:
-        description: "Publier un APK sideload signé sur la branche apk"
+        description: "Préparer une GitHub Release en brouillon avec l’APK signé"
         type: boolean
         default: false
 
@@ -55,7 +55,6 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       PROFILE: ${{ inputs.profil || 'play' }}
-      VITE_API_BASE: ${{ vars.KUMM_API_BASE || 'https://app.kumm.fr' }}
       VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v6
@@ -74,7 +73,6 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON: ${{ github.event_name == 'workflow_dispatch' && secrets.GOOGLE_SERVICES_JSON || '' }}
         run: |
-          node -e 'const u = new URL(process.env.VITE_API_BASE); if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) throw Error("Adresse publique HTTPS requise")'
           if [ "$PROFILE" = sideload ]; then export VITE_SIDELOAD_UPDATES=1; fi
           npx cap add android
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
@@ -86,7 +84,7 @@ jobs:
       - name: APK de test et bundle Play
         working-directory: android
         run: |
-          ./gradlew assembleDebug
+          ./gradlew testDebugUnitTest assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk ../kumm-test.apk
           if [ "$PROFILE" = play ]; then
             ./gradlew bundleRelease
@@ -142,6 +140,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -149,22 +149,33 @@ jobs:
         with:
           name: kumm-apk-sideload-signe
           path: ${{ runner.temp }}/kumm-publication
-      - name: Publier pour les mises à jour hors Play
+      - name: Préparer la release GitHub (brouillon uniquement)
         env:
           VERSION_CODE: ${{ github.run_number }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           D="$RUNNER_TEMP/kumm-publication"
           APK="$D/kumm.apk"
-          git fetch --quiet origin refs/heads/apk
-          previous=$(git rev-parse --verify 'FETCH_HEAD^{commit}')
-          P="$RUNNER_TEMP/kumm-apk-tree"
-          git worktree add --detach "$P" "$previous"
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName > "$D/stable-list.json"
+          if node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).length ? 0 : 1)' "$D/stable-list.json"; then
+            gh release view --json tagName > "$D/stable.json"
+            tag=$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).tagName' "$D/stable.json")
+            P="$D/stable"
+            mkdir "$P"
+            gh release download "$tag" --pattern kumm.apk --pattern latest.json --dir "$P"
+          else
+            # Première migration seulement : référence de signature/version historique.
+            git fetch --quiet origin refs/heads/apk
+            previous=$(git rev-parse --verify 'FETCH_HEAD^{commit}')
+            P="$RUNNER_TEMP/kumm-apk-tree"
+            git worktree add --detach "$P" "$previous"
+          fi
           "$BT/apksigner" verify --print-certs "$P/kumm.apk" > "$D/previous.cert"
           "$BT/apksigner" verify --print-certs "$APK" > "$D/candidate.cert"
           "$BT/aapt" dump badging "$APK" > "$D/candidate.badging"
           node scripts/android/release.mjs "$APK" "$VERSION_CODE" "$P/latest.json" "$D/candidate.badging" "$D/previous.cert" "$D/candidate.cert" "$D/latest.json"
-          cp "$APK" "$D/latest.json" "$P/"
-          git -C "$P" add kumm.apk latest.json
-          git -C "$P" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "APK Android (version $VERSION_CODE)"
-          git -C "$P" push origin HEAD:refs/heads/apk
+          # La branche apk reste une référence de migration, jamais modifiée ni supprimée.
+          version=$(node -p 'require("./package.json").version')
+          tag="android-${version}-${VERSION_CODE}"
+          gh release create "$tag" "$APK" "$D/latest.json" --target "$GITHUB_SHA" --draft --title "Kumm Android $version" --notes-file docs/ANDROID-RELEASE-NOTES.md

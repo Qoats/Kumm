@@ -1,4 +1,3 @@
-import type { Poi, Stop } from "../../shared/types";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { isHubName, isTramStationName } from "./network";
@@ -71,28 +70,6 @@ export const kindOfStop = (s: { name: string; sncf?: string }): Layer => {
   return k;
 };
 
-/* Arrêts de démonstration (mode ?mock) : x,y = position sur la carte schématique (0–360 / 0–440) */
-const RAW_STOPS: { id: string; name: string; x: number; y: number; lines: string[] }[] = [
-  {id:"HDF",name:"Homme de Fer",x:150,y:210,lines:["A","D","B","C","F"]},
-  {id:"LGS",name:"Langstross/Grand Rue",x:96,y:236,lines:["D"]},
-  {id:"GCE",name:"Gare Centrale",x:76,y:150,lines:["A","D","C","E"]},
-  {id:"BRO",name:"Broglie",x:208,y:176,lines:["B","C","E"]},
-  {id:"REP",name:"République",x:262,y:138,lines:["E","H","L3"]},
-  {id:"ETO",name:"Étoile Bourse",x:268,y:244,lines:["A","D","G"]},
-  {id:"HCV",name:"Hôpital Civil",x:166,y:310,lines:["G","H"]},
-  {id:"OBS",name:"Observatoire",x:252,y:196,lines:["C1","L1"]},
-  {id:"KRU",name:"Krutenau",x:208,y:290,lines:["C","F","L2"]},
-  {id:"FAU",name:"Faubourg National",x:118,y:176,lines:["C1","H"]},
-  {id:"BOU",name:"Boulevard de la Marne",x:60,y:350,lines:["B","E"]},
-  {id:"ESP",name:"Esplanade",x:130,y:370,lines:["A","D","E"]}
-];
-
-export const MOCK_STOPS: Stop[] = RAW_STOPS.map(r => ({
-  ...r,
-  lat: CENTER.lat - (r.y - 222) / KY,
-  lon: CENTER.lon + (r.x - 170) / KX
-}));
-
 /** Une info trafic de la CTS (texte brut, préparé par le serveur : /api/messages) */
 export interface TrafficMsg {
   id: string;
@@ -124,30 +101,3 @@ export function messagesForStop(name: string): TrafficMsg[] {
 export const isElevatorMsg = (m: TrafficMsg): boolean => /ascenseur|escalator|escalier m[ée]canique/i.test(m.title);
 /** Ligne touchée par un incident ou des travaux en cours */
 export const hasAlert = (l: string): boolean => MESSAGES.some(m => m.lines.some(r => sameLine(r, l)));
-
-/** Infos trafic de démonstration (mode ?mock uniquement) */
-export const MOCK_MESSAGES: TrafficMsg[] = [
-  { id: "demo-1", channel: "disruption", lines: ["B"], title: "Exemple : ligne B interrompue", period: "Démonstration", text: "Message fictif du mode démonstration." },
-  { id: "demo-2", channel: "works", lines: ["C1", "G"], title: "Exemple : arrêt déplacé", period: "Démonstration", text: "Message fictif du mode démonstration." }
-];
-
-/* Points de démonstration (mode ?mock) */
-const RAW_POIS: { id: string; kind: Poi["kind"]; name: string; x: number; y: number; info?: string }[] = [
-  { id: "vh1", kind: "velhop", name: "Vélhop Homme de Fer", x: 128, y: 196, info: "8 vélos disponibles" },
-  { id: "vh2", kind: "velhop", name: "Vélhop Broglie", x: 196, y: 150, info: "3 vélos disponibles" },
-  { id: "vh3", kind: "velhop", name: "Vélhop Étoile", x: 236, y: 262, info: "12 vélos disponibles" },
-  { id: "vh4", kind: "velhop", name: "Vélhop Krutenau", x: 184, y: 300 },
-  { id: "vp1", kind: "velopark", name: "Vélopark Gare Centrale", x: 96, y: 166, info: "Parking vélos sécurisé" },
-  { id: "vp2", kind: "velopark", name: "Vélopark République", x: 276, y: 160 },
-  { id: "vp3", kind: "velopark", name: "Vélopark Esplanade", x: 150, y: 352 },
-  { id: "pr1", kind: "pr", name: "P+R Rotonde", x: 36, y: 262, info: "212 places libres sur 400" },
-  { id: "pr2", kind: "pr", name: "P+R Elsau", x: 306, y: 330, info: "58 places libres sur 250" },
-  { id: "fx1", kind: "flexhop", name: "Zone Flex’hop Nord", x: 40, y: 110, info: "Transport à la demande, réservation dans l’app" },
-  { id: "fx2", kind: "flexhop", name: "Zone Flex’hop Sud", x: 326, y: 252 },
-  { id: "ter1", kind: "ter", name: "Strasbourg-Ville", x: 54, y: 128, info: "Gare TER" }
-];
-export const MOCK_POIS: Poi[] = RAW_POIS.map(r => ({
-  ...r,
-  lat: CENTER.lat - (r.y - 222) / KY,
-  lon: CENTER.lon + (r.x - 170) / KX
-}));

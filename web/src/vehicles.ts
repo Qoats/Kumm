@@ -1,3 +1,4 @@
+import { AUTONOMOUS } from "./local";
 /**
  * Trams et bus en circulation : position estimée par le serveur d'après les horaires temps réel (/api/vehicles),
  * puis animée ici seconde par seconde entre l'arrêt quitté et le suivant.
@@ -51,7 +52,7 @@ export const serverNow = (): number => Date.now() + skew;
 
 /** Recharge les positions si les dernières ont plus de 20 s ; rappelle onUpdate quand elles arrivent */
 export function refreshVehicles(onUpdate: () => void): void {
-  if (CONFIG.USE_MOCK || !CONFIG.SERVER_READY || loading || Date.now() - lastFetch < REFRESH_MS) return;
+  if (AUTONOMOUS || CONFIG.USE_MOCK || !CONFIG.SERVER_READY || loading || Date.now() - lastFetch < REFRESH_MS) return;
   loading = true;
   fetch(url("/api/vehicles"))
     .then(r => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))

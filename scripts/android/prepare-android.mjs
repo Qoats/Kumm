@@ -13,6 +13,8 @@ const java = app + "/src/main/java/fr/kumm/app";
 const read = path => fs.readFileSync(path, "utf8");
 const write = (path, update) => fs.writeFileSync(path, update(read(path)));
 
+fs.mkdirSync(app + "/src/test/java/fr/kumm/app", { recursive: true });
+fs.cpSync("android-tests", app + "/src/test/java/fr/kumm/app", { recursive: true });
 fs.cpSync("android-res", app + "/src/main/res", { recursive: true });
 for (const file of fs.readdirSync("android-src").filter(name => name.endsWith(".java"))) {
   const target = java + "/" + file;
@@ -26,7 +28,7 @@ write(app + "/src/main/res/values/styles.xml", text => text.includes("windowSpla
 
 write(app + "/src/main/AndroidManifest.xml", text => {
   const permissions = [
-    "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "FOREGROUND_SERVICE",
+    "RECEIVE_BOOT_COMPLETED", "ACCESS_NETWORK_STATE", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "FOREGROUND_SERVICE",
     "FOREGROUND_SERVICE_LOCATION", "FOREGROUND_SERVICE_DATA_SYNC", "POST_NOTIFICATIONS", "VIBRATE",
     ...(sideload ? ["REQUEST_INSTALL_PACKAGES"] : [])
   ];
@@ -36,6 +38,7 @@ write(app + "/src/main/AndroidManifest.xml", text => {
     }
   }
   if (!sideload) text = text.replace(/^[\t ]*<uses-permission android:name="android\.permission\.REQUEST_INSTALL_PACKAGES"\s*\/>\r?\n/gm, "");
+  if (!text.includes(".GtfsJob")) text = text.replace("</application>", '<service android:name=".GtfsJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />\n    </application>');
   if (!text.includes("StopWidget")) text = text.replace("</application>", read("android-src/widgets-manifest.xml") + "    </application>");
   if (!text.includes("default_notification_icon")) {
     text = text.replace("</application>", '    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_kumm" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="alertes" />\n    </application>');
@@ -49,6 +52,11 @@ write(app + "/build.gradle", text => {
   if (!text.includes("shrinkResources true")) {
     text = text.replace(/minifyEnabled (?:false|true)/, "minifyEnabled true\n            shrinkResources true");
   }
+  if (!text.includes("coreLibraryDesugaringEnabled")) text = text.replace("    buildTypes {", "    compileOptions {\n        coreLibraryDesugaringEnabled true\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n    }\n    buildTypes {");
+  if (!text.includes("desugar_jdk_libs")) text = text.replace("dependencies {", "dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'");
+  if (!text.includes("robolectric")) text = text.replace("dependencies {", "dependencies {\n    testImplementation 'org.robolectric:robolectric:4.16.1'");
+  if (!text.includes("mockwebserver")) text = text.replace("dependencies {", "dependencies {\n    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'");
+  if (!text.includes("includeAndroidResources")) text = text.replace("    buildTypes {", "    testOptions { unitTests.includeAndroidResources = true }\n    buildTypes {");
   return text;
 });
 const proguard = read("android-src/proguard-kumm.pro");

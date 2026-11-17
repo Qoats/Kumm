@@ -1,3 +1,4 @@
+import { AUTONOMOUS } from "./local";
 /**
  * Présentation au premier lancement : ce que fait Kumm, les symboles de la carte, où trouver les options,
  * puis les autorisations (position, notifications) expliquées avant d'être demandées, et l'acceptation des conditions.
@@ -30,7 +31,7 @@ export function onboardingSteps(): StepId[] {
 /** Toutes les étapes (premier lancement, ou « Revoir la présentation » dans les réglages) */
 export function allSteps(): StepId[] {
   const all: StepId[] = ["welcome", "features", "map", "where", "location", "alerts", "terms"];
-  return all.filter(id => id !== "alerts" || (NATIVE && PUSH_READY));   // alertes push : application Android seulement
+  return all.filter(id => id !== "alerts" || AUTONOMOUS || (NATIVE && PUSH_READY));   // alertes push : application Android seulement
 }
 
 export function acceptTerms(): void {
@@ -60,26 +61,26 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
   switch (id) {
     case "welcome":
       body = `<img class="onb-applogo" src="/favicon.svg" alt="" width="76" height="76"><h1>Bienvenue dans Kumm</h1>
-        <p>Les prochains trams et bus de Strasbourg, la carte du réseau et les perturbations en cours, au même endroit.</p>
+        <p>${AUTONOMOUS ? "Les horaires théoriques officiels CTS et TER, la carte du réseau et vos favoris, disponibles sans serveur Kumm. Le temps réel : Bientôt disponible." : "Les prochains trams et bus de Strasbourg, la carte du réseau et les perturbations en cours, au même endroit."}</p>
         <p class="onb-note">Kumm est une application indépendante : elle utilise les données ouvertes de la CTS, mais n’est pas éditée par la CTS.</p>`;
       actions = next("Découvrir");
       break;
     case "features":
       body = `<h1>Ce que vous pouvez faire</h1>
-        ${row(ic("clock"), "Passages en direct", "Les prochains départs à chaque arrêt, en temps réel.")}
-        ${row(ic("pin"), "Carte", "Les arrêts autour de vous et les trams et bus en circulation.")}
+        ${AUTONOMOUS ? row(ic("clock"), "Horaires théoriques", "Les prochains départs officiels, conservés sur le téléphone et recalculés toutes les 30 secondes.") : ""}${row(ic("clock"), "Passages en direct", AUTONOMOUS ? "Bientôt disponible" : "Les prochains départs à chaque arrêt, en temps réel.")}
+        ${row(ic("pin"), "Carte", AUTONOMOUS ? "Les arrêts autour de vous. Suivi des véhicules : Bientôt disponible." : "Les arrêts autour de vous et les trams et bus en circulation.")}
         ${row(ic("route"), "Itinéraires", "Cherchez un arrêt, une adresse ou un lieu, touchez « Naviguer » : en transports, à pied ou à vélo, avec le guidage.")}
-        ${row(ic("mail"), "Infos trafic", "Les perturbations et travaux en cours sur le réseau.")}
-        ${row(ic("bike"), "Vélhop et parkings relais", "Les vélos et les places disponibles.")}`;
+        ${row(ic("mail"), "Infos trafic", AUTONOMOUS ? "Bientôt disponible" : "Les perturbations et travaux en cours sur le réseau.")}
+        ${row(ic("bike"), "Vélhop et parkings relais", AUTONOMOUS ? "Les emplacements des stations et parkings. Disponibilités : Bientôt disponible." : "Les vélos et les places disponibles.")}`;
       actions = next();
       break;
     case "map":
       body = `<h1>Les symboles de la carte</h1>
         <div class="onb-legend">${LEGEND.map(([k, t]) => `<div>${markerIcon(k, 30)}<span>${t}</span></div>`).join("")}</div>
         <div class="onb-legend onb-legend2">
-          <div><span class="ln sm" style="background:#009EE0;color:#fff">B<span class="al">!</span></span><span>Ligne perturbée : touchez-la pour voir l’info trafic</span></div>
-          <div><span class="onb-live"><span class="live"></span></span><span>Horaire en temps réel (sinon, horaire prévu)</span></div>
-          <div><b class="onb-quai">À quai</b><span>Le tram ou le bus est à l’arrêt</span></div>
+          <div><span class="ln sm" style="background:#009EE0;color:#fff">B<span class="al">!</span></span><span>${AUTONOMOUS ? "Infos trafic : Bientôt disponible" : "Ligne perturbée : touchez-la pour voir l’info trafic"}</span></div>
+          <div><span class="onb-live"><span class="live"></span></span><span>${AUTONOMOUS ? "Temps réel : Bientôt disponible" : "Horaire en temps réel (sinon, horaire prévu)"}</span></div>
+          <div><b class="onb-quai">À quai</b><span>${AUTONOMOUS ? "Bientôt disponible" : "Le tram ou le bus est à l’arrêt"}</span></div>
         </div>
         <p class="onb-note">Les catégories en haut de la carte (${KINDS.tram.label}, ${KINDS.bus.label}, ${KINDS.velhop.label}…) servent à afficher ou masquer chaque type de point.</p>`;
       actions = next();
@@ -88,7 +89,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
       body = `<h1>Où trouver quoi</h1>
         ${row(ic("sliders"), "Réglages", "En haut de l’accueil : thème, alertes trafic, version de l’application, mentions légales.")}
         ${row(ic("heart"), "Favoris", "Touchez le cœur sur la fiche d’un arrêt pour voir ses passages dès l’accueil.")}
-        ${row(ic("mail"), "Infos trafic", "En haut de l’accueil, toutes les perturbations en cours.")}
+        ${row(ic("mail"), "Infos trafic", AUTONOMOUS ? "En haut de l’accueil. Bientôt disponible." : "En haut de l’accueil, toutes les perturbations en cours.")}
         ${row(ic("pin"), "Carte", "En bas de l’écran : la carte, les arrêts et les départs autour de vous.")}
         ${row(ic("search"), "Recherche et « Naviguer »", "En bas de l’écran : un arrêt, une adresse ou un lieu, puis « Naviguer » pour choisir l’itinéraire et l’heure.")}`;
       actions = next();
@@ -102,6 +103,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
       actions = `<button class="onb-main" data-onb="loc">Autoriser la position</button><button class="onb-sec" data-onb="next">Plus tard</button>`;
       break;
     case "alerts":
+      if (AUTONOMOUS) { body = `<div class="onb-big">${ic("mail")}</div><h1>Alertes trafic</h1><p>Bientôt disponible</p>`; actions = next(); break; }
       body = `<div class="onb-big">${ic("mail")}</div><h1>Alertes trafic</h1>
         <p>Recevez une notification quand une perturbation touche les lignes que vous suivez, même quand Kumm est fermée.</p>
         <div class="onb-box"><b>Ce que garde le serveur</b>

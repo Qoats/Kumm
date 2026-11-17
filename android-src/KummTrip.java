@@ -27,6 +27,7 @@ import org.json.JSONObject;
 public class KummTrip extends Plugin {
     @PluginMethod
     public void start(PluginCall call) {
+        if (!KummFeatures.REALTIME) { call.reject("Bientôt disponible"); return; }
         if (Build.VERSION.SDK_INT >= 33 && getPermissionState("notifications") != PermissionState.GRANTED) {
             requestPermissionForAlias("notifications", call, "afterNotifications");
             return;

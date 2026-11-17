@@ -17,10 +17,6 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.view.View;
 import android.widget.RemoteViews;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -78,25 +74,7 @@ public final class WidgetCore {
     /* ---------- réseau ---------- */
 
     static JSONObject get(Context c, String path) throws Exception {
-        JSONObject s = shared(c);
-        String base = s.optString("base", "");
-        if (base.isEmpty()) throw new Exception("Ouvrez Kumm une première fois");
-        HttpURLConnection h = (HttpURLConnection) new URL(base + path).openConnection();
-        h.setConnectTimeout(8000);
-        h.setReadTimeout(8000);
-        // le serveur reconnaît l'application Android à son origine (accès privé), et à sa clé si elle est configurée
-        h.setRequestProperty("Origin", "https://localhost");
-        try {
-            int code = h.getResponseCode();
-            InputStream in = code < 400 ? h.getInputStream() : h.getErrorStream();
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while (in != null && (n = in.read(buf)) > 0) out.write(buf, 0, n);
-            JSONObject j = json(out.toString("UTF-8"));
-            if (code >= 400) throw new Exception(j.optString("erreur", "Serveur indisponible (" + code + ")"));
-            return j;
-        } finally { h.disconnect(); }
+        return LocalTimetable.widget(c, path);
     }
 
     static String enc(String s) { try { return URLEncoder.encode(s, "UTF-8"); } catch (Exception e) { return s; } }
@@ -285,7 +263,7 @@ public final class WidgetCore {
                     fillDepartures(c, v, deps, 4);
                     if (j.optBoolean("scheduled")) v.setTextViewText(id(c, "w_sub"), "Horaires théoriques");
                     else if (type.equals("stop")) v.setTextViewText(id(c, "w_sub"), "màj " + hm(System.currentTimeMillis()));
-                } catch (Exception e) { return message(c, v, e.getMessage() != null ? e.getMessage() : "Serveur injoignable"); }
+                } catch (Exception e) { return message(c, v, e.getMessage() != null ? e.getMessage() : "Horaires locaux indisponibles"); }
                 return v;
             }
             case "trip":
@@ -318,7 +296,7 @@ public final class WidgetCore {
                         return v;
                     }
                     v.setTextViewText(id(c, "w_time"), hm(t.optLong(0)) + (g.optBoolean("rt") && type.equals("trip") ? " •" : ""));
-                    if (j.optBoolean("scheduled") && !line.equals("TER")) v.setTextViewText(id(c, "w_dest"), dest + " · Horaire théorique");
+                    if (j.optBoolean("scheduled")) v.setTextViewText(id(c, "w_dest"), dest + " · Horaire théorique");
                     if (type.equals("trip")) {
                         StringBuilder b = new StringBuilder();
                         for (int i = 1; i < t.length(); i++) b.append(i == 1 ? "puis " : " · ").append(hm(t.optLong(i)));
@@ -326,7 +304,7 @@ public final class WidgetCore {
                     }
                 } catch (Exception e) {
                     v.setTextViewText(id(c, "w_time"), "—");
-                    if (type.equals("trip")) v.setTextViewText(id(c, "w_next"), "Serveur injoignable");
+                    if (type.equals("trip")) v.setTextViewText(id(c, "w_next"), "Horaires locaux indisponibles");
                 }
                 return v;
             }
@@ -337,7 +315,7 @@ public final class WidgetCore {
                 String ls = lines != null && lines.length() > 0 ? join(lines) : "*";
                 try {
                     if (!shared(c).optBoolean("traffic")) {
-                        v.setTextViewText(id(c, "w_title"), "Prochainement disponible");
+                        v.setTextViewText(id(c, "w_title"), "Bientôt disponible");
                         v.setTextViewText(id(c, "w_sub"), "");
                         return v;
                     }
@@ -363,7 +341,7 @@ public final class WidgetCore {
                 } catch (Exception e) {
                     v.setImageViewBitmap(id(c, "w_badge"), chip(c, "?", 0xFF8A9A92, Color.WHITE, 34));
                     v.setTextViewText(id(c, "w_title"), "Infos trafic indisponibles");
-                    v.setTextViewText(id(c, "w_sub"), e.getMessage() != null ? e.getMessage() : "Serveur injoignable");
+                    v.setTextViewText(id(c, "w_sub"), e.getMessage() != null ? e.getMessage() : "Horaires locaux indisponibles");
                 }
                 return v;
             }
@@ -398,7 +376,7 @@ public final class WidgetCore {
                     }
                 } catch (Exception e) {
                     v.setTextViewText(id(c, "w_big"), "—");
-                    v.setTextViewText(id(c, "w_sub"), e.getMessage() != null ? e.getMessage() : "Serveur injoignable");
+                    v.setTextViewText(id(c, "w_sub"), e.getMessage() != null ? e.getMessage() : "Horaires locaux indisponibles");
                 }
                 return v;
             }

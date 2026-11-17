@@ -33,6 +33,17 @@ public class KummUpdater extends Plugin {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.O || getContext().getPackageManager().canRequestPackageInstalls();
     }
 
+    private boolean playInstallation() {
+        String installer;
+        try {
+            installer = Build.VERSION.SDK_INT >= 30 ? getContext().getPackageManager().getInstallSourceInfo(getContext().getPackageName()).getInstallingPackageName()
+                : getContext().getPackageManager().getInstallerPackageName(getContext().getPackageName());
+        } catch (Exception e) { return false; }
+        return "com.android.vending".equals(installer);
+    }
+    @PluginMethod public void source(PluginCall call) {
+        JSObject result = new JSObject(); result.put("play", playInstallation()); call.resolve(result);
+    }
     /** L'utilisateur a-t-il autorisé Kumm à installer des applications (réglage « Sources inconnues ») ? */
     @PluginMethod
     public void canInstall(PluginCall call) {
@@ -57,9 +68,10 @@ public class KummUpdater extends Plugin {
     /** Télécharge puis installe ; événements « progress » { done, total } pendant le téléchargement */
     @PluginMethod
     public void install(PluginCall call) {
+        if (playInstallation()) { call.reject("Utilisez Google Play pour mettre Kumm à jour"); return; }
         String url = call.getString("url", "");
         String sha = call.getString("sha256", "").toLowerCase();
-        if (!url.startsWith("https://") || !sha.matches("[0-9a-f]{64}")) { call.reject("Mise à jour invalide"); return; }
+        if (!url.matches("https://github\\.com/Qoats/Kumm/releases/download/[^/]+/kumm\\.apk") || !sha.matches("[0-9a-f]{64}")) { call.reject("Mise à jour invalide"); return; }
         if (!allowed()) { call.reject("Autorisation d'installer manquante", "PERMISSION"); return; }
         if (busy) { call.reject("Téléchargement déjà en cours"); return; }
         busy = true;
@@ -118,8 +130,17 @@ public class KummUpdater extends Plugin {
     }
 
     private File checked(Context ctx, File apk) throws Exception {
-        PackageInfo info = ctx.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), 0);
+        PackageInfo info = ctx.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), (Build.VERSION.SDK_INT >= 28 ? android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES : android.content.pm.PackageManager.GET_SIGNATURES));
         if (info == null || !ctx.getPackageName().equals(info.packageName)) { apk.delete(); throw new Exception("Ce fichier n'est pas une version de Kumm"); }
+        PackageInfo installed = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), (Build.VERSION.SDK_INT >= 28 ? android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES : android.content.pm.PackageManager.GET_SIGNATURES));
+        if ((Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode) <= (Build.VERSION.SDK_INT >= 28 ? installed.getLongVersionCode() : installed.versionCode)) throw new Exception("Version déjà installée ou plus ancienne");
+        android.content.pm.Signature[] installedSigners = Build.VERSION.SDK_INT >= 28 && installed.signingInfo != null ? installed.signingInfo.getApkContentsSigners() : installed.signatures;
+        android.content.pm.Signature[] archiveSigners = Build.VERSION.SDK_INT >= 28 && info.signingInfo != null ? info.signingInfo.getApkContentsSigners() : info.signatures;
+        if (installedSigners == null || archiveSigners == null || installedSigners.length == 0) throw new Exception("Signature Android absente");
+        java.util.Set<String> expected = new java.util.HashSet<>(), actual = new java.util.HashSet<>();
+        for (android.content.pm.Signature signature : installedSigners) expected.add(signature.toCharsString());
+        for (android.content.pm.Signature signature : archiveSigners) actual.add(signature.toCharsString());
+        if (!expected.equals(actual)) { apk.delete(); throw new Exception("La signature diffère de l’application installée"); }
         return apk;
     }
 

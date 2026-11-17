@@ -1,3 +1,5 @@
+import { AUTONOMOUS } from "./local";
+import { publicJson } from "./local-services";
 import type { Place, WalkRoute, WalkStep } from "../../shared/types";
 import type { AddressResponse, OsrmResponse, OsrmStep } from "../../shared/geo-api";
 import type { LL } from "./geo";
@@ -42,6 +44,7 @@ const toStep = (s: OsrmStep): WalkStep => ({
 });
 
 async function getJson<T>(path: string): Promise<T> {
+  if (AUTONOMOUS) return publicJson<T>(path);
   const r = await fetch(url(path));
   if (!r.ok) throw new Error("Service " + r.status);
   return (await r.json()) as T;

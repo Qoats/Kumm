@@ -1,3 +1,4 @@
+import { AUTONOMOUS } from "./local";
 /**
  * Alertes de descente pendant une navigation (« Naviguer », puis un itinéraire en transports, flow.ts). Pour chaque étape en
  * tram ou en bus, Kumm retrouve la course à prendre (ligne, arrêt de montée, arrêt de descente, heure) puis :
@@ -40,6 +41,7 @@ const NATIVE = Capacitor.getPlatform() === "android" && Capacitor.isPluginAvaila
 const Trip = registerPlugin<KummTripPlugin>("KummTrip");
 
 async function fetchTrip(q: string): Promise<TripDetail | null> {
+  if (AUTONOMOUS) return null;
   try {
     const r = await fetch(url("/api/trip?" + q));
     return r.ok ? (await r.json()) as TripDetail : null;
@@ -54,6 +56,7 @@ let legs: RouteLeg[] = [], legIdx = 0, retryTimer = 0, missed = 0, legsDone = 0;
 
 /** Navigation lancée : les étapes en tram ou en bus de l'itinéraire seront suivies */
 export function followRoute(list: RouteLeg[]): void {
+  if (AUTONOMOUS) { toast("Suivi en temps réel : Bientôt disponible"); return; }
   stopJourney(true);
   legs = list.filter(l => l.line); legIdx = 0; missed = 0; legsDone = 0;
   if (legs.length) void startLeg(legs[0].start - 120_000, true);

@@ -1,3 +1,7 @@
+import { clearDepartureCache } from "./api";
+import { foregroundClock } from "./foreground";
+import { migrateFavourites } from "./migrate";
+import { AUTONOMOUS, LOCAL_STATUS, syncLocal } from "./local";
 // police de l'interface, servie par Kumm lui-même (pas de requête vers Google Fonts : l'adresse IP des visiteurs reste privée)
 import "@fontsource/plus-jakarta-sans/latin-400.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-400.css";
@@ -43,7 +47,7 @@ import type { PlaceKey } from "./store";
 import type { Filter, Tab } from "./store";
 import {
   overlayAccount, overlayHelp, overlayWidget, debugBox, depCards, pickDir, stopNotice, stopTabs, trainBoard, header, layerCounts, overlayFavs, overlayLine, overlayMsgs, overlayPoi, overlaySettings, overlayLook, overlayStats, overlayNoel, overlayBikePick, overlayPlaceSet, overlayVehicle, overlayStop, screenHome, favRows, departureBoard, contremarqueInfo, arrivalPicker, plannedBoard,
-  screenLines, screenNearby, screenSearch, screenTrips, tripsDemo, whenSheet
+  screenLines, screenNearby, screenSearch, screenTrips, whenSheet
 } from "./views";
 import { cmpVersion, esc, fold } from "./util";
 import { Capacitor } from "@capacitor/core";
@@ -124,7 +128,7 @@ function draw(): void {
     (S.journey ? "" : rideBanner()) +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "") +
     // hors connexion : on affiche les dernières données reçues, en disant de quand elles datent
-    (OFFLINE.on || !navigator.onLine ? `<div class="offbar">${ic("clock", 'width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"')}Hors connexion${OFFLINE.at ? ` · horaires de ${hm(OFFLINE.at)}` : ""}</div>` : "");
+    (AUTONOMOUS && Object.values(LOCAL_STATUS).some(s => s.expired) ? `<div class="offbar">Données horaires périmées · Actualisez les données dans les paramètres</div>` : OFFLINE.on || !navigator.onLine ? `<div class="offbar">${ic("clock", 'width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"')}Hors connexion${OFFLINE.at ? ` · horaires de ${hm(OFFLINE.at)}` : ""}</div>` : "");
 
   if (act) {
     const el = document.getElementById(act) as HTMLInputElement | null;
@@ -214,7 +218,7 @@ async function loadDepsNow(): Promise<void> {
         .filter((g, i) => i === 0 || g.d < GARE_NEAR_M).slice(0, 3);
       await fillSlot("nearlist", async () => {
         const res = await Promise.all(gares.map(({ s }) => nextTrains(s.sncf!).catch(() => null)));
-        if (res.every(r => r === null)) throw new Error("Serveur Kumm injoignable");
+        if (res.every(r => r === null)) throw new Error(AUTONOMOUS ? "Horaires locaux indisponibles : actualisez les données" : "Serveur Kumm injoignable");
         return gares.map(({ s, d }, i) => trainBoard(res[i] ?? [], 4, s.sncf === STRASBOURG_VILLE ? "Strasbourg-Ville" : s.name, `Gare · ${fmtDist(d)}`, s.id, s.sncf)).join("");
       });
     } else if (S.tab === "nearby" && !S.overlay) {
@@ -230,7 +234,7 @@ async function loadDepsNow(): Promise<void> {
         if (!near.length) return `<div class="empty" style="padding:24px">Aucun arrêt ${filter === "all" ? "ni gare " : ""}à moins de 2 km.${filter === "all" ? " Les gares plus lointaines sont dans l’onglet TER." : ""}</div>`;
         const res = await Promise.all(near.map(s => nextDepartures(s).then(ds => ds.map(d => ({ stop: s, d }))).catch(() => null)));
         // aucun arrêt n'a pu être interrogé : on garde la liste affichée (voir le catch de loadDeps)
-        if (res.every(r => r === null)) throw new Error("Serveur Kumm injoignable");
+        if (res.every(r => r === null)) throw new Error(AUTONOMOUS ? "Horaires locaux indisponibles : actualisez les données" : "Serveur Kumm injoignable");
         const all: StopDeparture[] = [];
         let stops = 0;
         for (const rows of res) {   // dans l'ordre de distance
@@ -278,8 +282,7 @@ async function loadDepsNow(): Promise<void> {
       }
     }
     if (S.tab === "trips") {
-      if (CONFIG.USE_MOCK) { if (document.getElementById("trips")) await fillSlot("trips", async () => tripsDemo()); }
-      else ensurePlanned();   // calcule une seule fois par trajet ; chaque mode s'affiche dès qu'il arrive
+      ensurePlanned();   // calcule une seule fois par trajet ; chaque mode s'affiche dès qu'il arrive
     }
   } catch (e) {
     console.error(e);
@@ -449,8 +452,9 @@ app.addEventListener("click", e => {
     case "swap": swapTrip(); break;
     case "when": S.trip.whenDraft = { ...S.trip.when, at: S.trip.when.at || Math.ceil(Date.now() / 300_000) * 300_000 }; break;
     case "whenClose": S.trip.whenDraft = null; break;
-    case "replan": replan(); break;
-    case "report": if (S.overlay?.k === "stop") S.overlay.rep = true; break;
+    case "replan": if (AUTONOMOUS) void refreshLocal().then(() => replan()); else replan(); break;
+    case "syncGtfs": void refreshLocal(); return;
+    case "report": if (AUTONOMOUS) { toast("Signalements : Bientôt disponible"); return; } if (S.overlay?.k === "stop") S.overlay.rep = true; break;
     case "whenOk": if (S.trip.whenDraft) S.trip.when = S.trip.whenDraft; S.trip.whenDraft = null; S.trip.sel = 0; break;
     case "sheet": if (S.swiped) return; S.sheet = S.sheet === 0 ? 1 : S.sheet === 2 ? 1 : 0; break;
     case "msgs": S.overlay = { k: "msgs" }; break;
@@ -515,10 +519,11 @@ let waitingPermission: Release | null = null;
 async function offerUpdate(manual: boolean): Promise<void> {
   if (!CAN_UPDATE) { if (manual) toast("Mises à jour automatiques disponibles dans l'application Android"); return; }
   let rel: Release | null | "unpublished";
-  try { rel = await checkUpdate(); } catch { if (manual) toast("Impossible de vérifier les mises à jour pour le moment"); return; }
-  if (rel === "unpublished") { if (manual) toast(`Version ${VERSION} · aucune mise à jour n'est encore proposée par le serveur`); return; }
+  try { rel = await checkUpdate(manual); } catch (e) { if (manual) toast("Vérification impossible : " + String(e)); return; }
+  if (rel === "unpublished") { if (manual) toast(`Version ${VERSION} · aucune release stable disponible sur GitHub`); return; }
   if (!rel) { if (manual) toast(`Kumm est à jour (version ${VERSION})`); return; }
-  // une version plus récente existe : l'application n'est plus utilisable tant qu'elle n'est pas installée
+  if (!manual && localStorage.getItem("ignored-release") === String(rel.code)) return;
+  // La proposition reste facultative et peut être fermée à tout moment.
   S.upd = { rel, phase: "ready", pct: 0 };
   render();
 }
@@ -529,7 +534,7 @@ async function startUpdate(rel: Release): Promise<void> {
   try {
     const r = await installUpdate(rel, pct => { if (S.upd && pct !== S.upd.pct) { S.upd.pct = pct; render(); } });
     if (r === "permission") {
-      // Android ouvre son réglage ; au retour dans Kumm, l'installation reprend toute seule
+      // Le consentement initial couvre la reprise après le réglage Android.
       waitingPermission = rel;
       S.upd = { rel, phase: "perm", pct: 0 };
     } else {
@@ -544,7 +549,8 @@ async function startUpdate(rel: Release): Promise<void> {
 
 function updateAction(a: string): void {
   if (a === "go" && S.upd?.rel) void startUpdate(S.upd.rel);
-  else if (a === "quit") void CapApp.exitApp();
+  else if (a === "quit" || a === "later") { waitingPermission = null; S.upd = null; render(); }
+  else if (a === "ignore" && S.upd?.rel) { waitingPermission = null; localStorage.setItem("ignored-release", String(S.upd.rel.code)); S.upd = null; render(); }
   else if (a === "reload") location.reload();
 }
 
@@ -700,13 +706,6 @@ app.addEventListener("input", e => {
     if (S.q.trim().length > 2) refreshVehicles(() => { if (S.tab === "search") render(); });
   }
   if (t.id === "tto" || t.id === "tfrom") {
-    if (CONFIG.USE_MOCK) {
-      if (t.id !== "tto") return;
-      S.trip.toText = t.value;
-      const tr = document.getElementById("trips");
-      if (S.trip.toText.trim().length > 1) { if (!tr) render(); else tr.innerHTML = tripsDemo(); } else render();
-      return;
-    }
     if (t.id === "tto") { S.trip.toText = t.value; S.trip.dest = null; askSuggestions("to"); }
     else { S.trip.fromText = t.value; S.trip.fromIsMe = false; S.trip.from = null; askSuggestions("from"); }
   }
@@ -784,7 +783,11 @@ app.addEventListener("pointerup", e => {
   if (Math.abs(dy) > 24) { S.sheet = (dy < 0 ? Math.min(2, S.sheet + 1) : Math.max(0, S.sheet - 1)) as 0 | 1 | 2; S.swiped = true; setTimeout(() => { S.swiped = false; }, 300); render(); }
 });
 
-setInterval(() => { if (!document.hidden && document.activeElement?.tagName !== "INPUT") void loadDeps(); }, 30000);
+let nativeActive = true;
+const departureClock = foregroundClock(() => { void loadDeps(); });
+departureClock(!document.hidden);
+document.addEventListener("visibilitychange", () => departureClock(nativeActive && !document.hidden));
+if (AUTONOMOUS) void CapApp.addListener("appStateChange", ({ isActive }) => { nativeActive = isActive; departureClock(isActive && !document.hidden); });
 
 /* ============ DONNÉES RÉELLES ============ */
 let remotePois: Poi[] = [];
@@ -829,8 +832,9 @@ function applyQuayModes(): void {
   STOPS.forEach(project); rebuildPois(); refreshMarkers(); render();
 }
 
+let realInitialized = false;
 async function initReal(): Promise<void> {
-  await loadServerMode();
+  await loadServerMode().catch(e => toast(String(e)));
   render();
   // alertes : réglages renvoyés au programme d'arrière-plan à chaque démarrage ; toucher une notification ouvre les infos trafic
   if (CONFIG.CTS_TRAFFIC && S.alerts.enabled) syncAlerts(S.alerts).catch(e => console.warn("Alertes trafic :", e));
@@ -849,6 +853,16 @@ async function initReal(): Promise<void> {
   // 2) mise à jour depuis l'API
   try {
     const list = await loadStops();
+    if (AUTONOMOUS && list.length) {
+      try {
+        const old = JSON.parse(localStorage.getItem("stopsCache2") ?? "null") as { list?: typeof STOPS } | null;
+        const next = migrateFavourites(S.fav, old?.list ?? [], list);
+        if (JSON.stringify(next) !== JSON.stringify(S.fav)) {
+          if (!localStorage.getItem("fav-before-local-gtfs")) localStorage.setItem("fav-before-local-gtfs", JSON.stringify(S.fav));
+          S.fav = next; localStorage.setItem("fav", JSON.stringify(next));
+        }
+      } catch { /* Existing preferences remain untouched when storage is unavailable. */ }
+    }
     STOPS.length = 0; list.forEach(s => STOPS.push(project(s)));
     placeOnTramQuays(STOPS, quayModes); STOPS.forEach(project);
     rebuildPois();
@@ -875,6 +889,7 @@ async function initReal(): Promise<void> {
   // points d'intérêt (P+R, Vélopark…) : chargés à part, une panne ne bloque rien
   void loadPois().then(list => { remotePois = list; rebuildPois(); render(); });
   locateIfAllowed();
+  realInitialized = true;
 }
 
 /* Le serveur peut exiger une version minimale de l'application (après une évolution incompatible) */
@@ -891,14 +906,15 @@ async function checkVersion(): Promise<void> {
     }
   } catch { /* serveur injoignable : les écrans l'indiquent déjà */ }
 }
-if (!CONFIG.USE_MOCK && (!Capacitor.isNativePlatform() || CAN_UPDATE)) void checkVersion();
+if (!CONFIG.USE_MOCK && !Capacitor.isNativePlatform()) void checkVersion();
 // nouvelle version de l'application : proposée quelques secondes après le lancement (sans gêner l'affichage des horaires)
 if (!CONFIG.USE_MOCK && CAN_UPDATE) {
   setTimeout(() => { if (!S.upd) void offerUpdate(false); }, 2500);
+  setInterval(() => { if (!document.hidden && nativeActive && !S.upd) void offerUpdate(false); }, 3600000);
   void CapApp.addListener("resume", () => {
-    if (!waitingPermission) return;
+    if (!waitingPermission) { void offerUpdate(false); return; }
     const rel = waitingPermission; waitingPermission = null;
-    void startUpdate(rel);
+    if (S.upd?.rel?.code === rel.code) { S.upd = { rel, phase: "ready", pct: 0 }; render(); }
   });
 }
 
@@ -911,7 +927,7 @@ onOfflineChange(() => render());
 /* Android : le bouton « retour » ferme d'abord le guidage, une fenêtre ou une fiche, puis revient à l'accueil, puis quitte */
 if (Capacitor.isNativePlatform()) {
   void CapApp.addListener("backButton", () => {
-    if (S.upd) void CapApp.exitApp();   // application à mettre à jour : « retour » quitte
+    if (S.upd) { waitingPermission = null; S.upd = null; render(); }   // application à mettre à jour : « retour » quitte
     else if (S.onb) { if (S.onb.i > 0) { S.onb.i--; render(); } }
     else if (document.getElementById("navlayer")) stopNav();
     else if (S.modal) { S.modal = null; render(); }
@@ -947,3 +963,17 @@ document.addEventListener("scroll", e => {
   const cur = document.documentElement.dataset.hs, v = m.scrollTop > 60 ? "1" : m.scrollTop < 8 ? "0" : cur ?? "0";
   if (document.documentElement.dataset.hs !== v) document.documentElement.dataset.hs = v;
 }, { capture: true, passive: true });
+
+async function refreshLocal(): Promise<void> {
+  toast("Vérification des données officielles…");
+  try { await syncLocal(true); clearDepartureCache(); await initReal(); await loadDeps(); toast("Données horaires actualisées"); }
+  catch (e) { toast("Synchronisation impossible : " + String(e) + ". Les dernières données sont conservées."); }
+  render();
+}
+if (AUTONOMOUS) {
+  window.addEventListener("kumm:gtfs", () => { if (realInitialized) { clearDepartureCache(); void initReal(); } });
+  const resumeLocal = () => { if (!document.hidden) { clearDepartureCache(); void syncLocal(false).then(() => initReal()).catch(console.warn); void loadDeps(); } };
+  document.addEventListener("visibilitychange", resumeLocal);
+  void CapApp.addListener("appStateChange", ({ isActive }) => { if (isActive) resumeLocal(); });
+  setInterval(() => { if (!document.hidden) void syncLocal(false).catch(console.warn); }, 3600000);
+}
