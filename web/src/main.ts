@@ -1,7 +1,7 @@
 import { clearDepartureCache } from "./api";
 import { foregroundClock } from "./foreground";
 import { migrateFavourites } from "./migrate";
-import { AUTONOMOUS, LOCAL_STATUS, syncLocal } from "./local";
+import { AUTONOMOUS, LOCAL_STATE, LOCAL_STATUS, syncLocal } from "./local";
 // police de l'interface, servie par Kumm lui-même (pas de requête vers Google Fonts : l'adresse IP des visiteurs reste privée)
 import "@fontsource/plus-jakarta-sans/latin-400.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-400.css";
@@ -127,6 +127,7 @@ function draw(): void {
     (S.arrPick ? arrivalPicker(S.arrPick) : "") +
     (S.journey ? "" : rideBanner()) +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "") +
+    (AUTONOMOUS && !Object.keys(LOCAL_STATUS).length && LOCAL_STATE.phase !== "idle" ? localLoadBar() : "") +
     // hors connexion : on affiche les dernières données reçues, en disant de quand elles datent
     (AUTONOMOUS && Object.values(LOCAL_STATUS).some(s => s.expired) ? `<div class="offbar">Données horaires périmées · Actualisez les données dans les paramètres</div>` : OFFLINE.on || !navigator.onLine ? `<div class="offbar">${ic("clock", 'width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"')}Hors connexion${OFFLINE.at ? ` · horaires de ${hm(OFFLINE.at)}` : ""}</div>` : "");
 
@@ -945,7 +946,7 @@ applyTheme(S.prefs);
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.prefs.theme === "auto") applyTheme(S.prefs); });
 
 /* pour inspecter les données dans la console du navigateur : __kumm.STOPS, __kumm.LINE_MODES */
-(window as unknown as { __kumm: unknown }).__kumm = { STOPS, POIS, LINE_MODES, LINE_NAMES, kindOfStop, S, render, ride: rideDebug };
+(window as unknown as { __kumm: unknown }).__kumm = { STOPS, POIS, LINE_MODES, LINE_NAMES, kindOfStop, S, render, ride: rideDebug, LOCAL_STATE };
 
 // premier lancement (ou conditions modifiées) : présentation avant tout le reste
 { const steps = onboardingSteps(); if (steps.length) S.onb = { steps, i: 0, refused: false }; }
@@ -964,6 +965,14 @@ document.addEventListener("scroll", e => {
   if (document.documentElement.dataset.hs !== v) document.documentElement.dataset.hs = v;
 }, { capture: true, passive: true });
 
+/** Bandeau tant que les horaires officiels ne sont pas chargés : progression ou cause de l'échec, avec « Réessayer » */
+function localLoadBar(): string {
+  const err = LOCAL_STATE.phase === "error";
+  const text = err ? `Horaires indisponibles : ${esc(LOCAL_STATE.error ?? "erreur inconnue")}`
+    : "Téléchargement et préparation des horaires officiels CTS et TER (première ouverture : jusqu’à quelques minutes, connexion requise)…";
+  return `<div class="offbar" style="position:fixed;left:8px;right:8px;top:calc(var(--safe-top,0px) + 8px);z-index:60;display:block;white-space:normal;line-height:1.35">${text}${err ? ` <button class="pill" data-act="syncGtfs" style="margin-left:6px">Réessayer</button>` : ""}</div>`;
+}
+
 async function refreshLocal(): Promise<void> {
   toast("Vérification des données officielles…");
   try { await syncLocal(true); clearDepartureCache(); await initReal(); await loadDeps(); toast("Données horaires actualisées"); }
@@ -971,6 +980,7 @@ async function refreshLocal(): Promise<void> {
   render();
 }
 if (AUTONOMOUS) {
+  window.addEventListener("kumm:gtfs-state", () => render());
   window.addEventListener("kumm:gtfs", () => { if (realInitialized) { clearDepartureCache(); void initReal(); } });
   const resumeLocal = () => { if (!document.hidden) { clearDepartureCache(); void syncLocal(false).then(() => initReal()).catch(console.warn); void loadDeps(); } };
   document.addEventListener("visibilitychange", resumeLocal);

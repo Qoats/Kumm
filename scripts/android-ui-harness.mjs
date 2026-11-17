@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import { chromium } from "@playwright/test";
 
-export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewport = { width: 390, height: 844 }, headless = true, clockAt } = {}) {
+export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewport = { width: 390, height: 844 }, headless = true, clockAt, failSync = false } = {}) {
   cts ??= process.env.GTFS_CTS; ter ??= process.env.GTFS_TER;
   if (!cts || !ter) throw Error("GTFS_CTS et GTFS_TER (archives officielles) sont requis");
   const bytes = { cts: fs.readFileSync(cts).toString("base64"), ter: fs.readFileSync(ter).toString("base64") };
@@ -13,6 +13,7 @@ export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewpo
   const forbidden = [], errors = [], consoleErrors = [];
   await context.exposeFunction("__native", async (plugin, method, options) => {
     if (plugin === "KummGtfs") {
+      if (method === "sync" && failSync) throw Error("Source officielle HTTP 503");
       if (method === "sync") return Object.fromEntries(["cts", "ter"].map(s => [s, { revision: s + "-official", checked: Date.now() }]));
       if (method === "read") return { data: bytes[options.source] };
     }
@@ -50,6 +51,6 @@ export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewpo
   });
   if (clockAt) await page.clock.install({ time: clockAt });
   await page.goto(base);
-  await page.waitForFunction(() => window.__kumm?.STOPS.length > 1500, null, { timeout: 90000 });
+  if (!failSync) await page.waitForFunction(() => window.__kumm?.STOPS.length > 1500, null, { timeout: 90000 });
   return { browser, context, page, forbidden, errors, consoleErrors };
 }

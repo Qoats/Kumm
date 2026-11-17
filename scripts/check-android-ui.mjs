@@ -99,6 +99,14 @@ try {
   }
   ok("infos trafic et ponctualité : Bientôt disponible");
 
+  // 9. Échec du téléchargement initial : cause affichée avec « Réessayer » (pas de liste vide silencieuse)
+  const bad = await openApp({ cts, ter, base, failSync: true });
+  try {
+    await bad.page.waitForFunction(() => document.body.innerText.includes("Horaires indisponibles"), null, { timeout: 15000 });
+    assert.ok(await bad.page.locator('[data-act="syncGtfs"]').count());
+  } finally { await bad.browser.close(); }
+  ok("échec du téléchargement initial : cause et « Réessayer » visibles");
+
   assert.deepEqual(forbidden, [], "aucune requête vers le serveur Kumm");
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ result: "passed", checks }));
