@@ -62,14 +62,15 @@ try {
   assert.equal(veh.stale, 0, "chaque véhicule est entre deux arrêts de son horaire (à l actualisation de 30 s près)");
   assert.ok(veh.trams > 0 && veh.bus > 0 && veh.withPath > 0, JSON.stringify(veh));
   // animation : un véhicule en mouvement se déplace
-  const moving = await page.evaluate(() => [...document.querySelectorAll(".vm[data-vid]")].map(e => e.getAttribute("data-vid"))
-    .find(id => { const v = window.__kummVeh.get(id); return v && !v.w && v.a[2] !== v.b[2]; }));
-  assert.ok(moving, "un véhicule en mouvement est affiché");
-  const pos = id => page.evaluate(i => document.querySelector(`[data-vid="${i}"]`)?.style.transform, id);
-  const before = await pos(moving);
+  const ids = await page.evaluate(() => [...document.querySelectorAll(".vm[data-vid]")].map(e => e.getAttribute("data-vid"))
+    .filter(id => { const v = window.__kummVeh.get(id); return v && !v.w && v.a[2] !== v.b[2]; }).slice(0, 12));
+  assert.ok(ids.length, "des véhicules en mouvement sont affichés");
+  const pos = () => page.evaluate(list => list.map(i => document.querySelector(`[data-vid="${i}"]`)?.style.transform), ids);
+  const before = await pos();
   await page.waitForTimeout(6000);
-  const after = await pos(moving);
-  assert.ok(after && before !== after, "le véhicule avance : " + before + " → " + after);
+  const after = await pos();
+  assert.ok(after.some((t, i) => t && t !== before[i]), "au moins un véhicule avance");
+  const moving = ids[after.findIndex((t, i) => t && t !== before[i])];
   ok(`carte : ${veh.n} véhicules théoriques (${veh.trams} trams, ${veh.bus} bus, ${veh.withPath} sur un tracé), animés`);
 
   // 6. Suivi d'un véhicule

@@ -970,7 +970,7 @@ function localLoadBar(): string {
   const err = LOCAL_STATE.phase === "error";
   const text = err ? `Horaires indisponibles : ${esc(LOCAL_STATE.error ?? "erreur inconnue")}`
     : "Téléchargement et préparation des horaires officiels CTS et TER (première ouverture : jusqu’à quelques minutes, connexion requise)…";
-  return `<div class="offbar" style="position:fixed;left:8px;right:8px;top:calc(var(--safe-top,0px) + 8px);z-index:60;display:block;white-space:normal;line-height:1.35">${text}${err ? ` <button class="pill" data-act="syncGtfs" style="margin-left:6px">Réessayer</button>` : ""}</div>`;
+  return `<div class="offbar" style="left:12px;right:12px;transform:none;display:block;white-space:normal;line-height:1.4;border-radius:14px;text-align:center">${text}${err ? ` <button class="pill" data-act="syncGtfs" style="margin-left:6px">Réessayer</button>` : ""}</div>`;
 }
 
 async function refreshLocal(): Promise<void> {
