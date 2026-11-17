@@ -1,26 +1,27 @@
-# Site web statique sur GitHub Pages (app.kumm.fr) : l'application et les horaires ouverts, sans serveur.
-# Les horaires (GTFS CTS et SNCF) sont copiés chaque jour depuis le portail officiel transport.data.gouv.fr
-# (scripts/fetch-open-data.mjs) et servis avec le site. Aucune API CTS, aucun jeton, aucun temps réel.
+# kumm.fr : site de présentation (dossier vitrine/) sur GitHub Pages.
 #
-# Le déploiement ne se fait que si la variable de dépôt PAGES_ENABLED vaut « true » (voir docs/GITHUB-PAGES.md) :
-# tant qu'elle n'existe pas, le site actuel (VPS) n'est pas touché.
-name: Site web (GitHub Pages)
+# L'application web (app.kumm.fr) est servie par un autre dépôt, « Qoats/kumm-app », qui construit l'application à partir
+# du code de ce dépôt et des horaires ouverts de transport.data.gouv.fr (voir docs/GITHUB-PAGES.md).
+# Ici, on vérifie seulement que l'application se construit toujours (sans la déployer).
+#
+# Le déploiement de kumm.fr ne se fait que si la variable de dépôt PAGES_ENABLED vaut « true » : tant qu'elle n'existe pas,
+# le site actuel n'est pas touché.
+name: Site de présentation (GitHub Pages)
 
 on:
   pull_request:
-    paths: [web/**, shared/**, data/**, scripts/fetch-open-data.mjs, package.json, package-lock.json, vite.config.ts, .github/workflows/pages.yml]
+    paths: [web/**, shared/**, data/**, vitrine/**, scripts/fetch-open-data.mjs, package.json, package-lock.json, vite.config.ts, .github/workflows/pages.yml]
   push:
     branches: [main]
-    paths: [web/**, shared/**, data/**, scripts/fetch-open-data.mjs, package.json, package-lock.json, vite.config.ts, .github/workflows/pages.yml]
-  schedule:
-    - cron: "37 5 * * *"
+    paths: [vitrine/**, .github/workflows/pages.yml]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  construction:
+  verification-application:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -32,19 +33,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      # Application + horaires. Échoue (et n'écrase donc pas le site en ligne) si une archive manque ou est invalide.
+      # Construit l'application web et télécharge les horaires ouverts, comme le fera le dépôt de l'application.
       - run: npm run build:pages
-      - name: Domaine et page d'erreur
-        run: |
-          printf 'app.kumm.fr\n' > dist/pages/CNAME
-          cp dist/pages/index.html dist/pages/404.html
-      - uses: actions/upload-pages-artifact@v4
-        if: github.event_name != 'pull_request'
-        with:
-          path: dist/pages
 
-  deploiement:
-    needs: construction
+  presentation:
     if: github.event_name != 'pull_request' && vars.PAGES_ENABLED == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -57,5 +49,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      # vitrine/CNAME contient « kumm.fr »
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: vitrine
       - id: deployment
         uses: actions/deploy-pages@v4

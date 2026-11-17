@@ -1,11 +1,15 @@
 # Héberger Kumm sur GitHub Pages (kumm.fr et app.kumm.fr)
 
-Le site n'a plus besoin de serveur : l'application web fait ses calculs dans le navigateur, comme l'application Android, et lit des horaires ouverts qui sont publiés avec le site.
+Le site n'a plus besoin de serveur : l'application web fait ses calculs dans le navigateur, comme l'application Android, et lit des horaires ouverts qui sont publiés avec elle.
 
-| Adresse | Contenu | Dépôt GitHub Pages |
-|---|---|---|
-| `app.kumm.fr` | l'application web | ce dépôt (`Qoats/Kumm`), workflow `Site web (GitHub Pages)` |
-| `kumm.fr` | le site de présentation (`vitrine/`) | un second dépôt, car GitHub Pages n'accepte **qu'un seul domaine par dépôt** (voir plus bas) |
+GitHub Pages n'accepte **qu'un seul domaine par dépôt**. Il y a donc deux dépôts, un par adresse :
+
+| Adresse | Contenu | Dépôt | Workflow |
+|---|---|---|---|
+| `kumm.fr` | le site de présentation (`vitrine/`) | `Qoats/Kumm` (ce dépôt) | `Site de présentation (GitHub Pages)` |
+| `app.kumm.fr` | l'application web | [`Qoats/kumm-app`](https://github.com/Qoats/kumm-app) | `Application web (GitHub Pages)` |
+
+`Qoats/kumm-app` ne contient pas de code : son workflow récupère le code public de `Qoats/Kumm`, construit l'application (`npm run build:pages`), y ajoute les horaires et publie le tout. Il n'a besoin d'**aucun secret ni jeton**.
 
 ## D'où viennent les données
 
@@ -16,18 +20,25 @@ Uniquement des **données ouvertes** du portail officiel [transport.data.gouv.fr
 
 Aucune API de la CTS n'est utilisée (ni SIRI Lite, ni jeton), aucun temps réel. Le script `scripts/fetch-open-data.mjs` interroge l'API du portail, télécharge la copie archivée la plus récente de chaque jeu (adresse permanente hébergée par le portail), vérifie que l'archive est un GTFS valide, puis écrit `data/cts.zip`, `data/ter.zip` et `data/manifest.json` à côté de l'application. Le site les sert lui-même : les navigateurs ne peuvent pas lire directement les serveurs des producteurs (pas d'en-tête CORS), d'où cette copie.
 
-Le workflow se relance **chaque jour à 05 h 37 UTC** et à chaque modification de l'application. Si une archive est absente ou invalide, le déploiement est annulé et la version précédente reste en ligne. L'application relit le manifeste une fois par heure et ne retélécharge une archive que si sa révision a changé.
+Le workflow de `kumm-app` se relance **chaque jour à 05 h 37 UTC** (nouveaux horaires et dernier code de `Qoats/Kumm`) et à la demande (*Actions → Run workflow*, le champ `ref` permet de construire une autre branche de `Qoats/Kumm`). Si une archive est absente ou invalide, la construction échoue et la version en ligne reste inchangée. L'application relit le manifeste une fois par heure et ne retélécharge une archive que si sa révision a changé.
+
+> Le code fusionné dans `Qoats/Kumm` n'arrive donc sur `app.kumm.fr` qu'au prochain passage du workflow (au plus 24 h), ou tout de suite en le lançant à la main.
 
 L'attribution exigée par les licences figure dans l'application (Réglages → À propos) et dans les mentions légales.
 
 ## Mise en route (une seule fois)
 
-1. **Fusionner** la pull request qui ajoute ce mode (le workflow ne déploie rien tant que l'étape 3 n'est pas faite).
-2. Sur GitHub : **Settings → Pages → Build and deployment → Source : GitHub Actions**.
-3. **Settings → Secrets and variables → Actions → Variables → New repository variable** : `PAGES_ENABLED` = `true`. Lancer ensuite le workflow « Site web (GitHub Pages) » (Actions → Run workflow).
-4. **Settings → Pages → Custom domain** : `app.kumm.fr`, puis cocher **Enforce HTTPS** quand GitHub a validé le domaine (quelques minutes à une heure après la mise à jour du DNS).
+### app.kumm.fr (dépôt `Qoats/kumm-app`)
+1. Fusionner la pull request de `Qoats/Kumm` qui ajoute le mode statique (`npm run build:pages`).
+2. Dans `Qoats/kumm-app` : **Settings → Pages → Build and deployment → Source : GitHub Actions**, puis *Actions → Application web (GitHub Pages) → Run workflow*.
+3. **Settings → Pages → Custom domain** : `app.kumm.fr`, puis cocher **Enforce HTTPS** quand GitHub a validé le domaine (quelques minutes à une heure après la mise à jour du DNS).
 
-> Tant que le DNS pointe vers l'ancien serveur (VPS), `app.kumm.fr` continue de fonctionner comme avant. Le changement ne se fait qu'à l'étape DNS ci-dessous.
+### kumm.fr (dépôt `Qoats/Kumm`)
+1. **Settings → Pages → Source : GitHub Actions**.
+2. **Settings → Secrets and variables → Actions → Variables** : créer `PAGES_ENABLED` = `true`, puis lancer *Actions → Site de présentation (GitHub Pages) → Run workflow*.
+3. **Settings → Pages → Custom domain** : `kumm.fr` (le fichier `vitrine/CNAME` le contient déjà), puis **Enforce HTTPS**.
+
+> Tant que le DNS pointe vers l'ancien serveur (VPS), `kumm.fr` et `app.kumm.fr` continuent de fonctionner comme avant. Le changement ne se fait qu'à l'étape DNS ci-dessous.
 
 ## DNS
 
@@ -42,41 +53,7 @@ L'attribution exigée par les licences figure dans l'application (Réglages → 
 
 À **ne pas toucher** : `relais.kumm.fr` (messagerie Relais, qui reste sur le VPS) et les enregistrements de messagerie (MX, SPF, DKIM) éventuels.
 
-GitHub recommande de [vérifier le domaine](https://docs.github.com/fr/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages) (Settings du compte → Pages) pour éviter qu'un tiers le réclame.
-
-## Le site de présentation (kumm.fr)
-
-Les fichiers sont dans `vitrine/` (avec `vitrine/CNAME` = `kumm.fr`). Comme un dépôt ne publie qu'un domaine, ils doivent vivre dans un second dépôt GitHub (par exemple `Qoats/kumm-site`) qui contient ces fichiers à la racine et ce workflow dans `.github/workflows/pages.yml` :
-
-```yaml
-name: Site de présentation
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: pages
-  cancel-in-progress: false
-jobs:
-  deploiement:
-    runs-on: ubuntu-24.04
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: .
-      - id: deployment
-        uses: actions/deploy-pages@v4
-```
-
-Puis, dans ce second dépôt : Settings → Pages → Source : GitHub Actions, Custom domain : `kumm.fr`.
+GitHub recommande de [vérifier le domaine](https://docs.github.com/fr/pages/configuring-a-custom-domain-for-your-github-pages-site/verifying-your-custom-domain-for-github-pages) (Settings de l'organisation → Pages) pour éviter qu'un tiers le réclame.
 
 ## Revenir au serveur (VPS)
 

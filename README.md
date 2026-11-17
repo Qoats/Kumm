@@ -79,7 +79,7 @@ npm test           # tests
 ```
 
 - Architecture Android autonome, tests et recette : [`docs/ANDROID-AUTONOME.md`](docs/ANDROID-AUTONOME.md)
-- Hébergement du site sur GitHub Pages (kumm.fr, app.kumm.fr), DNS et données ouvertes : [`docs/GITHUB-PAGES.md`](docs/GITHUB-PAGES.md)
+- Hébergement sur GitHub Pages (kumm.fr ici, app.kumm.fr dans le dépôt kumm-app), DNS et données ouvertes : [`docs/GITHUB-PAGES.md`](docs/GITHUB-PAGES.md)
 - Notes de développement, données et exploitation du serveur : [`docs/DEVELOPPEMENT.md`](docs/DEVELOPPEMENT.md)
 - Politique de confidentialité : [`docs/POLITIQUE-CONFIDENTIALITE.md`](docs/POLITIQUE-CONFIDENTIALITE.md)
 
