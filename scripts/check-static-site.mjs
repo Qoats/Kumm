@@ -48,6 +48,8 @@ try {
   await page.evaluate(() => window.__kummMap.setView([48.5846, 7.7507], 15, { animate: false }));
   await page.waitForFunction(() => window.__kummVeh?.size > 20 && document.querySelectorAll(".vm").length > 3, null, { timeout: 30000 });
   assert.equal(await page.locator(".vm.vapprox").count(), 0);
+  assert.equal(await page.locator('.lyr[data-layer="velhop"]').count(), 0, "pas de filtre Vélhop sur la carte");
+  assert.equal(await page.locator('header [data-act="msgs"], [data-act="msgs"]').count(), 0, "pas d'icône Infos trafic");
   ok("carte : véhicules théoriques calculés dans le navigateur");
 
   await page.evaluate(() => { window.__kumm.S.tab = "trips"; window.__kumm.render(); });
@@ -61,7 +63,7 @@ try {
 
   await page.evaluate(() => { window.__kumm.S.overlay = { k: "settings" }; window.__kumm.render(); });
   const settings = await text();
-  assert.doesNotMatch(settings, /Se déconnecter|Google Play/);
+  assert.doesNotMatch(settings, /Se déconnecter|Google Play|Alertes trafic|Vélhop|Info trafic/i);
   assert.match(settings, /Télécharger l’application Android/);
   ok("réglages : pas de connexion ni de lien Google Play");
 
