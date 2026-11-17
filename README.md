@@ -1,199 +1,87 @@
 # Kumm
 
-Application web et Android pour le réseau de transports de Strasbourg : horaires théoriques CTS, carte, parkings relais, Vélhop, trajets avec correspondances et guidage à pied.
+**Les transports de Strasbourg dans votre poche : horaires, carte, lignes et itinéraires.**
+Kumm (« viens » en alsacien) est une application Android indépendante pour le réseau CTS et les trains TER de l'Eurométropole de Strasbourg. Elle fonctionne **sans compte et sans serveur** : les horaires officiels sont enregistrés sur votre téléphone et restent consultables hors connexion.
 
-> **Projet indépendant, non officiel.** Kumm n'est ni édité, ni approuvé, ni affilié à la CTS ni à l'Eurométropole de Strasbourg. Le logo et le nom sont propres au projet.
+[![Dernière version](https://img.shields.io/github/v/release/Qoats/Kumm?label=derni%C3%A8re%20version&color=2e7d5b)](https://github.com/Qoats/Kumm/releases/latest)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
-## Mettre en ligne pour le grand public
-Sur un VPS : **`docs/DEPLOIEMENT-VPS.md`** (Docker + Caddy, HTTPS automatique, site vitrine sur `kumm.fr`, application sur `app.kumm.fr`). Voir aussi **`docs/MISE-EN-LIGNE.md`** (hébergement, variables, supervision, services à remplacer, liste de contrôle, Play Store) et le modèle **`docs/POLITIQUE-CONFIDENTIALITE.md`**. Le serveur expose `/health` pour la supervision ; son fonctionnement en charge (cache, secours, limites, compression) y est décrit.
+<p align="center">
+  <img src="docs/images/01-accueil.png" width="19%" alt="Accueil : arrêts favoris, lignes et raccourcis">
+  <img src="docs/images/02-ligne.png" width="19%" alt="Une ligne de tram avec tous ses arrêts">
+  <img src="docs/images/03-arret.png" width="19%" alt="Prochains passages à un arrêt">
+  <img src="docs/images/04-carte.png" width="19%" alt="Carte avec les arrêts et les véhicules">
+  <img src="docs/images/05-itineraire.png" width="19%" alt="Itinéraire avec correspondances">
+</p>
 
-## Horaires CTS et autorisation SIRI Lite
+> **Projet indépendant et non officiel.** Kumm n'est ni édité, ni approuvé, ni affilié à la CTS, à la SNCF ni à l'Eurométropole de Strasbourg.
 
-Le serveur utilise par défaut le GTFS officiel publié par la CTS sous la responsabilité de l’Eurométropole de Strasbourg, sous [Licence Ouverte 2.0](https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts). Il vérifie le cache toutes les heures, télécharge une mise à jour après 20 h et garde la dernière copie valide si le téléchargement échoue. Les heures respectent le calendrier GTFS et le fuseau Europe/Paris.
+## Ce que vous pouvez faire
 
-Le temps réel est désactivé par défaut. Après autorisation, définir `CTS_MODE=live` et fournir un **nouveau jeton** CTS dans l’environnement du serveur. `CTS_TRAFFIC=1` réactive aussi les perturbations CTS. Le GTFS reste utilisé pour les horaires planifiés. Le serveur ne demande aucun jeton CTS en mode théorique.
+- **Voir les prochains passages** de tous les trams, bus et TER, à chaque arrêt, avec les horaires officiels.
+- **Suivre une ligne** : tous ses arrêts dans l'ordre, dans les deux sens, avec les terminus.
+- **Explorer la carte** : arrêts de tram, de bus et gares, parkings relais, et les véhicules en circulation, qui avancent sur leur tracé.
+- **Préparer un trajet** : adresse, arrêt ou lieu, puis itinéraire en transports avec correspondances, à pied ou à vélo.
+- **Garder vos arrêts favoris** sous la main, avec leurs prochains passages sur l'accueil, et enregistrer « Maison » et « Travail ».
+- **Utiliser des widgets** sur l'écran d'accueil d'Android (arrêt favori, trajet, arrêt proche, raccourcis).
+- **Personnaliser l'apparence** : quatre thèmes (dont un contraste élevé et un thème sombre) et cinq couleurs.
 
-## Publier ou contribuer sans rien divulguer
-- Ne mettez **jamais** de jeton dans le code, un fichier d'exemple, une capture d'écran ou un message de commit. Le jeton vit dans `.env` (poste local) ou dans les variables d'environnement de l'hébergeur.
-- Avant chaque publication : `npm run check:secrets` (cherche jetons, clés privées et fichiers sensibles ; code de sortie 1 si quelque chose est trouvé).
-- Si un jeton a été publié, même quelques minutes : **supprimez-le sur le portail CTS et générez-en un nouveau**. Effacer le fichier ou le commit ne suffit pas, l'historique reste lisible.
-- Sur GitHub : Settings → Code security → activez *Secret scanning* et *Push protection*.
-- Un serveur public est protégé par une **limite de requêtes par adresse** (`RATE_LIMIT_PER_MIN`, 600 par défaut) et ne relaie qu'une liste fixe de services. La page `/diag` n'existe que si `ENABLE_DIAG=1` : ne l'activez pas sur un serveur public.
-- Android ne contient plus d’adresse de serveur Kumm ni de jeton CTS : les horaires sont lus dans les GTFS officiels enregistrés sur le téléphone.
+## Installer l'application (Android)
 
-## Licences et données
-Le code est sous licence MIT (fichier `LICENSE`). Les données gardent leurs conditions : horaires et arrêts CTS / Eurométropole de Strasbourg (Licence Ouverte 2.0), parkings et Vélhop (Licence Ouverte), cartes et marche à pied © contributeurs OpenStreetMap (ODbL, attribution obligatoire), trajets Transitous. Les tuiles du serveur public d'OpenStreetMap sont réservées à un usage modéré : pour une large diffusion, utilisez un fournisseur de tuiles dédié.
+1. Ouvrez la [dernière version](https://github.com/Qoats/Kumm/releases/latest) depuis votre téléphone et téléchargez **`kumm.apk`**.
+2. Ouvrez le fichier. Android vous demandera d'autoriser l'installation depuis cette source : acceptez pour cette fois seulement.
+3. Au premier lancement, gardez Internet actif quelques secondes : l'application télécharge les horaires officiels. Ensuite, ils restent sur le téléphone.
 
-## Structure
+> **Vous avez déjà une ancienne version (0.52.x) ?** La version 0.53 est signée avec une nouvelle clé : Android refuse de la poser par-dessus. Désinstallez l'ancienne version d'abord ; vos favoris enregistrés sur le téléphone seront perdus. Les versions suivantes se mettront à jour normalement.
 
-```
-web/             application et ressources Vite
-server/          serveur HTTP, GTFS CTS, services ouverts et SIRI facultatif
-shared/          types communs au client et au serveur
-android-src/     classes Java et manifeste complémentaire
-android-res/     ressources Android
-android/         projet Capacitor généré localement
-data/            géométrie versionnée utilisée par le serveur
-scripts/android/ préparation, vérification et publication Android
-scripts/         génération des données et contrôles manuels
-tests/           tests serveur et distribution Android
-deploy/          Caddy et mise à jour du VPS
-vitrine/         site public indépendant de l’application
-docs/            procédures de maintenance et de diffusion
-```
+**Mises à jour.** Quand une nouvelle version est publiée sur GitHub, Kumm vous la propose au démarrage : *Télécharger et installer*, *Plus tard* ou *Ignorer cette version*. Rien n'est téléchargé sans votre accord, et le fichier est vérifié (empreinte et signature) avant l'installation.
 
-## Installer et lancer (une seule fois, puis à chaque session)
-Node 22.12 ou plus récent. Dans PowerShell, utilisez `npm.cmd` si `npm` est bloqué.
+Une version web existe aussi sur [app.kumm.fr](https://app.kumm.fr).
 
-1. `npm.cmd install`
-2. `copy .env.example .env`
-3. **Mode développement** : `npm.cmd run dev` puis ouvrez http://localhost:5173 (la page se recharge à chaque modification)
-4. **Mode "production"** : `npm.cmd run build` puis `npm.cmd start`, et ouvrez http://localhost:3000
+## Comment ça marche
 
-## Application Android autonome
+Kumm lit directement les **données ouvertes officielles** : le GTFS de la CTS (trams et bus) et celui de la SNCF (TER). Les horaires sont stockés sur le téléphone, recalculés toutes les 30 secondes au premier plan et actualisés chaque jour quand Internet est disponible.
 
-L’application conserve l’interface Capacitor, ses thèmes, son identifiant `fr.kumm.app` et ses données utilisateur. Elle télécharge directement les GTFS officiels CTS / SNCF, conserve les horaires théoriques sur le téléphone et les recalcule toutes les 30 secondes au premier plan. Aucune instance Kumm n’est nécessaire. Les fonctions temps réel affichent « Bientôt disponible ».
+Deux choses à savoir :
 
-La synchronisation utilise ETag / Last-Modified, un bouton manuel et une tâche Android quotidienne. Les dernières données valides restent disponibles hors connexion. Les fonds de carte, adresses et itinéraires piétons/vélo détaillés utilisent directement leurs services publics avec Internet. Le calcul local des correspondances utilise des cheminements à pied estimés ; la garantie d’accessibilité hors ligne reste à compléter.
+- **Les horaires sont théoriques**, pas en temps réel : retards, suppressions et perturbations ne sont pas connus de l'application.
+- **La position d'un véhicule sur la carte est estimée** à partir de ses horaires et de son parcours. Ce n'est pas un GPS.
 
-Avec Node 22.12+, JDK 21 et SDK Android 36 :
+Les fonctions qui exigent vraiment le temps réel (informations trafic, ponctualité mesurée, signalements, disponibilité des vélos Vélhop) ne sont pas disponibles pour l'instant et affichent « Bientôt disponible ».
+
+## Vie privée
+
+- Aucun compte, aucune publicité, et aucun serveur Kumm : l'application n'envoie rien à un serveur du projet.
+- Vos favoris et vos réglages restent sur votre téléphone.
+- L'application contacte directement les sources publiques, seulement quand c'est nécessaire : horaires CTS et SNCF, fonds de carte OpenStreetMap, recherche d'adresses (Base Adresse Nationale), calcul des cheminements à pied et à vélo (OpenStreetMap) et la page des versions sur GitHub.
+- Votre position sert à afficher les arrêts proches sur l'appareil. Pour calculer un cheminement à pied ou à vélo, les coordonnées du trajet sont envoyées au service de routage OpenStreetMap.
+
+## Données et licences
+
+| Donnée | Source |
+|---|---|
+| Arrêts, lignes et horaires CTS | CTS / Eurométropole de Strasbourg, [Licence Ouverte 2.0](https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts) |
+| Gares et horaires TER | SNCF, données ouvertes |
+| Fonds de carte, tracés des lignes, voies ferrées, cheminements | © contributeurs OpenStreetMap ([ODbL](https://www.openstreetmap.org/copyright)) |
+| Adresses | Base Adresse Nationale, via la Géoplateforme de l'IGN |
+| Parkings relais | Eurométropole de Strasbourg, open data |
+
+Le code de Kumm est publié sous [licence MIT](LICENSE). Les données gardent les conditions de leurs producteurs.
+
+## Contribuer et développer
+
+Le projet est écrit en TypeScript (interface web empaquetée avec Capacitor pour Android) ; un serveur Node optionnel sert la version web.
 
 ```sh
 npm ci
-npx cap add android
-node scripts/android/prepare-android.mjs play VERSION_CODE
-npm run build:android
-(cd android && ./gradlew testDebugUnitTest assembleDebug bundleRelease)
+npm run dev        # interface web sur http://localhost:5173
+npm test           # tests
 ```
 
-`VERSION_CODE` doit être supérieur à celui de l’installation existante. Les fichiers debug servent aux tests ; ils ne remplacent pas une version de diffusion signée avec une autre clé. Pour une compilation sideload, choisir `sideload` et définir `VITE_SIDELOAD_UPDATES=1` pendant `npm run build:android`.
+- Architecture Android autonome, tests et recette : [`docs/ANDROID-AUTONOME.md`](docs/ANDROID-AUTONOME.md)
+- Notes de développement, données et exploitation du serveur : [`docs/DEVELOPPEMENT.md`](docs/DEVELOPPEMENT.md)
+- Politique de confidentialité : [`docs/POLITIQUE-CONFIDENTIALITE.md`](docs/POLITIQUE-CONFIDENTIALITE.md)
 
-Le workflow « APK Android » produit APK de revue et AAB Play non signé. La préparation manuelle d’une diffusion sideload sur `main` réutilise les secrets de signature existants et crée une **GitHub Release en brouillon**. Les mises à jour sont facultatives : accepter, reporter ou ignorer. Les installations Play utilisent Google Play. La branche `apk` est conservée comme référence de première migration.
+Les captures d'écran de ce README se régénèrent avec `node scripts/capture-screenshots.mjs`.
 
-Architecture, sources, tests et recette avant diffusion : [Android autonome](docs/ANDROID-AUTONOME.md). Préparation Play : [Google Play](docs/GOOGLE-PLAY.md).
-
-## Widgets de l’écran d’accueil Android
-
-Les sept widgets et leurs ressources restent présents : arrêt favori, trajet grand/petit, arrêt proche, trafic, Vélhop / P+R et raccourcis. Les horaires sont lus dans une base SQLite locale, même application fermée. Les fonctions nécessitant du temps réel indiquent « Bientôt disponible ». Les couleurs, réglages et choix d’arrêt sont conservés. Android actualise les widgets selon ses contraintes ; le bouton ↻ recalcule les passages localement.
-
-## Logo et installation sur téléphone
-Le logo est un « K » dessiné comme une ligne de plan de transport (barre blanche, branches jaune et bleue), avec un rond d'arrêt à chaque extrémité (« Kumm » = « viens » en alsacien). Fichiers dans `web/public/` : `favicon.svg` (logo vectoriel, modifiable), `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`, `manifest.webmanifest`. Une variante rouge / bleu / violet est fournie à part. Dans l'en-tête, le logo est l'icône `kumm` de `web/src/icons.ts` (il prend la couleur du thème).
-Pour installer l'app sur un téléphone : ouvrez-la dans le navigateur, puis « Ajouter à l'écran d'accueil » (l'icône Kumm apparaît).
-
-## Personnalisation
-Réglages (bouton à curseurs en haut de l'accueil, ou la roue de la carte) : 4 thèmes (Automatique, Menthe clair, Forêt sombre, Contraste élevé), 5 couleurs principales (vert par défaut, turquoise, bleu, violet, rouge) et la carte sombre avec les thèmes sombres. Le choix est gardé sur l'appareil.
-Pour ajouter une couleur ou un thème : tout est dans `web/src/style.css` (variables en haut du fichier) et `web/src/themes.ts` (listes proposées dans les réglages).
-
-## Comment un arrêt est classé tram / bus / TER
-Par son **nom**, d'après des listes trouvées sur internet (fichier `web/src/network.ts`) :
-- stations de tram : index des stations du plan du tramway de Strasbourg (version du 19 janvier 2026) + les stations de la ligne F prolongée vers Wolfisheim citées par la CTS.
-Un arrêt CTS absent de la liste est un arrêt de bus.
-Les **gares TER** sont les 13 gares SNCF de l'Eurométropole (`shared/ter.ts`, code UIC et position) : elles ont leur propre
-repère et leur tableau des départs. Strasbourg-Ville est rattachée à « Gare Centrale » (onglets Tous / Tram / Bus / Train). L'écriture n'a pas d'importance (accents, majuscules, tirets, « / » sont ignorés).
-Si une station de tram s'affiche comme un bus, ajoutez son nom dans `TRAM_STATIONS`. Pour trouver les oublis, dans la console du navigateur (F12) :
-
-    __kumm.STOPS.filter(s => __kumm.kindOfStop(s)==="bus" && s.lines.some(l => /^[A-F]$/.test(l))).map(s => s.name)
-
-## La carte « À proximité »
-Avec les vraies données, c'est une vraie carte OpenStreetMap (zoom et déplacement au doigt ou à la souris) : chaque arrêt est placé à ses coordonnées réelles. Seuls les repères visibles à l'écran sont dessinés (300 arrêts au plus). Le bouton cible recentre sur votre position.
-Si la zone reste grise avec un message « Fond de carte indisponible », votre réseau n'atteint pas `tile.openstreetmap.org` : les arrêts restent affichés mais sans fond.
-Les fonds de carte viennent des serveurs publics d'OpenStreetMap, faits pour un usage modéré : pour une vraie mise en ligne, il faudra un fournisseur de tuiles dédié.
-
-## Sources des données (tout est référencé ici)
-| Donnée | Source |
-|---|---|
-| Arrêts, lignes et horaires théoriques | GTFS officiel CTS / Eurométropole de Strasbourg, Licence Ouverte 2.0 |
-| Temps réel CTS, si autorisé et activé | API CTS SIRI Lite |
-| Parkings relais (12) : positions, capacités | Eurométropole de Strasbourg, open data (data.strasbourg.eu : « parkings » et « occupation en temps réel des parkings », Licence Ouverte) ; liste des 12 sites confirmée par la page « Park-and-Ride » de cts-strasbourg.eu |
-| Places libres des P+R | jeu « occupation-parkings-temps-reel » (mise à jour toutes les 3 minutes) |
-| Stations Vélhop + vélos disponibles | flux GBFS `gbfs.nextbike.net/maps/gbfs/v2/nextbike_ae/fr/` (jeu « VLS Vélhop Strasbourg » sur transport.data.gouv.fr, Licence Ouverte 2.0) |
-| Véloparks | page « Véloparcs CTS (P+V) » de cts-strasbourg.eu (sites, placés sur les arrêts du même nom) ; VéloParcs Gare et Sainte-Aurélie : strasbourg.eu « Où garer son vélo à Strasbourg ? » |
-| Stations de tram | index du plan du tramway de Strasbourg v2.12 (cartometro.com) + avis CTS (ligne F prolongée) |
-| Gares TER, horaires et temps réel des trains | SNCF, données ouvertes (transport.data.gouv.fr) : horaires GTFS `Export_OpenData_SNCF_GTFS_NewTripId.zip` (téléchargés une fois par jour, gardés dans `state/ter-gtfs.zip`) et temps réel GTFS-RT `sncf-gtfs-rt-trip-updates` (toutes les `TER_POLL_S` secondes) ; voir `server/ter.ts` |
-| Voies ferrées (trains sur la carte) | © contributeurs OpenStreetMap (ODbL) : voies principales autour de Strasbourg extraites par `node scripts/build-rail.mjs` dans `data/rail.json` (relancé chaque nuit avec les tracés) |
-| Fonds de carte, marche à pied | © contributeurs OpenStreetMap (tuiles relayées par le serveur ; routage `routing.openstreetmap.de`) |
-| Adresses | Base Adresse Nationale, via la Géoplateforme de l'IGN (`data.geopf.fr/geocodage`) |
-| Trajets avec correspondances | Transitous / MOTIS (`api.transitous.org`) |
-| Tracés des lignes (véhicules sur la carte) | © contributeurs OpenStreetMap (ODbL) : itinéraires CTS extraits par `npm run build:shapes` dans `data/shapes.json` (à relancer quand le réseau change) |
-| Contrôle des tracés | plan détaillé officiel de la CTS (non inclus dans le dépôt) : `python3 scripts/check-shapes-plan.py Plan-Detaille-reseau-CTS.pdf http://localhost:3000` écrit `data/shape-cuts.json`, les morceaux de tracé OpenStreetMap absents du plan, que le serveur retire (le bus y suit la route) ; à relancer à chaque nouveau plan |
-| Carte 3D du guidage | OpenFreeMap (`tiles.openfreemap.org`, tuiles vectorielles OpenMapTiles, © contributeurs OpenStreetMap), affichée avec MapLibre GL ; repli sur la carte 2D si le téléphone ne sait pas l'afficher |
-Pas encore branchés : Flex'hop (zones de transport à la demande) ; les TGV et Intercités (seuls les TER sont affichés).
-
-## Trains TER
-- Seuls les trains qui desservent une gare de l'Eurométropole sont gardés en mémoire (environ 1 000 par semaine).
-- Un train absent du temps réel SNCF roule à l'heure ; un retard annoncé à une gare est reporté sur les gares suivantes.
-- Sur la carte, la position d'un train est estimée d'après ses horaires (comme les trams et bus), le long des voies de `data/rail.json`
-  (en ligne droite si ce fichier manque). Son code de trajet est `terelsass` + numéro du train (« Elsàss » : l'Alsace en alsacien).
-- `/health` → `trains_ter` : nombre de trains, âge du temps réel, dernière erreur. `TER_POLL_S=0` désactive les trains.
-
-## Carte : catégories de points
-Chaque catégorie a sa couleur, sa forme et son symbole : Tram (cercle bleu), Bus (carré turquoise), Vélhop (cercle vert), Vélopark (losange vert foncé, « P »), P+R (hexagone bleu), Flex'hop (écusson rose) et Gare TER (octogone violet). Les boutons en haut de la carte affichent ou masquent chaque catégorie.
-
-Sources de données réelles :
-- **Tram / bus** : liste d'arrêts de la CTS. **Gares TER** : gares SNCF de l'Eurométropole (`shared/ter.ts`).
-- **P+R et Vélopark** : endpoints `park-and-ride` et `veloparc` de l'API CTS.
-- **Vélhop et Flex'hop** : pas encore branchés (le bouton est grisé et l'indique).
-Si une catégorie reste vide, ouvrez `http://localhost:3000/api/veloparc` (ou `park-and-ride`) et regardez ce que renvoie la CTS.
-
-## Itinéraires avec correspondances
-Il n'y a pas d'onglet Itinéraires : on cherche un arrêt, une adresse ou un lieu dans **Recherche**, puis **Naviguer** (sur la fiche de l'arrêt ou au bout de la ligne de résultat) ouvre l'écran de choix (transports, à pied, vélo) ; son bouton retour ramène à l'écran d'origine.
-L'écran Itinéraires calcule de vrais trajets en transports (avec correspondances) grâce à **Transitous**, un service public et gratuit basé sur MOTIS (`api.transitous.org`), qui utilise les horaires ouverts du réseau. Chaque trajet montre les étapes, les horaires et les arrêts ; « Guider à pied jusqu'à l'arrêt » lance la navigation, puis propose la marche finale jusqu'à la destination.
-- Si le service est injoignable, l'app se replie sur les lignes directes et affiche la cause.
-- Usage raisonnable seulement (service communautaire). Les réponses sont gardées 60 secondes par le serveur.
-- Vérification : http://localhost:3000/diag, rubrique `transitous` (nombre de trajets trouvés pour Hoenheim → Gare Centrale).
-
-## Itinéraires et guidage à pied
-- Le départ peut être « Ma position », une adresse de Strasbourg ou un arrêt.
-- Le guidage affiche une vraie carte (OpenStreetMap), les virages, votre position, et recalcule si vous sortez du tracé. Le bouton « Simuler » fait avancer un point sur le trajet pour tester sans marcher.
-- Services utilisés (gratuits, usage raisonnable) : la Base Adresse Nationale (adresses), `routing.openstreetmap.de` (marche à pied) et les tuiles OpenStreetMap (fond de carte). Pour une vraie mise en ligne avec beaucoup d'utilisateurs, il faudra un fournisseur dédié (variables `GEO_ADDRESS_BASE` et `GEO_WALK_BASE` dans `.env`).
-
-## Diagnostic en un clic
-Ajoutez `ENABLE_DIAG=1` dans votre `.env` (en local seulement), relancez le serveur, puis ouvrez http://localhost:3000/diag : la page teste la connexion à www / opendata / api, le token (masqué), les services SIRI, les chemins de P+R et de Vélopark, et cherche la description officielle de l'API (swagger) pour en lister les vrais chemins. Copiez ce qu'elle affiche en cas de problème.
-
-## Si la CTS est injoignable (« fetch failed », ECONNRESET)
-Le serveur ne réessaie pas une connexion coupée et fait une pause de 2 minutes avant de rappeler la CTS (pour ne pas aggraver un blocage éventuel). Le message d'erreur dans « Détails techniques » donne la cause réseau.
-Test en une ligne : `curl.exe -sS -o NUL -w "code=%{http_code}" https://api.cts-strasbourg.eu` — un code 401 ou 404 est bon signe (le site répond) ; « Connection was reset » veut dire que la connexion est coupée avant d'arriver à l'API.
-
-## Si un arrêt affiche une erreur ou « aucun passage »
-Ouvrez la fiche de l'arrêt et le bouton « Détails techniques » : il montre les codes essayés (code de l'arrêt, puis codes des quais) et la réponse exacte de la CTS.
-Pour voir les données brutes depuis PowerShell (serveur lancé) :
-
-    (Invoke-WebRequest http://localhost:3000/api/lines-discovery).Content.Substring(0,1500)
-    (Invoke-WebRequest http://localhost:3000/api/stoppoints-discovery).Content.Substring(0,1500)
-
-Dans la console du navigateur (F12), `__kumm.STOPS` et `__kumm.LINE_MODES` montrent ce que l'app a compris.
-
-## Vérifier l'API
-Ouvrez http://localhost:3000/api/stoppoints-discovery (ou :5173/api/...) : vous devez voir du JSON.
-Si un arrêt reste vide, ouvrez sa fiche et le bouton « Détails techniques » : copiez ce qu'il affiche.
-
-## Vérifier le code
-`npm.cmd run typecheck` contrôle les types de tout le projet.
-
-## Règle d'interface : un menu ne doit jamais revenir en haut tout seul
-L'interface est redessinée en entier à chaque changement (`render()` → `draw()` remplace le contenu de la page). Sans précaution,
-chaque liste revient en haut dès qu'on touche un bouton : c'est arrivé plusieurs fois (réglages, catégories de la carte,
-choix de la direction dans « À proximité »…). Désormais :
-- **`web/src/scroll.ts` garde la position de toutes les zones qui défilent**, automatiquement, à chaque redessin : rien à faire
-  pour un nouveau menu qui utilise une zone défilante normale (`overflow: auto` ou `scroll`).
-- Une zone est reconnue par son **`id`**, son attribut **`data-scroll="nom"`**, ou à défaut par sa place dans la page. Si un menu
-  change de structure d'un redessin à l'autre (un bloc qui apparaît au-dessus de la liste, par exemple), donnez à sa zone
-  défilante un `id` ou un `data-scroll` stable.
-- Les positions sont gardées **par écran** : un onglet retrouve sa position quand on y revient ; une fiche (arrêt, ligne,
-  réglages…) repart du haut à chaque nouvelle ouverture.
-- Ne remettez jamais `scrollTop = 0` à la main dans `draw()`, et n'ajoutez pas de liste de zones « à surveiller » : c'est ce qui
-  faisait oublier les nouveaux menus.
-- **Après toute modification de l'interface**, lancez `node scripts/check-scroll.mjs` (serveur démarré) : il passe dans chaque
-  menu, fait défiler toutes ses zones, redessine l'écran et signale toute zone qui a bougé. Ajoutez-y chaque nouveau menu.
-
-## Règle de carte : un véhicule reste toujours sur sa voie, sans cacher les stations
-- La position d'un tram ou d'un bus vient de son tracé réel (`web/src/vehicles.ts`). **Tout déplacement d'affichage se fait le
-  long de ce tracé** (`vehiclePosAlong`), jamais en ligne droite ni sur le côté : sinon le véhicule sort de sa voie dans les virages.
-- Près d'une station, le véhicule attend juste avant l'icône (ou se place juste après en repartant), sur sa voie (`besideStops`
-  dans `web/src/livemap.ts`). Un véhicule qui ne touche pas de station n'est jamais déplacé.
-- **Après toute modification de la carte**, lancez `node scripts/check-map.mjs` (serveur démarré) : pendant 30 s, à plusieurs
-  endroits du réseau, il vérifie que chaque véhicule est à moins de 3 px de son tracé et qu'aucun ne recouvre une station.
-
-## Sécurité
-- Le token reste dans `.env`, côté serveur. Ne le publiez jamais (`.gitignore` l'exclut).
-- Les textes venant de l'API sont échappés avant affichage.
+Les contributions sont les bienvenues : ouvrez une *issue* pour proposer une amélioration ou signaler un problème (n'y publiez jamais de jeton ou de secret).
