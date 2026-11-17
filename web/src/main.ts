@@ -907,7 +907,7 @@ async function checkVersion(): Promise<void> {
     }
   } catch { /* serveur injoignable : les écrans l'indiquent déjà */ }
 }
-if (!CONFIG.USE_MOCK && !Capacitor.isNativePlatform()) void checkVersion();
+if (!CONFIG.USE_MOCK && !AUTONOMOUS && !Capacitor.isNativePlatform()) void checkVersion();
 // nouvelle version de l'application : proposée quelques secondes après le lancement (sans gêner l'affichage des horaires)
 if (!CONFIG.USE_MOCK && CAN_UPDATE) {
   setTimeout(() => { if (!S.upd) void offerUpdate(false); }, 2500);

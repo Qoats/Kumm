@@ -14,7 +14,8 @@
     "build:android": "vite build --mode android && cap sync android",
     "android:open": "cap open android",
     "check:secrets": "node scripts/check-secrets.mjs",
-    "build:shapes": "node scripts/build-shapes.mjs"
+    "build:shapes": "node scripts/build-shapes.mjs",
+    "build:pages": "vite build --mode pages --outDir ../dist/pages && node scripts/fetch-open-data.mjs dist/pages"
   },
   "engines": {
     "node": ">=22.12.0"

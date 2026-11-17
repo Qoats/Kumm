@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Confidentialité – Kumm</title>
+<title>Politique de confidentialité – Kumm</title>
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="stylesheet" href="/fonts/fonts.css">
@@ -14,81 +14,42 @@
 <header><a href="/"><img src="/logo.svg" alt="">Kumm</a></header>
 <main>
 <h1>Politique de confidentialité</h1>
-<p class="date">Dernière mise à jour : 1<sup>er</sup> novembre 2026</p>
+<p class="date">Dernière mise à jour : 17 novembre 2026</p>
 
-<p>Cette page explique quelles données Kumm utilise, pourquoi, et combien de temps elles sont gardées. Kumm n’a pas de compte utilisateur, pas de publicité et pas d’outil de statistiques de visite.</p>
+<p>Cette page explique quelles données Kumm utilise, pourquoi, et qui les voit. Kumm n’a pas de compte utilisateur, pas de publicité, pas d’outil de statistiques de visite, et <b>aucun serveur qui reçoive vos données</b> : l’application fait ses calculs sur votre appareil.</p>
 
 <h2>Responsable</h2>
 <p>L’éditeur de Kumm, particulier (voir les <a href="/mentions-legales.html">mentions légales</a>). Contact : <a href="mailto:support@axim.ch">support@axim.ch</a>.</p>
 
-<h2>Sur votre téléphone</h2>
-<p>Vos arrêts favoris, vos réglages (thème, couleur, lignes suivies) et vos préférences sont enregistrés uniquement sur votre téléphone ou dans votre navigateur. Ils ne sont pas envoyés au serveur.</p>
+<h2>Sur votre appareil</h2>
+<ul>
+  <li>Vos arrêts favoris, vos adresses « Maison » et « Travail », vos réglages (thème, couleur, préférences) et une copie des horaires officiels sont enregistrés uniquement sur votre téléphone ou dans votre navigateur (stockage local du navigateur ou de l’application). Ils ne sont envoyés à personne.</li>
+  <li>Kumm n’utilise aucun cookie. Vous supprimez ces données avec « Rétablir les réglages d’origine » dans les réglages, en vidant les données du site dans votre navigateur ou en désinstallant l’application.</li>
+</ul>
 
 <h2>Votre position</h2>
 <ul>
-  <li>Si vous l’autorisez, votre position sert à afficher les arrêts proches et à vous guider. Ce calcul se fait sur votre téléphone.</li>
-  <li>Quand vous demandez un itinéraire, le point de départ et d’arrivée sont envoyés au serveur Kumm, qui les transmet au service de calcul : Transitous pour les transports, le serveur de routage d’OpenStreetMap (routing.openstreetmap.de) pour la marche et le vélo. Ces services reçoivent les coordonnées, mais pas votre adresse IP ni aucun identifiant de votre téléphone.</li>
-  <li>Le serveur Kumm ne conserve pas ces positions.</li>
-  <li>Vous pouvez retirer l’autorisation de localisation à tout moment dans les réglages de votre téléphone ; Kumm reste utilisable sans.</li>
+  <li>Si vous l’autorisez, votre position sert à afficher les arrêts proches, à partir de « Ma position » dans les itinéraires et à vous guider. Ce calcul se fait sur votre appareil, et Kumm ne conserve pas votre position.</li>
+  <li>Quand vous demandez un itinéraire à pied ou à vélo, les coordonnées du départ et de l’arrivée sont envoyées au service de calcul d’OpenStreetMap (routing.openstreetmap.de), qui reçoit aussi l’adresse IP de votre appareil. Les itinéraires en transports sont calculés sur votre appareil.</li>
+  <li>Vous pouvez retirer l’autorisation de localisation à tout moment dans les réglages de votre téléphone ou de votre navigateur ; Kumm reste utilisable sans.</li>
 </ul>
 
-<h2>Trajet partagé (« Êtes-vous dans ce bus ? »)</h2>
+<h2>Services contactés directement par l’application</h2>
+<p>Il n’y a pas de serveur Kumm entre vous et ces services : votre appareil les contacte directement. Comme pour tout site web, chacun voit donc l’adresse IP de votre appareil, et reçoit seulement ce qui est indiqué ci-dessous. Chacun applique sa propre politique de confidentialité.</p>
 <ul>
-  <li>Quand l’application est ouverte et que la position est autorisée, Kumm compare votre position à celle des trams, bus et trains TER en circulation, <b>sur votre téléphone</b>. Si vous semblez voyager dans un véhicule, l’application vous demande si vous êtes à bord. Rien n’est envoyé à ce stade.</li>
-  <li>Si vous acceptez de partager votre trajet, votre position est envoyée au serveur Kumm toutes les 10 secondes, avec seulement le trajet concerné : <b>aucun nom, aucun identifiant de votre téléphone</b>. Le serveur utilise cette position pour estimer celle du véhicule et son retard. Les coordonnées affichées sont projetées sur le trajet et arrondies.</li>
-  <li>Le serveur garde uniquement la dernière position de chaque véhicule, en mémoire, pendant 2 minutes au plus ; les positions ne sont jamais écrites sur disque.</li>
-  <li>Pour améliorer la position estimée des trams et bus, le serveur garde des <b>observations sur le véhicule</b> : sa vitesse entre deux arrêts, son temps à quai, ses arrêts en pleine voie (feux, bouchons) et son retard sur l’horaire. Chaque observation indique la ligne, le code du trajet (la course du tram ou du bus, par exemple « hoeb2610240612 »), le jour de la semaine, le mois et la demi-heure. Elle ne contient <b>ni votre position, ni la date exacte, ni aucun identifiant de votre téléphone</b>. Ces observations sont gardées 12 mois.</li>
-  <li>Le partage s’arrête quand vous touchez « Arrêter », au terminus, si vous quittez le trajet, au bout d’une heure, ou quand l’application passe en arrière-plan.</li>
+  <li><b>Hébergement du site (version web)</b> : GitHub Pages (GitHub, Inc.) sert le site, l’application et les fichiers d’horaires. GitHub peut conserver des journaux techniques (adresse IP, date, page demandée) : <a href="https://docs.github.com/fr/site-policy/privacy-policies/github-general-privacy-statement">déclaration de confidentialité de GitHub</a>.</li>
+  <li><b>Fonds de carte</b> : OpenStreetMap (tile.openstreetmap.org) reçoit les images de carte que vous affichez, donc la zone que vous regardez. Pendant un guidage, le fond de carte vient d’OpenFreeMap (tiles.openfreemap.org).</li>
+  <li><b>Recherche d’adresses</b> : le texte que vous tapez est envoyé à la Base Adresse Nationale, via la Géoplateforme de l’IGN (data.geopf.fr). Il est accompagné d’un point de référence fixe au centre de Strasbourg, pas de votre position.</li>
+  <li><b>Itinéraires à pied et à vélo</b> : OpenStreetMap (routing.openstreetmap.de), voir « Votre position ».</li>
+  <li><b>Stations Vélhop</b> : la liste des stations est demandée à nextbike (gbfs.nextbike.net), sans information vous concernant.</li>
+  <li><b>Horaires</b> : sur le site, ils sont servis par le site lui-même, qui les copie chaque jour depuis le portail officiel transport.data.gouv.fr. Dans l’application Android, ils sont téléchargés directement auprès de leurs producteurs (CTS, SNCF).</li>
+  <li><b>Mises à jour de l’application Android</b> : une fois par jour au plus, l’application interroge GitHub (api.github.com et github.com) pour savoir si une nouvelle version existe. Rien n’est téléchargé sans votre accord.</li>
 </ul>
-
-<h2>Alertes de descente pendant une navigation</h2>
-<ul>
-  <li>Quand vous lancez le guidage d’un itinéraire en tram ou en bus, Kumm suit chaque étape : rappel de valider votre titre quand le véhicule arrive, alerte 5 arrêts avant votre descente, puis juste avant. Sur Android, cela fonctionne <b>même écran éteint</b>, avec une notification « Trajet en cours ».</li>
-  <li>Une fois à bord, votre position est envoyée comme pour un trajet partagé (ci-dessus) : toutes les 10 secondes, sans nom ni identifiant, avec les mêmes règles de conservation. Pour retrouver le véhicule, le serveur reçoit la ligne et les arrêts de montée et de descente, sans identifiant ; ils ne sont pas conservés.</li>
-  <li>Le suivi s’arrête à votre arrêt, si vous quittez le trajet, au bout de 2 heures, ou avec le bouton « Arrêter » de la notification ou de l’application.</li>
-</ul>
-
-<h2>Recherche d’adresses</h2>
-<p>Le texte que vous tapez pour chercher une adresse est envoyé par le serveur Kumm à la Base Adresse Nationale, sans votre adresse IP. Il n’est pas conservé.</p>
-
-<h2>Signalements à un arrêt</h2>
-<ul>
-  <li>Quand vous signalez un problème à un arrêt (ascenseur en panne, distributeur hors service, écran éteint, véhicule bondé, arrêt dégradé), le serveur Kumm enregistre l’arrêt, le type de problème et un identifiant tiré au hasard par l’application, rendu illisible (haché) avant d’être enregistré. Aucun texte libre, aucune position, aucun nom.</li>
-  <li>Cet identifiant sert seulement à compter chaque appareil une seule fois. Votre adresse IP sert à limiter le nombre d’envois par heure ; elle est gardée en mémoire une heure au plus et n’est jamais enregistrée sur disque.</li>
-  <li>Un signalement s’efface seul : 30 minutes pour un véhicule bondé, 12 heures pour un écran éteint, 48 heures pour le reste, ou plus tôt si d’autres voyageurs indiquent que c’est réglé.</li>
-</ul>
-
-<h2>Météo</h2>
-<p>La météo affichée est celle du centre de Strasbourg, demandée par le serveur Kumm à Open-Meteo. Votre position et votre adresse IP ne leur sont pas transmises.</p>
-
-<h2>Alerte avant un passage (application Android)</h2>
-<p>Si vous touchez la cloche à côté d’un départ, le serveur Kumm garde l’arrêt, le passage choisi, le délai et l’identifiant de notification de votre téléphone, le temps de vous prévenir. Ces données sont supprimées dès que l’alerte est envoyée ou que le passage est passé.</p>
-
-<h2>Alertes trafic (application Android)</h2>
-<ul>
-  <li>Si vous activez les alertes, votre téléphone obtient un identifiant de notification auprès de Firebase Cloud Messaging (Google). Cet identifiant et la liste des lignes que vous suivez sont enregistrés sur le serveur Kumm, pour vous envoyer une notification quand une de ces lignes est perturbée.</li>
-  <li>Ces données sont supprimées dès que vous désactivez les alertes, ou quand Google signale que l’identifiant n’est plus valable (application désinstallée, par exemple).</li>
-  <li>Pour acheminer la notification, Google traite cet identifiant selon ses propres règles : <a href="https://firebase.google.com/support/privacy">firebase.google.com/support/privacy</a>.</li>
-</ul>
-
-<h2>Carte du guidage</h2>
-<p>Pendant un guidage, le fond de carte est chargé directement depuis OpenFreeMap (tiles.openfreemap.org) : comme pour tout site web, ce service voit l’adresse IP de votre téléphone. Les autres cartes de Kumm passent par le serveur Kumm.</p>
-
-<h2>Version web en test</h2>
-<p>Pendant la phase de test, la version web demande un identifiant et un mot de passe. Après la connexion, un cookie de session est enregistré dans votre navigateur pendant 30 jours. Il sert uniquement à vous garder connecté ; il n’est pas utilisé pour vous suivre. Aucun autre cookie n’est utilisé.</p>
-
-<h2>Journaux du serveur</h2>
-<p>Pour protéger le service contre les abus, le serveur garde en mémoire, pendant quelques minutes au plus, le nombre de requêtes et de tentatives de connexion par adresse IP. Il ne les écrit pas dans un fichier. Les journaux du serveur contiennent seulement des compteurs et des messages d’erreur, sans adresse IP, sans position et sans les adresses recherchées.</p>
-<p class="mute">L’hébergeur (voir les <a href="/mentions-legales.html">mentions légales</a>) peut conserver ses propres journaux techniques pour la sécurité de son réseau.</p>
+<p>Kumm n’envoie aucune donnée à Google, Firebase ou à un outil d’audience, et ne demande aucune permission de notification.</p>
 
 <h2>Vos droits</h2>
-<p>Kumm ne conserve presque aucune donnée vous concernant :</p>
-<ul>
-  <li>vos favoris et réglages sont sur votre téléphone : vous les supprimez en désinstallant l’application ou avec « Rétablir les réglages d’origine » ;</li>
-  <li>votre abonnement aux alertes est supprimé dès que vous désactivez les alertes dans l’application ;</li>
-  <li>un accès testeur peut être supprimé sur simple demande.</li>
-</ul>
-<p>Pour toute autre question sur vos données : <a href="mailto:support@axim.ch">support@axim.ch</a>. Si vous estimez que vos droits ne sont pas respectés, vous pouvez contacter la CNIL (<a href="https://www.cnil.fr">cnil.fr</a>).</p>
+<p>Kumm ne conserve aucune donnée vous concernant : tout ce qui est enregistré est sur votre appareil et vous le supprimez vous-même (voir ci-dessus). Les services listés plus haut traitent les données qu’ils reçoivent selon leurs propres règles ; pour exercer vos droits auprès d’eux, adressez-vous à eux.</p>
+<p>Pour toute question sur vos données : <a href="mailto:support@axim.ch">support@axim.ch</a>. Si vous estimez que vos droits ne sont pas respectés, vous pouvez contacter la CNIL (<a href="https://www.cnil.fr">cnil.fr</a>).</p>
 
 <h2>Modifications</h2>
 <p>Cette page sera mise à jour si le fonctionnement de Kumm change. La date de mise à jour est indiquée en haut.</p>

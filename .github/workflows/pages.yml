@@ -1,0 +1,60 @@
+# kumm.fr : site de présentation (dossier vitrine/) sur GitHub Pages.
+#
+# L'application web (app.kumm.fr) est servie par un autre dépôt, « Qoats/kumm-app », qui construit l'application à partir
+# du code de ce dépôt et des horaires ouverts de transport.data.gouv.fr (voir docs/GITHUB-PAGES.md).
+# Ici, on vérifie seulement que l'application se construit toujours (sans la déployer).
+#
+# Le déploiement de kumm.fr ne se fait que si la variable de dépôt PAGES_ENABLED vaut « true » : tant qu'elle n'existe pas,
+# le site actuel n'est pas touché.
+name: Site de présentation (GitHub Pages)
+
+on:
+  pull_request:
+    paths: [web/**, shared/**, data/**, vitrine/**, scripts/fetch-open-data.mjs, package.json, package-lock.json, vite.config.ts, .github/workflows/pages.yml]
+  push:
+    branches: [main]
+    paths: [vitrine/**, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verification-application:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # Construit l'application web et télécharge les horaires ouverts, comme le fera le dépôt de l'application.
+      - run: npm run build:pages
+
+  presentation:
+    if: github.event_name != 'pull_request' && vars.PAGES_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      # vitrine/CNAME contient « kumm.fr »
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: vitrine
+      - id: deployment
+        uses: actions/deploy-pages@v4

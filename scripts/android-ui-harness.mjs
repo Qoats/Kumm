@@ -4,12 +4,12 @@
 import fs from "node:fs";
 import { chromium } from "@playwright/test";
 
-export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewport = { width: 390, height: 844 }, headless = true, clockAt, failSync = false, tiles = false, scale = 1 } = {}) {
+export async function openApp({ cts, ter, base = "http://127.0.0.1:5173", viewport = { width: 390, height: 844 }, headless = true, clockAt, failSync = false, tiles = false, scale = 1, colorScheme = "light" } = {}) {
   cts ??= process.env.GTFS_CTS; ter ??= process.env.GTFS_TER;
   if (!cts || !ter) throw Error("GTFS_CTS et GTFS_TER (archives officielles) sont requis");
   const bytes = { cts: fs.readFileSync(cts).toString("base64"), ter: fs.readFileSync(ter).toString("base64") };
   const browser = await chromium.launch({ headless });
-  const context = await browser.newContext({ viewport, deviceScaleFactor: scale });
+  const context = await browser.newContext({ viewport, deviceScaleFactor: scale, colorScheme });
   const forbidden = [], errors = [], consoleErrors = [];
   await context.exposeFunction("__native", async (plugin, method, options) => {
     if (plugin === "KummGtfs") {

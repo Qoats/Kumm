@@ -1,8 +1,36 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
-export const AUTONOMOUS = Capacitor.getPlatform() === "android";
+/** Site statique (GitHub Pages) : mêmes calculs locaux qu'Android, archives GTFS servies par le site lui-même */
+export const STATIC_SITE = import.meta.env["VITE_STATIC"] === "1" && !Capacitor.isNativePlatform();
+export const AUTONOMOUS = Capacitor.getPlatform() === "android" || STATIC_SITE;
 type Source = "cts" | "ter";
 interface Status { checked: number; revision: string; etag?: string; modified?: string; error?: string; expired?: boolean; validUntil?: string }
-const Gtfs = registerPlugin<{ sync(o: { manual: boolean }): Promise<Record<Source, Status>>; read(o: { source: Source }): Promise<{ data: string }> }>("KummGtfs");
+interface GtfsBridge { sync(o: { manual: boolean }): Promise<Record<Source, Status>>; read(o: { source: Source }): Promise<{ data?: string; bytes?: Uint8Array }> }
+
+/**
+ * Archives du site (publiées chaque jour depuis transport.data.gouv.fr par scripts/fetch-open-data.mjs) :
+ * /data/manifest.json décrit la révision de chacune ; l'archive n'est relue que si sa révision a changé.
+ */
+const webGtfs: GtfsBridge = {
+  async sync() {
+    const r = await fetch("/data/manifest.json", { cache: "no-store" });
+    if (!r.ok) throw Error("Données horaires indisponibles sur ce site (HTTP " + r.status + ")");
+    const m = (await r.json()) as { sources?: Partial<Record<Source, { revision?: string }>> };
+    const out = {} as Record<Source, Status>;
+    for (const s of ["cts", "ter"] as Source[]) {
+      const revision = m.sources?.[s]?.revision;
+      if (!revision) throw Error("Manifeste de données incomplet : " + s.toUpperCase());
+      out[s] = { revision, checked: Date.now() };
+    }
+    return out;
+  },
+  async read({ source }) {
+    const m = (await (await fetch("/data/manifest.json", { cache: "no-store" })).json()) as { sources: Record<Source, { revision: string }> };
+    const r = await fetch(`/data/${source}.zip?v=${encodeURIComponent(m.sources[source].revision)}`);
+    if (!r.ok) throw Error("Archive " + source.toUpperCase() + " indisponible (HTTP " + r.status + ")");
+    return { bytes: new Uint8Array(await r.arrayBuffer()) };
+  }
+};
+const Gtfs: GtfsBridge = STATIC_SITE ? webGtfs : registerPlugin<GtfsBridge>("KummGtfs");
 export let LOCAL_STATUS: Partial<Record<Source, Status>> = {};
 /** État visible du chargement des horaires : l'écran affiche un bandeau tant que la liste d'arrêts est vide */
 export const LOCAL_STATE: { phase: "idle" | "loading" | "error"; error?: string; since: number } = { phase: "idle", since: 0 };
@@ -42,7 +70,7 @@ export function syncLocal(manual = true): Promise<void> {
       try {
         if (old?.revision !== n.revision) {
           const r = await Gtfs.read({ source });
-          const raw = atob(r.data), bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
+          const bytes = r.bytes ?? Uint8Array.from(atob(r.data ?? ""), c => c.charCodeAt(0));
           await rpc({ method: "save", source, value: { bytes, ...n } }); changed = true;
         } else if (n.checked !== old.checked) await rpc({ method: "checked", source, checked: n.checked });
       } catch (e) { errors.push(source.toUpperCase() + " : " + String(e)); }
