@@ -1,4 +1,4 @@
-import { AUTONOMOUS } from "./local";
+import { AUTONOMOUS, STATIC_SITE } from "./local";
 /**
  * Présentation au premier lancement : ce que fait Kumm, les symboles de la carte, où trouver les options,
  * puis les autorisations (position, notifications) expliquées avant d'être demandées, et l'acceptation des conditions.
@@ -41,10 +41,12 @@ export function acceptTerms(): void {
 /** Le premier lancement est-il terminé ? (sinon la position n'est demandée qu'à l'étape prévue) */
 export const onboardingDone = (): boolean => load().done === true;
 
-const LEGEND: [Layer, string][] = [
+const ALL_LEGEND: [Layer, string][] = [
   ["tram", "Station de tram"], ["bus", "Arrêt de bus"], ["ter", "Gare (trams, bus et trains)"],
   ["velhop", "Station Vélhop"], ["velopark", "Vélopark"], ["pr", "Parking relais"], ["flexhop", "Arrêt Flex’hop (sur réservation)"]
 ];
+
+const LEGEND: [Layer, string][] = STATIC_SITE ? ALL_LEGEND.filter(([k]) => k !== "velhop") : ALL_LEGEND;
 
 const dots = (i: number, n: number): string =>
   `<div class="onb-dots" aria-hidden="true">${Array.from({ length: n }, (_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>`;
@@ -71,7 +73,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
         ${row(ic("pin"), "Carte", "Les arrêts autour de vous et les trams et bus en circulation, positions estimées d’après les horaires.")}
         ${row(ic("route"), "Itinéraires", "Cherchez un arrêt, une adresse ou un lieu, touchez « Naviguer » : en transports, à pied ou à vélo, avec le guidage.")}
         ${AUTONOMOUS ? "" : row(ic("mail"), "Infos trafic", "Les perturbations et travaux en cours sur le réseau.")}
-        ${row(ic("bike"), AUTONOMOUS ? "Parkings relais et stations Vélhop" : "Vélhop et parkings relais", AUTONOMOUS ? "Leurs emplacements sur la carte." : "Les vélos et les places disponibles.")}
+        ${row(ic("bike"), AUTONOMOUS ? (STATIC_SITE ? "Parkings relais" : "Parkings relais et stations Vélhop") : "Vélhop et parkings relais", AUTONOMOUS ? "Leurs emplacements sur la carte." : "Les vélos et les places disponibles.")}
         ${AUTONOMOUS ? `<p class="onb-note">Retards, infos trafic et disponibilités en direct : Bientôt disponible.</p>` : ""}`;
       actions = next();
       break;
@@ -83,7 +85,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
           <div><span class="onb-live"><span class="live"></span></span><span>Horaire en temps réel (sinon, horaire prévu)</span></div>
           <div><b class="onb-quai">À quai</b><span>Le tram ou le bus est à l’arrêt</span></div>
         </div>`}
-        <p class="onb-note">Les catégories en haut de la carte (${KINDS.tram.label}, ${KINDS.bus.label}, ${KINDS.velhop.label}…) servent à afficher ou masquer chaque type de point.</p>`;
+        <p class="onb-note">Les catégories en haut de la carte (${KINDS.tram.label}, ${KINDS.bus.label}${STATIC_SITE ? "" : `, ${KINDS.velhop.label}`}…) servent à afficher ou masquer chaque type de point.</p>`;
       actions = next();
       break;
     case "where":

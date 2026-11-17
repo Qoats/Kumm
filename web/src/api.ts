@@ -1,5 +1,5 @@
 import { localPois } from "./local-services";
-import { AUTONOMOUS, localQuery } from "./local";
+import { AUTONOMOUS, STATIC_SITE, localQuery } from "./local";
 import { Capacitor } from "@capacitor/core";
 import type { Departure, Poi, PoiKind, Stop } from "../../shared/types";
 import type { AnnotatedStopPoint, SiriStopMonitoring, SiriStopPoints } from "../../shared/cts-api";
@@ -330,6 +330,7 @@ export async function loadMessages(): Promise<TrafficMsg[]> {
 
 /** Stations Vélhop et parkings relais : sources ouvertes, relayées par notre serveur */
 export async function loadPois(): Promise<Poi[]> {
+  if (STATIC_SITE) return (await localPois()).filter(p => p.kind !== "velhop");   // le site n'affiche ni Vélhop ni infos trafic
   if (AUTONOMOUS) return localPois();
   const out: Poi[] = [];
   const sources: { path: string; kind: PoiKind }[] = [{ path: "/poi/pr", kind: "pr" }, { path: "/poi/velhop", kind: "velhop" }];
