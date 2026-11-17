@@ -176,8 +176,12 @@ jobs:
             P="$RUNNER_TEMP/kumm-apk-tree"
             git worktree add --detach "$P" "$previous"
           fi
-          "$BT/apksigner" verify --print-certs "$P/kumm.apk" > "$D/previous.cert"
-          "$BT/apksigner" verify --print-certs "$APK" > "$D/candidate.cert"
+          # Les deux APK doivent être valides ; leurs certificats sont lus directement dans l'archive
+          # (le texte d'apksigner change d'une version à l'autre et n'est pas fiable à analyser).
+          "$BT/apksigner" verify "$P/kumm.apk"
+          "$BT/apksigner" verify "$APK"
+          python3 scripts/android/apk-cert.py "$P/kumm.apk" > "$D/previous.cert"
+          python3 scripts/android/apk-cert.py "$APK" > "$D/candidate.cert"
           "$BT/aapt" dump badging "$APK" > "$D/candidate.badging"
           node scripts/android/release.mjs "$APK" "$VERSION_CODE" "$P/latest.json" "$D/candidate.badging" "$D/previous.cert" "$D/candidate.cert" "$D/latest.json"
           # La branche apk reste une référence de migration, jamais modifiée ni supprimée.
