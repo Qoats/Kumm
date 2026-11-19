@@ -1,0 +1,3 @@
+walk-graph.bin : plan des rues de l'Eurométropole de Strasbourg pour les itinéraires à pied et à vélo hors ligne.
+Données © contributeurs OpenStreetMap, publiées sous licence ODbL 1.0 : https://www.openstreetmap.org/copyright
+Ce fichier est une base de données dérivée d'OpenStreetMap (voir scripts/build-walk-graph.mjs) : il est redistribué sous la même licence ODbL.

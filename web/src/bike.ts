@@ -1,5 +1,6 @@
 import { AUTONOMOUS } from "./local";
 import { publicJson } from "./local-services";
+import { offlineRoute } from "./offline-routes";
 import type { WalkRoute } from "../../shared/types";
 import type { OsrmResponse, OsrmRoute } from "../../shared/geo-api";
 import type { LL } from "./geo";
@@ -22,9 +23,13 @@ const toSteps = (r: OsrmRoute): WalkRoute["steps"] =>
 /** Un ou plusieurs itinéraires à vélo (le serveur demande les alternatives à OSRM) */
 export async function fetchBike(from: LL, to: LL): Promise<BikeRoute[]> {
   const path = `/geo/bike?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}`;
-  const r = AUTONOMOUS ? new Response(JSON.stringify(await publicJson(path))) : await fetch(url(path));
-  if (!r.ok) throw new Error("Service " + r.status);
-  const j = (await r.json()) as OsrmResponse;
+  // calculé sur l'appareil (graphe de rues livré avec l'appli) ; le service en ligne ne sert qu'en secours
+  let j = AUTONOMOUS ? await offlineRoute("bike", from, to) : null;
+  if (!j) {
+    const r = AUTONOMOUS ? new Response(JSON.stringify(await publicJson(path))) : await fetch(url(path));
+    if (!r.ok) throw new Error("Service " + r.status);
+    j = (await r.json()) as OsrmResponse;
+  }
   if (j.code !== "Ok" || !j.routes?.length) throw new Error("Aucun itinéraire vélo");
   return j.routes.map(rt => ({ distance: rt.distance, duration: rt.duration, coords: rt.geometry.coordinates, steps: toSteps(rt) }));
 }
