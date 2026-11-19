@@ -78,9 +78,9 @@ summary::-webkit-details-marker{display:none}
 summary::after{content:"+";color:var(--brick-ink);font-size:24px;line-height:1}
 details[open] summary::after{content:"–"}
 details p{color:var(--soft);padding-bottom:18px;max-width:42em}
-.publisher{display:flex;flex-wrap:wrap;align-items:center;gap:28px}
-.publisher img{width:240px;max-width:100%;height:auto;border-radius:16px;display:block}
-.publisher p{max-width:30em;color:var(--soft)}
+.maker{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-bottom:28px}
+.maker img{width:150px;height:auto;border-radius:12px;display:block}
+.maker p{margin:0;font-size:15px;color:var(--soft)}
 footer{padding:64px 0 60px;font-size:14px;color:var(--mute)}
 footer p+p{margin-top:8px}
 @media (max-width:900px){
@@ -182,14 +182,13 @@ footer p+p{margin-top:8px}
   <details><summary>Kumm est-il l’appli officielle de la CTS ?</summary><p>Non. C’est un projet indépendant, ni édité ni approuvé par la CTS ni par l’Eurométropole de Strasbourg. Pour acheter tes titres de transport, utilise l’application de la CTS.</p></details>
   <details><summary>Une question, un problème ?</summary><p>Écris à <a href="mailto:support@axim.ch">support@axim.ch</a>.</p></details>
 </section>
-
-<section class="band w publisher">
-  <img src="/img/qoats-logo.jpg" alt="Qoats – software with a spine" width="450" height="166" loading="lazy">
-  <p>Kumm est fait par <b>Qoats</b> – software with a spine.</p>
-</section>
 </main>
 
 <footer><div class="w">
+  <div class="maker">
+    <img src="/img/qoats-logo.jpg" alt="Qoats – software with a spine" width="450" height="166" loading="lazy">
+    <p>Kumm est fait par <b>Qoats</b> – software with a spine.</p>
+  </div>
   <p>Kumm est un projet indépendant, ni édité ni approuvé par la CTS ni par l’Eurométropole de Strasbourg.</p>
   <p>Horaires : données ouvertes de la CTS / Eurométropole de Strasbourg (Licence Ouverte 2.0) et de la SNCF (ODbL), via transport.data.gouv.fr. Adresses : Base Adresse Nationale. Cartes © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>.</p>
   <p><a href="/mentions-legales.html">Mentions légales</a> · <a href="/confidentialite.html">Confidentialité</a> · <a href="https://github.com/Qoats/Kumm">Code source</a></p>
