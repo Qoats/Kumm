@@ -6,6 +6,8 @@
 import * as L from "leaflet";
 import type { LL } from "./geo";
 import { makeBaseLayer, wantsDarkMap } from "./tiles";
+import { loadMapLibre, offlineStyle } from "./offline-map";
+import { AUTONOMOUS } from "./local";
 
 export interface NavView {
   /** position actuelle ; bearing : direction de la marche en degrés (null : inconnue) */
@@ -33,9 +35,13 @@ function hasWebGL(): boolean {
 
 /** Style OpenFreeMap ; le style sombre n'a pas de bâtiments en relief : on les ajoute */
 async function loadStyle(dark: boolean): Promise<unknown> {
-  const r = await fetch(OFM + (dark ? "dark" : "liberty"));
-  if (!r.ok) throw new Error("style " + r.status);
-  const style = (await r.json()) as { layers: { id: string; type: string }[] };
+  let style: { layers: { id: string; type: string }[] };
+  if (AUTONOMOUS) style = await offlineStyle(dark);      // style, tuiles, icônes et polices livrés avec l'appli
+  else {
+    const r = await fetch(OFM + (dark ? "dark" : "liberty"));
+    if (!r.ok) throw new Error("style " + r.status);
+    style = (await r.json()) as { layers: { id: string; type: string }[] };
+  }
   if (dark && !style.layers.some(l => l.type === "fill-extrusion")) {
     style.layers.push({
       id: "building-3d", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: 14,
@@ -51,9 +57,7 @@ const line = (coords: [number, number][]): GeoJSON.Feature<GeoJSON.LineString> =
 export interface NavLook { color?: string; overview?: boolean }
 
 async function create3D(el: HTMLElement, coords: [number, number][], dest: LL, look: NavLook = {}): Promise<NavView> {
-  const [ml, worker] = await Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url")]);
-  await import("maplibre-gl/dist/maplibre-gl.css");
-  ml.setWorkerUrl(worker.default);
+  const ml = await loadMapLibre();
   const style = await loadStyle(wantsDarkMap());
   const map = new ml.Map({
     container: el, style: style as never, center: coords[0], zoom: look.overview ? 15 : 17.5, pitch: look.overview ? 35 : 60, bearing: 0,

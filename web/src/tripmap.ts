@@ -14,7 +14,7 @@ import { TRIP } from "./trip";
 let host: HTMLDivElement | null = null;
 let map: L.Map | null = null;
 let routes: L.LayerGroup | null = null;
-let base: L.GridLayer | null = null;
+let base: L.Layer | null = null;
 let baseDark: boolean | null = null;
 let lastSig = "";
 
@@ -25,7 +25,7 @@ function useBaseLayer(m: L.Map): void {
   if (base && baseDark === dark) return;
   if (base) m.removeLayer(base);
   base = makeBaseLayer(dark).addTo(m);
-  base.bringToBack();
+  (base as L.GridLayer).bringToBack?.();
   baseDark = dark;
 }
 

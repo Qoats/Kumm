@@ -333,7 +333,7 @@ export function screenNearby(): string {
   const h = S.sheet === 2 ? "calc(100% - 132px - var(--safe-top))" : `calc(${S.sheet === 0 ? "64px" : "42%"} + var(--navh, 0px))`;
   const counts = layerCounts();
   const chips = LAYERS.filter(k => !(STATIC_SITE && k === "velhop")).map(k => `<button class="lyr ${S.layers[k] ? "on" : ""} ${!CONFIG.USE_MOCK && !counts[k] ? "nodata" : ""}" data-layer="${k}" aria-pressed="${S.layers[k]}">${markerIcon(k, 24)}<span>${KINDS[k].label}</span></button>`).join("");
-  const background = `<div id="livemap-slot"></div><span class="osm" style="bottom:calc(${h} + 4px)">© OpenStreetMap</span>`;
+  const background = `<div id="livemap-slot"></div><span class="osm" style="bottom:calc(${h} + 4px)">© OpenStreetMap, OpenMapTiles</span>`;
   return `<div class="map">
     ${background}
     <button class="msearch" data-tab="search">${ic("search")}<span>Où allez-vous ?</span></button>
@@ -612,7 +612,7 @@ export function screenTrips(): string {
   ];
   const whenRow = t.mode !== "transit" ? "" : `<div class="twhen"><button class="twchip" data-act="when">${ic("clock")}<span>${esc(whenLabel(t.when))}</span><b>▾</b></button></div>`;
   const tabs = `<div class="tmodes">${modes.map(m => `<button data-mode="${m.id}" class="${t.mode === m.id ? "on" : ""}" aria-label="${m.label}">${ic(m.icon)}<span>${modeDuration(m.id)}</span></button>`).join("")}</div>`;
-  return form + tabs + whenRow + `<div class="tmap"><div id="tripmap-slot"></div><span class="osm">© OpenStreetMap</span></div><div class="pad tlist">${tripList()}</div>`;
+  return form + tabs + whenRow + `<div class="tmap"><div id="tripmap-slot"></div><span class="osm">© OpenStreetMap, OpenMapTiles</span></div><div class="pad tlist">${tripList()}</div>`;
 }
 
 /* ============ ÉCRANS SUPERPOSÉS ============ */
@@ -1171,7 +1171,7 @@ export function overlaySettings(): string {
     ${CONFIG.CTS_TRAFFIC && S.alerts.enabled ? alertSettings() : ""}`}
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
-      <div class="src">Horaires théoriques et arrêts : CTS / Eurométropole de Strasbourg · Licence Ouverte 2.0 <a href="https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts" target="_blank" rel="noopener noreferrer">Source</a><br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>${STATIC_SITE ? "" : "Vélhop : flux GBFS nextbike / Eurométropole<br>"}Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Carte 3D du guidage : OpenFreeMap, OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : ${AUTONOMOUS ? "calcul local sur GTFS CTS / SNCF" : "Transitous (MOTIS)"}<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires théoriques) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
+      <div class="src">Horaires théoriques et arrêts : CTS / Eurométropole de Strasbourg · Licence Ouverte 2.0 <a href="https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts" target="_blank" rel="noopener noreferrer">Source</a><br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>${STATIC_SITE ? "" : "Vélhop : flux GBFS nextbike / Eurométropole<br>"}Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Fond de carte : OpenFreeMap, © OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : ${AUTONOMOUS ? "calcul local sur GTFS CTS / SNCF" : "Transitous (MOTIS)"}<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires théoriques) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
       <div class="src" style="margin-top:10px"><a href="https://kumm.fr/mentions-legales.html" target="_blank" rel="noopener">Mentions légales</a> · <a href="https://kumm.fr/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></div></div>
     <button class="ghost" data-act="replayOnb">Revoir la présentation</button>
     ${AUTONOMOUS ? `<p>Horaires théoriques · CTS / SNCF</p><p>Dernière synchronisation : ${esc(syncLabel())}</p><button class="ghost" data-act="syncGtfs">Actualiser les données horaires</button><p>Passages en temps réel, retards, avances, suppressions, perturbations et météo en direct : Bientôt disponible.</p><p>Les fonds de carte et recherches d’adresses nécessitent Internet.</p>` : ""}
