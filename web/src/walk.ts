@@ -1,5 +1,6 @@
 import { AUTONOMOUS } from "./local";
 import { publicJson } from "./local-services";
+import { offlineRoute } from "./offline-routes";
 import type { Place, WalkRoute, WalkStep } from "../../shared/types";
 import type { AddressResponse, OsrmResponse, OsrmStep } from "../../shared/geo-api";
 import type { LL } from "./geo";
@@ -52,7 +53,8 @@ async function getJson<T>(path: string): Promise<T> {
 
 /** Itinéraire à pied entre deux points */
 export async function fetchWalk(from: LL, to: LL): Promise<WalkRoute> {
-  const j = await getJson<OsrmResponse>(`/geo/walk?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}`);
+  // calculé sur l'appareil (graphe de rues livré avec l'appli) ; le service en ligne ne sert qu'en secours
+  const j = (AUTONOMOUS ? await offlineRoute("foot", from, to) : null) ?? await getJson<OsrmResponse>(`/geo/walk?from=${from.lat},${from.lon}&to=${to.lat},${to.lon}`);
   const r = j.routes?.[0];
   if (j.code !== "Ok" || !r) throw new Error("Aucun itinéraire à pied");
   return { distance: r.distance, duration: r.duration, coords: r.geometry.coordinates, steps: r.legs.flatMap(l => l.steps).map(toStep) };

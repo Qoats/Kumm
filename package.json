@@ -10,7 +10,7 @@
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node --env-file=.env dist/server/index.js",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.server.json --noEmit",
-    "test": "node --import tsx --test tests/kumm.test.mjs tests/android-release.test.mjs tests/android-local.test.mjs",
+    "test": "node --import tsx --test tests/kumm.test.mjs tests/android-release.test.mjs tests/android-local.test.mjs tests/walk-graph.test.mjs",
     "build:android": "vite build --mode android && cap sync android",
     "android:open": "cap open android",
     "check:secrets": "node scripts/check-secrets.mjs",
