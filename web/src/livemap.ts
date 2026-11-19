@@ -30,7 +30,7 @@ let lastUser = "";
 let centered = false;
 let watcher: ResizeObserver | null = null;
 
-let base: L.GridLayer | null = null;
+let base: L.Layer | null = null;
 let baseDark: boolean | null = null;
 let tileErrors = 0, tilesLoaded = false, note: HTMLDivElement | null = null;
 
@@ -55,7 +55,7 @@ function useBaseLayer(m: L.Map): void {
     }
   });
   base.addTo(m);
-  base.bringToBack();
+  (base as L.GridLayer).bringToBack?.();
 }
 
 /* Niveaux de détail (comme un plan en ligne) : de près des icônes, plus loin de simples points dessinés sur un seul canevas

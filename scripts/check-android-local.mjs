@@ -124,9 +124,10 @@ try {
  }
  await page.screenshot({path:'/tmp/kumm-android-local-settings.png',fullPage:true});
  await page.evaluate(()=>{window.__kumm.S.overlay=null;window.__kumm.S.tab='nearby';window.__kumm.render();});
- await page.waitForFunction(()=>window.__kummMap && document.querySelectorAll('.leaflet-tile').length>0);
+ // fond de carte livré avec l'appli : dessiné par MapLibre à partir du paquet local, sans aucune tuile en ligne
+ await page.waitForFunction(()=>window.__kummMap && document.querySelector('.leaflet-gl-layer canvas'));
  assert.match(await page.locator('body').innerText(),/OpenStreetMap/);
- assert.ok((await page.locator('.leaflet-tile').first().getAttribute('src')).startsWith('https://tile.openstreetmap.org/'));
+ assert.equal(await page.locator('.leaflet-tile').count(),0,'no online raster tile when the offline map is available');
  await page.screenshot({path:'/tmp/kumm-android-local-map.png',fullPage:true});
  assert.deepEqual(forbidden,[],'Android must never request a Kumm server endpoint');
  assert.deepEqual(errors,[]);
