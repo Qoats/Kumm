@@ -1,6 +1,6 @@
 # Kumm Android autonome — architecture et validation
 
-Version proposée : 0.53.0. Même application Capacitor, identifiant `fr.kumm.app`, origine WebView `https://localhost`, composants, thèmes, ressources et préférences existants. Aucun nouveau site, aucune WebView distante.
+Version proposée : 0.54.0. Même application Capacitor, identifiant `fr.kumm.app`, origine WebView `https://localhost`, composants, thèmes, ressources et préférences existants. Aucun nouveau site, aucune WebView distante.
 
 ## Dépendances recensées et remplacement Android
 
@@ -88,7 +88,7 @@ Avant une diffusion : recette sur un appareil Android avec l’APK réellement s
 - Archives officielles : 1 347 points CTS ; 2 491 points ferroviaires TER retenus sur les 5 257 points SNCF du flux complet. Les 3 061 arrêts/gares regroupés chargés dans l’interface proviennent de ces données.
 - Scénario navigateur avec pont natif de test : réussi pour horaires hors ligne après rechargement, favoris, recherche, lignes, itinéraires locaux, rafraîchissement manuel, compteur de 30 secondes sans téléchargement et sans remplacement de l’écran, suspension en arrière-plan, mentions théoriques / « Bientôt disponible », source et attribution cartographiques.
 - Mises à jour dans ce scénario : aucune installation au contrôle automatique ; report, refus mémorisé, recherche manuelle et téléchargement seulement après accord ; refus de permission Android sans boucle d’ouverture des réglages.
-- APK de revue Play et sideload, AAB Play non signé : compilés ; contrôles du contenu des paquets réussis. Signature debug vérifiée. Identifiant, version 0.53.0, code de test 10000, cible API 36 et retrait de `REQUEST_INSTALL_PACKAGES` sur le profil Play vérifiés.
+- APK de revue Play et sideload, AAB Play non signé : compilés ; contrôles du contenu des paquets réussis. Signature debug vérifiée. Identifiant, version 0.54.0, code de test 10000, cible API 36 et retrait de `REQUEST_INSTALL_PACKAGES` sur le profil Play vérifiés.
 - Contrôle des secrets, syntaxe YAML du workflow, `git diff --check` et test de sécurité de l’ancien canal VPS : réussis.
 
 Aucune release n’a été créée ou publiée pendant ces essais. Aucun VPS n’a été utilisé ni déployé. La branche distante `apk` est conservée. Les validations de production sur téléphone et la parité d’accessibilité décrites ci-dessus restent à terminer ; ces résultats ne les remplacent pas.
