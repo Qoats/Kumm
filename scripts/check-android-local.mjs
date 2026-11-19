@@ -17,7 +17,7 @@ try {
      if(method==='sync') { syncs++; if(offline) throw Error('Offline'); return Object.fromEntries(['cts','ter'].map(s=>[s,{revision:s+'-official',checked:Date.now()}])); }
      if(method==='read') return {data:bytes[options.source]};
    }
-   if(plugin==='App') return {version:'0.53.0',build:'10000'};
+   if(plugin==='App') return {version:'0.54.0',build:'10000'};
    if(plugin==='KummUpdater') {
      if(method==='source') return {play:false};
      if(method==='canInstall') return {allowed:installAllowed};
