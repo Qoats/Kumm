@@ -1,5 +1,0 @@
-Carte hors ligne de l'Eurométropole de Strasbourg.
-Données © contributeurs OpenStreetMap, licence ODbL 1.0 : https://www.openstreetmap.org/copyright
-Tuiles vectorielles : OpenFreeMap (https://openfreemap.org), schéma © OpenMapTiles (https://www.openmaptiles.org/, CC-BY 4.0).
-Styles : OpenFreeMap « liberty » et « dark ». Polices : Noto Sans (SIL Open Font License 1.1).
-Ces fichiers sont construits par scripts/build-map-pack.mjs ; le paquet de tuiles dérive d'OpenStreetMap et est redistribué sous la même licence ODbL.
