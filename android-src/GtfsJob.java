@@ -6,9 +6,10 @@ public class GtfsJob extends JobService {
     private Thread task;
     @Override public boolean onStartJob(JobParameters parameters) {
         task = new Thread(() -> {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
             try { KummGtfs.synchronize(getApplicationContext(), false, true); }
             catch (Exception ignored) { /* Last valid local schedules remain available. */ }
-            jobFinished(parameters, false);
+            if (!Thread.currentThread().isInterrupted()) jobFinished(parameters, false);
         }, "kumm-gtfs-periodic"); task.start();
         return true;
     }

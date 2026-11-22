@@ -1,8 +1,5 @@
-# Règles R8 de Kumm (ajoutées à android/app/proguard-rules.pro par .github/workflows/android.yml).
-# Le code du projet est conservé tel quel : il est appelé par le manifeste, par le pont JavaScript de Capacitor
-# et par réflexion, ce que R8 ne voit pas. Le reste (bibliothèques) est réduit et obscurci.
-
--keep class fr.kumm.app.** { *; }
+# Les composants Android sont conservés via le manifeste. Les plugins Kumm
+# passent par les règles du pont Capacitor ci-dessous.
 
 # Capacitor : plugins et méthodes appelées depuis la page web
 -keep @com.getcapacitor.annotation.CapacitorPlugin public class * { @com.getcapacitor.annotation.PermissionCallback <methods>; @com.getcapacitor.annotation.ActivityCallback <methods>; @com.getcapacitor.PluginMethod public <methods>; }

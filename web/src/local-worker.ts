@@ -1,4 +1,4 @@
-/** GTFS parsing and queries stay off the UI thread. No network access in this worker. */
+/** GTFS parsing and queries stay off the UI thread. ZIP reads are from the app’s local WebView origin. */
 import { planLocal } from "./local-planner";
 import { createSchedule } from "./local-schedule";
 import { buildChains, vehiclesAt } from "./local-vehicles";
@@ -53,7 +53,7 @@ async function request(path: string): Promise<unknown> {
   if (p === "/gtfs/stops") return c.scheduledStops();
   if (p === "/gtfs/lines") return c.scheduledLines();
   if (p === "/gtfs/departures") {
-    if (!state.cts) throw Error("Téléchargez les données CTS dans les paramètres pour consulter les horaires hors connexion.");
+    if (!state.cts) throw Error("Horaires CTS indisponibles sur cet appareil.");
     return c.scheduledDepartures(q.get("MonitoringRef") ?? "", at);
   }
   if (p === "/quay-lines") return c.scheduledQuayLines();
@@ -73,15 +73,23 @@ async function request(path: string): Promise<unknown> {
   throw Error("Bientôt disponible");
 }
 self.onmessage = async (e: MessageEvent) => {
-  const { id, method, source, value, path } = e.data;
+  const { id, method, source, value, path, archiveUrl } = e.data;
   try {
     await ready;
     let result: unknown;
     if (method === "status") result = Object.fromEntries(Object.entries(state).map(([k, v]) => [k, { checked: v.checked, revision: v.revision, etag: v.etag, modified: v.modified, validUntil: feeds[k as Source].validUntil(), expired: feeds[k as Source].validUntil() < new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replaceAll("-", "") }]));
     else if (method === "save") {
       // Parse a separate instance first; neither the persisted archive nor live queries change on failure.
-      const next = createSchedule(source === "ter"); await next.load(value.bytes);
-      await stored(source, value); feeds[source as Source] = next; state[source as Source] = value; result = true;
+      let bytes: Uint8Array = value.bytes;
+      if (archiveUrl) {
+        const response = await fetch(archiveUrl);
+        if (!response.ok) throw Error("Archive locale indisponible (HTTP " + response.status + ")");
+        bytes = new Uint8Array(await response.arrayBuffer());
+      }
+      const next = createSchedule(source === "ter");
+      await next.load(bytes, Boolean(state.cts || state.ter));
+      const saved = { ...value, bytes };
+      await stored(source, saved); feeds[source as Source] = next; state[source as Source] = saved; result = true;
     } else if (method === "checked") {
       const old = state[source as Source];
       if (!old) throw Error("Réponse 304 sans copie locale");

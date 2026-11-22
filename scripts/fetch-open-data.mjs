@@ -5,7 +5,7 @@
 //   CTS (trams et bus)  : jeu « Réseau urbain CTS », Licence Ouverte 2.0
 //   SNCF (TER)          : jeu « Réseau SNCF TGV, Intercités et TER », ODbL
 //
-// Usage : node scripts/fetch-open-data.mjs dist/pages
+// Usage : node scripts/fetch-open-data.mjs dist/pages | node scripts/fetch-open-data.mjs dist/web cts
 // Code de sortie non nul si une archive manque ou est invalide : le déploiement est alors annulé et le site
 // précédent reste en ligne.
 import crypto from "node:crypto";
@@ -15,6 +15,7 @@ import { unzipSync } from "fflate";
 
 const SOURCES = {
   cts: {
+    official: "https://opendata.cts-strasbourg.eu/google_transit.zip",
     dataset: "5ae1715488ee384c8ba0342b",
     name: "CTS / Eurométropole de Strasbourg",
     licence: "Licence Ouverte 2.0",
@@ -46,7 +47,14 @@ function validate(bytes) {
   if (bytes.length < 500_000) throw Error("archive anormalement petite : " + bytes.length + " octets");
 }
 
-async function fetchSource(key, src) {
+async function fetchSource(key, src, direct) {
+  if (direct) {
+    const r = await fetch(src.official, { headers: { "User-Agent": UA }, cache: "no-cache", signal: AbortSignal.timeout(180_000) });
+    if (!r.ok) throw Error(`[${key}] HTTP ${r.status} pour ${src.official}`);
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    validate(bytes);
+    return { key, bytes, from: src.official, at: r.headers.get("Last-Modified"), etag: r.headers.get("ETag") ?? undefined, title: "Réseau urbain CTS" };
+  }
   const d = await get(API + src.dataset, "json");
   const gtfs = d.resources.filter(r => r.format === "GTFS");
   if (!gtfs.length) throw Error(`Aucune ressource GTFS dans « ${d.title} »`);
@@ -69,17 +77,19 @@ async function fetchSource(key, src) {
 }
 
 const out = path.resolve(process.argv[2] ?? "dist/pages", "data");
+const onlyCts = process.argv[3] === "cts";
 fs.mkdirSync(out, { recursive: true });
-const manifest = { generated: new Date().toISOString(), sources: {} };
-for (const [key, src] of Object.entries(SOURCES)) {
-  const r = await fetchSource(key, src);
+const manifest = { generated: "", sources: {} };
+for (const [key, src] of Object.entries(onlyCts ? { cts: SOURCES.cts } : SOURCES)) {
+  const r = await fetchSource(key, src, onlyCts);
   fs.writeFileSync(path.join(out, key + ".zip"), r.bytes);
   manifest.sources[key] = {
     revision: crypto.createHash("sha256").update(r.bytes).digest("hex").slice(0, 16),
-    bytes: r.bytes.length, publishedAt: r.at, retrievedFrom: r.from,
+    bytes: r.bytes.length, publishedAt: r.at, etag: r.etag, retrievedFrom: r.from,
     dataset: r.title, producer: src.name, licence: src.licence, page: src.page
   };
   console.log(`${key} : ${(r.bytes.length / 1e6).toFixed(1)} Mo, ${manifest.sources[key].revision}, ${r.at}`);
 }
+manifest.generated = new Date().toISOString();
 fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest, null, 1) + "\n");
 console.log("manifeste écrit dans", path.join(out, "manifest.json"));

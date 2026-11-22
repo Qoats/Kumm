@@ -56,9 +56,11 @@ write(app + "/src/main/AndroidManifest.xml", text => {
 
 write(app + "/build.gradle", text => {
   text = text.replace(/versionCode \d+/, "versionCode " + code)
-    .replace(/versionName "[^"]*"/, `versionName "${version}"`);
+    .replace(/versionName "[^"]*"/, `versionName "${version}"`)
+    .replace("proguard-android.txt", "proguard-android-optimize.txt")
+    .replace(/minifyEnabled false/, "minifyEnabled true");
   if (!text.includes("shrinkResources true")) {
-    text = text.replace(/minifyEnabled (?:false|true)/, "minifyEnabled true\n            shrinkResources true");
+    text = text.replace("minifyEnabled true", "minifyEnabled true\n            shrinkResources true");
   }
   if (!text.includes("coreLibraryDesugaringEnabled")) text = text.replace("    buildTypes {", "    compileOptions {\n        coreLibraryDesugaringEnabled true\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n    }\n    buildTypes {");
   if (!text.includes("desugar_jdk_libs")) text = text.replace("dependencies {", "dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'");
@@ -67,5 +69,16 @@ write(app + "/build.gradle", text => {
   if (!text.includes("includeAndroidResources")) text = text.replace("    buildTypes {", "    testOptions { unitTests.includeAndroidResources = true }\n    buildTypes {");
   return text;
 });
+write("android/build.gradle", text => text.replace("com.android.tools.build:gradle:8.13.0", "com.android.tools.build:gradle:8.13.2"));
+write("android/gradle.properties", text => {
+  const optimized = "android.r8.optimizedResourceShrinking=true";
+  text = text.replace(/^android\.enableR8\.fullMode\s*=\s*false\b[^\r\n]*(?:\r?\n|$)/m, "");
+  const setting = /^android\.r8\.optimizedResourceShrinking\s*=.*$/m;
+  return setting.test(text) ? text.replace(setting, optimized) : `${text.trimEnd()}\n${optimized}\n`;
+});
 const proguard = read("android-src/proguard-kumm.pro");
-write(app + "/proguard-rules.pro", text => text.includes(proguard.trim()) ? text : text + "\n" + proguard);
+write(app + "/proguard-rules.pro", text => {
+  // Remplace aussi les règles générées avant l'activation de l'optimisation.
+  text = text.replace(/^# Règles R8 de Kumm \(ajoutées à android\/app\/proguard-rules\.pro[^\r\n]*\r?\n[\s\S]*?^-renamesourcefileattribute SourceFile[ \t]*\r?\n?/m, "");
+  return text.includes(proguard.trim()) ? text : text.trimEnd() + "\n\n" + proguard;
+});

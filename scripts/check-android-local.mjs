@@ -79,16 +79,14 @@ try {
  await page.evaluate(()=>{for(const fn of window.__listeners.appStateChange??[])fn({isActive:true});});
  await page.waitForFunction(n=>window.__queries>n,paused);
  await page.evaluate(()=>{window.__kumm.S.overlay={k:'settings'};window.__kumm.render();});
- const manualBefore=syncs;
- await page.locator('[data-act="syncGtfs"]').click();
- await page.waitForFunction(()=>!document.body.textContent.includes('Vérification des données officielles…'),null,{timeout:30000});
- assert.ok(syncs>manualBefore);
+ await page.locator('.overlay').waitFor();
+ assert.equal(await page.locator('.overlay [data-act="syncGtfs"]').count(),0);
  if(updates) {
-   await page.locator('[data-act="checkUpdate"]').click();
-   await page.locator('[data-upd="ignore"]').click();
-   assert.equal(await page.evaluate(()=>localStorage.getItem('ignored-release')),'99999999');
-   assert.equal(installs,0);
-   await page.locator('[data-act="checkUpdate"]').click();
+   const resumeNextDay = () => page.evaluate(()=>{
+     localStorage.setItem('release-checked',String(Date.now()-86400001));
+     for(const fn of window.__listeners.resume??[])fn({});
+   });
+   await resumeNextDay();
    installAllowed=false;
    await page.locator('[data-upd="go"]').click();
    await page.waitForFunction(()=>document.querySelector('.upd-msg')?.textContent?.includes('autoriser'));
@@ -101,6 +99,10 @@ try {
    await page.locator('[data-upd="later"]').waitFor();
    assert.equal(installs,1,'download must follow explicit consent');
    await page.locator('[data-upd="later"]').click();
+   await resumeNextDay();
+   await page.locator('[data-upd="ignore"]').click();
+   assert.equal(await page.evaluate(()=>localStorage.getItem('ignored-release')),'99999999');
+   assert.equal(installs,1);
  }
  await page.evaluate(id=>{localStorage.setItem('fav',JSON.stringify([id]));},stop.id);
  await page.evaluate(()=>{const k=window.__kumm;k.S.tab='search';k.S.overlay=null;k.S.q='Homme';k.render();});
@@ -131,5 +133,5 @@ try {
  await page.screenshot({path:'/tmp/kumm-android-local-map.png',fullPage:true});
  assert.deepEqual(forbidden,[],'Android must never request a Kumm server endpoint');
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({result:'passed',stops:await page.evaluate(()=>window.__kumm.STOPS.length),checks:['official-archives','onboarding-labels','offline-reload','favourites','search','lines','local-journeys','30s-local-refresh','background-pause','manual-sync','realtime-labels','map-source-and-attribution','no-kumm-server-requests'],updates: updates ? 'defer, ignore, manual check, consent before APK' : 'not requested',nativeBridge:'test adapter; Android runtime not emulated'}));
+ console.log(JSON.stringify({result:'passed',stops:await page.evaluate(()=>window.__kumm.STOPS.length),checks:['official-archives','onboarding-labels','offline-reload','favourites','search','lines','local-journeys','30s-local-refresh','background-pause','settings','realtime-labels','map-source-and-attribution','no-kumm-server-requests'],updates: updates ? 'defer, ignore, automatic check, consent before APK' : 'not requested',nativeBridge:'test adapter; Android runtime not emulated'}));
 } finally {await browser.close();}

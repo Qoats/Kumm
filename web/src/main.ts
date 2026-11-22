@@ -1,7 +1,7 @@
 import { clearDepartureCache } from "./api";
 import { foregroundClock } from "./foreground";
 import { migrateFavourites } from "./migrate";
-import { AUTONOMOUS, LOCAL_STATE, LOCAL_STATUS, syncLocal } from "./local";
+import { AUTONOMOUS, LOCAL_STATE, LOCAL_STATUS, STATIC_SITE, onScheduleNetworkReady, syncLocal } from "./local";
 // police de l'interface, servie par Kumm lui-même (pas de requête vers Google Fonts : l'adresse IP des visiteurs reste privée)
 import "@fontsource/plus-jakarta-sans/latin-400.css";
 import "@fontsource/plus-jakarta-sans/latin-ext-400.css";
@@ -53,7 +53,7 @@ import { cmpVersion, esc, fold } from "./util";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { stopNav } from "./nav";
-import { DEFAULT_PREFS, applyTheme, savePrefs } from "./themes";
+import { applyTheme, savePrefs } from "./themes";
 import type { Accent, Theme, Ui } from "./themes";
 import type { Place, Poi, StopDeparture } from "../../shared/types";
 import { buildVeloparks } from "./places";
@@ -70,7 +70,7 @@ import { CAN_UPDATE, PLAY_URL, checkUpdate, installUpdate, updateView } from "./
 import { forgetScroll, restoreScroll, saveScroll } from "./scroll";
 import { stopJourney } from "./journey";
 import { answerRide, rideBanner, rideDebug, startRideDetection, stopRideDetection, stopSharing } from "./ride";
-import { acceptTerms, allSteps, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
+import { acceptTerms, onboardingDone, onboardingSteps, onboardingView } from "./onboarding";
 import type { Release } from "./update";
 import { NATIVE, PUSH_READY, addArrival, askPermission, checkAlerts, followed, onAlertTap, removeArrival, saveAlerts, syncAlerts } from "./alerts";
 
@@ -127,9 +127,8 @@ function draw(): void {
     (S.arrPick ? arrivalPicker(S.arrPick) : "") +
     (S.journey ? "" : rideBanner()) +
     (S.toast ? `<div class="toast">${esc(S.toast)}</div>` : "") +
-    (AUTONOMOUS && !Object.keys(LOCAL_STATUS).length && LOCAL_STATE.phase !== "idle" ? localLoadBar() : "") +
-    // hors connexion : on affiche les dernières données reçues, en disant de quand elles datent
-    (AUTONOMOUS && Object.values(LOCAL_STATUS).some(s => s.expired) ? `<div class="offbar">Données horaires périmées · Actualisez les données dans les paramètres</div>` : OFFLINE.on || !navigator.onLine ? `<div class="offbar">${ic("clock", 'width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"')}Hors connexion${OFFLINE.at ? ` · horaires de ${hm(OFFLINE.at)}` : ""}</div>` : "");
+    (AUTONOMOUS && !LOCAL_STATUS.cts && (LOCAL_STATE.phase === "error" || (STATIC_SITE && LOCAL_STATE.phase === "loading")) ? localLoadBar() : "") +
+    (AUTONOMOUS && Object.values(LOCAL_STATUS).some(s => s.expired) ? `<div class="offbar">Données horaires périmées</div>` : !NATIVE && (OFFLINE.on || !navigator.onLine) ? `<div class="offbar">${ic("clock", 'width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"')}Hors connexion${OFFLINE.at ? ` · horaires de ${hm(OFFLINE.at)}` : ""}</div>` : "");
 
   if (act) {
     const el = document.getElementById(act) as HTMLInputElement | null;
@@ -300,7 +299,7 @@ async function loadDepsNow(): Promise<void> {
 }
 
 /* ============ ÉVÉNEMENTS ============ */
-const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-reset],[data-bikest],[data-place],[data-pset],[data-arr],[data-arrlead],[data-arrat],[data-rep]";
+const CLICKABLE = "[data-tab],[data-act],[data-line],[data-ldir],[data-stop],[data-f],[data-fav],[data-mb],[data-sg],[data-nav],[data-layer],[data-poi],[data-poitrip],[data-bikenav],[data-mode],[data-smode],[data-dirk],[data-onb],[data-upd],[data-ride],[data-sel],[data-alerts],[data-aline],[data-wk],[data-wq],[data-goto],[data-follow],[data-jstop],[data-wpick],[data-theme-pick],[data-accent-pick],[data-ui-pick],[data-darkmap],[data-bikest],[data-place],[data-pset],[data-arr],[data-arrlead],[data-arrat],[data-rep]";
 
 app.addEventListener("click", e => {
   const b = (e.target as HTMLElement).closest<HTMLElement>(CLICKABLE);
@@ -425,12 +424,11 @@ app.addEventListener("click", e => {
     return;
   }
   if (d.stepfree) { S.prefs.stepFree = !S.prefs.stepFree; savePrefs(S.prefs); render(); return; }
-  if (d.themePick || d.accentPick || d.uiPick || d.darkmap || d.reset) {
+  if (d.themePick || d.accentPick || d.uiPick || d.darkmap) {
     if (d.themePick) S.prefs.theme = d.themePick as Theme;
     if (d.uiPick) S.prefs.ui = d.uiPick as Ui;
     if (d.accentPick) S.prefs.accent = d.accentPick as Accent;
     if (d.darkmap) S.prefs.darkMap = !S.prefs.darkMap;
-    if (d.reset) S.prefs = { ...DEFAULT_PREFS };
     savePrefs(S.prefs); applyTheme(S.prefs); render(); return;
   }
   if (d.layer) {
@@ -480,10 +478,8 @@ app.addEventListener("click", e => {
       break;
     }
     case "contremarque": S.modal = contremarqueInfo(); break;
-    case "checkUpdate": void offerUpdate(true); return;
     case "unfollow": S.follow = null; break;
     case "refollow": if (S.follow) S.follow.paused = false; break;
-    case "replayOnb": S.overlay = null; S.onb = { steps: allSteps(), i: 0, refused: false }; break;
   }
   render();
 });
@@ -517,13 +513,9 @@ async function changeAlerts(what: string): Promise<void> {
 /* ---------- mises à jour de l'application (Android) : vérifiées au lancement, installées depuis l'application ---------- */
 let waitingPermission: Release | null = null;
 
-async function offerUpdate(manual: boolean): Promise<void> {
-  if (!CAN_UPDATE) { if (manual) toast("Mises à jour automatiques disponibles dans l'application Android"); return; }
-  let rel: Release | null | "unpublished";
-  try { rel = await checkUpdate(manual); } catch (e) { if (manual) toast("Vérification impossible : " + String(e)); return; }
-  if (rel === "unpublished") { if (manual) toast(`Version ${VERSION} · aucune release stable disponible sur GitHub`); return; }
-  if (!rel) { if (manual) toast(`Kumm est à jour (version ${VERSION})`); return; }
-  if (!manual && localStorage.getItem("ignored-release") === String(rel.code)) return;
+async function offerUpdate(): Promise<void> {
+  const rel = await checkUpdate().catch(() => null);
+  if (!rel || rel === "unpublished" || localStorage.getItem("ignored-release") === String(rel.code)) return;
   // La proposition reste facultative et peut être fermée à tout moment.
   S.upd = { rel, phase: "ready", pct: 0 };
   render();
@@ -835,6 +827,29 @@ function applyQuayModes(): void {
 }
 
 let realInitialized = false;
+let localCatalogPending = false;
+
+async function refreshLocalCatalog(): Promise<void> {
+  if (LOCAL_STATUS.cts || LOCAL_STATUS.ter) CONFIG.SERVER_READY = true;
+  const [list, info, lines, modes] = await Promise.all([loadStops(), loadLineInfo(), loadQuayLines(), loadQuayModes()]);
+  Object.assign(LINE_MODES, info.modes); Object.assign(LINE_NAMES, info.names); Object.assign(COLORS, info.colors);
+  Object.assign(TEXT_COLORS, info.text); Object.assign(DIRS, info.ends);
+  quayLines = lines; quayModes = modes;
+  placeOnTramQuays(list, modes); list.forEach(project);
+  if (list.length && JSON.stringify(list) !== JSON.stringify(STOPS)) {
+    const fav = migrateFavourites(S.fav, STOPS, list);
+    if (fav.some((id, i) => id !== S.fav[i]) || fav.length !== S.fav.length) {
+      S.fav = fav;
+      try { localStorage.setItem("fav", JSON.stringify(fav)); } catch { /* stockage indisponible */ }
+    }
+    if (S.overlay?.k === "stop") S.overlay.id = migrateFavourites([S.overlay.id], STOPS, list)[0] ?? S.overlay.id;
+    STOPS.splice(0, STOPS.length, ...list);
+    applyQuayLines(); rebuildPois(); refreshMarkers();
+  }
+  clearDepartureCache();
+  if (!document.hidden && nativeActive) void loadDeps();
+}
+
 async function initReal(): Promise<void> {
   await loadServerMode().catch(e => toast(String(e)));
   render();
@@ -868,6 +883,7 @@ async function initReal(): Promise<void> {
     STOPS.length = 0; list.forEach(s => STOPS.push(project(s)));
     placeOnTramQuays(STOPS, quayModes); STOPS.forEach(project);
     rebuildPois();
+    refreshMarkers();
     if (CONFIG.CTS_REALTIME) try { localStorage.setItem("stopsCache2", JSON.stringify({ t: Date.now(), list })); } catch { /* ignoré */ }
     render();
   } catch (e) {
@@ -892,6 +908,10 @@ async function initReal(): Promise<void> {
   void loadPois().then(list => { remotePois = list; rebuildPois(); render(); });
   locateIfAllowed();
   realInitialized = true;
+  if (localCatalogPending) {
+    localCatalogPending = false;
+    void refreshLocalCatalog().catch(console.warn);
+  }
 }
 
 /* Le serveur peut exiger une version minimale de l'application (après une évolution incompatible) */
@@ -911,20 +931,21 @@ async function checkVersion(): Promise<void> {
 if (!CONFIG.USE_MOCK && !AUTONOMOUS && !Capacitor.isNativePlatform()) void checkVersion();
 // nouvelle version de l'application : proposée quelques secondes après le lancement (sans gêner l'affichage des horaires)
 if (!CONFIG.USE_MOCK && CAN_UPDATE) {
-  setTimeout(() => { if (!S.upd) void offerUpdate(false); }, 2500);
-  setInterval(() => { if (!document.hidden && nativeActive && !S.upd) void offerUpdate(false); }, 3600000);
+  setTimeout(() => { if (!S.upd) void offerUpdate(); }, 2500);
+  setInterval(() => { if (!document.hidden && nativeActive && !S.upd) void offerUpdate(); }, 3600000);
   void CapApp.addListener("resume", () => {
-    if (!waitingPermission) { void offerUpdate(false); return; }
+    if (!waitingPermission) { void offerUpdate(); return; }
     const rel = waitingPermission; waitingPermission = null;
     if (S.upd?.rel?.code === rel.code) { S.upd = { rel, phase: "ready", pct: 0 }; render(); }
   });
 }
 
-/* Perte et retour de la connexion du téléphone */
-window.addEventListener("offline", () => toast("Vous êtes hors ligne"));
-window.addEventListener("online", () => { toast("Connexion rétablie"); void loadDeps(); });
-window.addEventListener("offline", () => render());
-onOfflineChange(() => render());
+/* Sur le web, signale le retour aux dernières données connues. */
+if (!NATIVE) {
+  window.addEventListener("offline", () => toast("Vous êtes hors ligne"));
+  onOfflineChange(render);
+}
+window.addEventListener("online", () => { if (!NATIVE) toast("Connexion rétablie"); void loadDeps(); });
 
 /* Android : le bouton « retour » ferme d'abord le guidage, une fenêtre ou une fiche, puis revient à l'accueil, puis quitte */
 if (Capacitor.isNativePlatform()) {
@@ -966,11 +987,11 @@ document.addEventListener("scroll", e => {
   if (document.documentElement.dataset.hs !== v) document.documentElement.dataset.hs = v;
 }, { capture: true, passive: true });
 
-/** Bandeau tant que les horaires officiels ne sont pas chargés : progression ou cause de l'échec, avec « Réessayer » */
+/** Progression sur le site web ou cause d'un échec CTS avec « Réessayer ». */
 function localLoadBar(): string {
   const err = LOCAL_STATE.phase === "error";
   const text = err ? `Horaires indisponibles : ${esc(LOCAL_STATE.error ?? "erreur inconnue")}`
-    : "Téléchargement et préparation des horaires officiels CTS et TER (première ouverture : jusqu’à quelques minutes, connexion requise)…";
+    : "Chargement des horaires officiels…";
   return `<div class="offbar" style="left:12px;right:12px;transform:none;display:block;white-space:normal;line-height:1.4;border-radius:14px;text-align:center">${text}${err ? ` <button class="pill" data-act="syncGtfs" style="margin-left:6px">Réessayer</button>` : ""}</div>`;
 }
 
@@ -982,9 +1003,15 @@ async function refreshLocal(): Promise<void> {
 }
 if (AUTONOMOUS) {
   window.addEventListener("kumm:gtfs-state", () => render());
-  window.addEventListener("kumm:gtfs", () => { if (realInitialized) { clearDepartureCache(); void initReal(); } });
-  const resumeLocal = () => { if (!document.hidden) { clearDepartureCache(); void syncLocal(false).then(() => initReal()).catch(console.warn); void loadDeps(); } };
+  window.addEventListener("kumm:gtfs", () => {
+    if (realInitialized) void refreshLocalCatalog().catch(console.warn);
+    else localCatalogPending = true;
+  });
+  const checkSchedules = () => { if (!document.hidden && nativeActive) void syncLocal(false).catch(console.warn); };
+  const resumeLocal = () => { checkSchedules(); if (!document.hidden && nativeActive) void loadDeps(); };
   document.addEventListener("visibilitychange", resumeLocal);
   void CapApp.addListener("appStateChange", ({ isActive }) => { if (isActive) resumeLocal(); });
-  setInterval(() => { if (!document.hidden) void syncLocal(false).catch(console.warn); }, 3600000);
+  window.addEventListener("online", checkSchedules);
+  onScheduleNetworkReady(checkSchedules);
+  setInterval(checkSchedules, STATIC_SITE ? 3600000 : 60_000);
 }

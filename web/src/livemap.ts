@@ -1,15 +1,18 @@
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import type { GeoJSONSource, Map as VectorMap } from "maplibre-gl";
 import { isHub, kindOfStop } from "./data";
 import { KINDS } from "./kinds";
 import type { Layer } from "./kinds";
 import { markerIcon } from "./markers";
-import { makeBaseLayer, wantsDarkMap } from "./tiles";
-import { AUTONOMOUS } from "./local";
-import { POIS, S, STOPS, USER, render, toast } from "./store";
+import { makeBaseLayer, usesTouchMap, wantsDarkMap } from "./tiles";
+import { AUTONOMOUS, LOCAL_STATUS } from "./local";
+import { STOP_LAYERS, STOP_SOURCE, stopFeatures, stopFilters } from "./map-stops";
+import { POIS, S, STOPS, USER, render, stopById, toast } from "./store";
+import { stopKey } from "./network";
 import { COLORS, lineLabel, lineText } from "./data";
 import { esc } from "./util";
-import { VEHICLES, followInfo, refreshVehicles, shownPath, shownProgress, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
+import { VEHICLES, followInfo, refreshVehicles, serverNow, shownPath, shownProgress, vehicleHeading, vehicleKind, vehiclePos, vehiclePosAlong } from "./vehicles";
 import { followStops } from "./views";
 import type { Vehicle } from "./vehicles";
 
@@ -32,6 +35,9 @@ let watcher: ResizeObserver | null = null;
 
 let base: L.Layer | null = null;
 let baseDark: boolean | null = null;
+let vectorStops: VectorMap | null = null;
+let vectorDataDirty = true, vectorFilterKey = "";
+let pendingStop: { id: string; name: string } | undefined;
 let tileErrors = 0, tilesLoaded = false, note: HTMLDivElement | null = null;
 
 /** Fond de carte clair ou sombre selon le thème ; le remplace à chaud si le thème change */
@@ -39,7 +45,12 @@ function useBaseLayer(m: L.Map): void {
   const dark = wantsDarkMap();
   if (base && baseDark === dark) return;
   if (base) m.removeLayer(base);
-  base = makeBaseLayer(dark);
+  vectorStops = null; lastKey = "";
+  base = makeBaseLayer(dark, vector => {
+    vectorStops = vector;
+    vectorDataDirty = true; vectorFilterKey = ""; lastKey = "";
+    if (S.tab === "nearby") render();
+  });
   baseDark = dark;
   tileErrors = 0; tilesLoaded = false;
   base.on("tileload", () => { tilesLoaded = true; note?.remove(); note = null; });
@@ -65,7 +76,9 @@ const MAX_ICONS = 160, MAX_DOTS = 2500;
 let dots: L.Canvas | null = null;
 const shown = new Map<string, L.Layer>();
 let shownMode = "";
+let markersDirty = false;
 let zooming = false;
+let dragging = false;
 /* Glissement des véhicules suspendu un instant quand la carte change d'échelle : sinon ils traverseraient l'écran
    depuis leur ancienne place */
 let glideTimer = 0;
@@ -95,13 +108,23 @@ function create(): void {
   map.on("zoomstart", () => { zooming = true; freezeGlide(); });
   map.on("viewreset", freezeGlide);
   // l'utilisateur déplace la carte : le suivi se met en pause (bouton « Suivre de nouveau » dans le panneau)
-  map.on("dragstart", () => { if (S.follow && !S.follow.paused) { S.follow.paused = true; render(); } });
-  map.on("zoomend", () => { zooming = false; freezeGlide(); syncVehicles(); });
+  map.on("dragstart", () => {
+    dragging = true;
+    if (S.follow && !S.follow.paused) { S.follow.paused = true; render(); }
+  });
+  map.on("dragend", () => { dragging = false; });
+  map.on("zoomend", () => { zooming = false; freezeGlide(); });
   me = L.marker([USER.lat, USER.lon], {
     icon: L.divIcon({ html: '<div class="me-dot"></div>', className: "lm-icon", iconSize: [22, 22], iconAnchor: [11, 11] }),
     interactive: false, keyboard: false, zIndexOffset: 1000, title: "Votre position"
   }).addTo(map);
   map.on("moveend", sync);
+  map.on("click", e => {
+    if (!vectorStops) return;
+    const pt = vectorStops.project([e.latlng.lng, e.latlng.lat]);
+    const hit = vectorStops.queryRenderedFeatures([[pt.x - 5, pt.y - 5], [pt.x + 5, pt.y + 5]], { layers: STOP_LAYERS })[0];
+    if (hit) openVectorStop({ id: String(hit.properties.id), name: String(hit.properties.name) });
+  });
   // pour inspecter la carte dans la console du navigateur (comme __kumm.STOPS)
   (window as unknown as { __kummMap?: L.Map; __kummVeh?: unknown }).__kummMap = map;
   (window as unknown as { __kummVeh?: unknown }).__kummVeh = VEHICLES;
@@ -111,14 +134,41 @@ function create(): void {
 
 /** Positions des arrêts modifiées (repères recentrés) : tous les repères sont recréés au prochain affichage */
 export function refreshMarkers(): void {
-  markers?.clearLayers(); shown.clear(); lastKey = "";
+  markersDirty = true; lastKey = ""; vectorDataDirty = true;
   sync();
+  if (pendingStop && S.tab === "nearby" && !S.overlay) openVectorStop(pendingStop);
+  else pendingStop = undefined;
+}
+
+function openVectorStop(point: { id: string; name: string }): void {
+  const stop = stopById(point.id) ?? STOPS.find(s => stopKey(s.name) === stopKey(point.name));
+  if (stop) { pendingStop = undefined; S.overlay = { k: "stop", id: stop.id }; render(); }
+  else if (vectorDataDirty) { pendingStop = point; toast("Préparation de la fiche de l’arrêt…"); }
+}
+
+function syncVectorStops(vector: VectorMap): void {
+  if (vectorDataDirty && LOCAL_STATUS.cts && STOPS.some(s => !s.sncf)) {
+    vectorDataDirty = false;
+    const source = vector.getSource<GeoJSONSource>(STOP_SOURCE);
+    void source?.setData(stopFeatures(STOPS)).catch(console.warn);
+  }
+  const active = (["tram", "bus", "ter"] as const).filter(k => S.layers[k] && (S.filter === "all" || S.filter === k));
+  const hubs = S.layers.tram || S.layers.bus || S.layers.ter;
+  const key = `${active.join(",")}|${hubs}`;
+  if (key === vectorFilterKey) return;
+  vectorFilterKey = key;
+  stopFilters(active, hubs).forEach((filter, i) => vector.setFilter(STOP_LAYERS[i], filter));
 }
 
 /** Affiche seulement les repères visibles à l'écran (la liste complète compte des milliers d'arrêts) ;
    ne crée ou ne retire que ce qui change, au lieu de tout redessiner à chaque déplacement */
 function sync(): void {
-  if (!map || !markers || !dots) return;
+  if (!map || !markers || !dots || zooming || dragging) return;
+  if (markersDirty) {
+    markers.clearLayers(); shown.clear(); markersDirty = false;
+  }
+  if (vectorStops) syncVectorStops(vectorStops);
+  const currentMap = map;
   const z = map.getZoom();
   const mode = z >= ICON_ZOOM ? "icons" : z >= DOT_ZOOM ? "dots" : "far";
   const b = map.getBounds().pad(mode === "icons" ? 0.25 : 0.1);
@@ -130,29 +180,42 @@ function sync(): void {
 
   const want = new Map<string, () => L.Layer>();
   const max = mode === "icons" ? MAX_ICONS : MAX_DOTS;
-  const place = (id: string, lat: number, lon: number, kind: Layer, title: string, open: () => void): void => {
-    if (want.size >= max || !b.contains([lat, lon])) return;
+  const cellSize = mode !== "icons" && usesTouchMap() ? (mode === "far" ? 24 : 16) : 0;
+  const cells = new Map<string, { id: string; priority: number }>();
+  const place = (id: string, lat: number, lon: number, kind: Layer, title: string, open: () => void, priority: number): void => {
+    if (cellSize) {
+      const pt = currentMap.project([lat, lon], z);
+      const key = `${Math.floor(pt.x / cellSize)},${Math.floor(pt.y / cellSize)}`;
+      const old = cells.get(key);
+      if (old && old.priority >= priority) return;
+      if (old) want.delete(old.id);
+      else if (want.size >= max) return;
+      cells.set(key, { id, priority });
+    } else if (want.size >= max) return;
     want.set(id, () => {
       const layer = mode === "icons"
         ? L.marker([lat, lon], { icon: icon(kind, 30), title, keyboard: false })
-        : L.circleMarker([lat, lon], { renderer: dots!, radius: mode === "far" ? 4 : 5, color: "#fff", weight: 1.5, fillColor: KINDS[kind].color, fillOpacity: 1 });
+        : L.circleMarker([lat, lon], { renderer: dots!, radius: mode === "far" ? 4 : 5, color: "#fff", weight: 1.5, fillColor: KINDS[kind].color, fillOpacity: 1, bubblingMouseEvents: false });
       return layer.on("click", open);
     });
   };
-  for (const s of STOPS) {
+  for (const s of vectorStops ? [] : STOPS) {
+    if (!b.contains([s.lat, s.lon])) continue;
     const k = kindOfStop(s);
-    if (isHub(s)) {
+    const hub = isHub(s);
+    if (hub) {
       // pôle d'échanges : visible dès que les trams, les bus ou les gares sont affichés, même de loin
       if (!S.layers.tram && !S.layers.bus && !S.layers.ter) continue;
     } else {
       if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
       if (mode === "far" && k !== "tram" && k !== "ter") continue;   // de loin : stations de tram et gares seulement
     }
-    place("s:" + s.id, s.lat, s.lon, k, `${isHub(s) ? "Gare" : KINDS[k].label} · ${s.name}`, () => { S.overlay = { k: "stop", id: s.id }; render(); });
+    const priority = hub || k === "ter" ? 3 : k === "tram" ? 2 : 1;
+    place("s:" + s.id, s.lat, s.lon, k, `${hub ? "Gare" : KINDS[k].label} · ${s.name}`, () => { S.overlay = { k: "stop", id: s.id }; render(); }, priority);
   }
   for (const p of POIS) {
-    if (!S.layers[p.kind] || (mode === "far" && p.kind !== "pr")) continue;
-    place("p:" + p.id, p.lat, p.lon, p.kind, `${KINDS[p.kind].label} · ${p.name}`, () => { S.overlay = { k: "poi", id: p.id }; render(); });
+    if (!S.layers[p.kind] || (mode === "far" && p.kind !== "pr") || !b.contains([p.lat, p.lon])) continue;
+    place("p:" + p.id, p.lat, p.lon, p.kind, `${KINDS[p.kind].label} · ${p.name}`, () => { S.overlay = { k: "poi", id: p.id }; render(); }, p.kind === "pr" ? 3 : 1);
   }
   for (const [id, layer] of shown) if (!want.has(id)) { markers.removeLayer(layer); shown.delete(id); }
   for (const [id, make] of want) if (!shown.has(id)) { const l = make(); l.addTo(markers); shown.set(id, l); }
@@ -188,20 +251,52 @@ const vehIcon = (line: string, h: number): L.DivIcon => L.divIcon({
   className: "lm-icon vm", iconSize: [34, 34], iconAnchor: [17, 17]
 });
 
-/** Place les véhicules visibles (catégories et filtre Tram / Bus respectés) ; appelé chaque seconde */
+/** Indexe les arrêts par case pour ne tester que les voisins d'une position en pixels. */
+function stopGap(m: L.Map, min: number): (p: L.LatLngTuple) => number {
+  const cells = new Map<string, L.Point[]>();
+  const add = (ll: L.LatLngExpression): void => {
+    const pt = m.latLngToContainerPoint(ll);
+    const key = `${Math.floor(pt.x / min)},${Math.floor(pt.y / min)}`;
+    const cell = cells.get(key);
+    if (cell) cell.push(pt);
+    else cells.set(key, [pt]);
+  };
+  if (vectorStops) {
+    for (const hit of vectorStops.queryRenderedFeatures({ layers: STOP_LAYERS })) {
+      if (hit.geometry.type === "Point") add([hit.geometry.coordinates[1], hit.geometry.coordinates[0]]);
+    }
+  } else {
+    for (const [id, layer] of shown) {
+      if (id.startsWith("s:")) add((layer as L.Marker | L.CircleMarker).getLatLng());
+    }
+  }
+  return p => {
+    const pt = m.latLngToContainerPoint(p);
+    const x = Math.floor(pt.x / min), y = Math.floor(pt.y / min);
+    let distance = min;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const cell = cells.get(`${x + dx},${y + dy}`);
+        if (cell) for (const stop of cell) distance = Math.min(distance, stop.distanceTo(pt));
+      }
+    }
+    return distance;
+  };
+}
+
 /**
  * Véhicule qui recouvrirait l'icône d'une station : il reste sur sa voie et attend juste avant l'icône (en arrivant), ou
  * se place juste après (en repartant). On cherche, le long de son propre tracé (virages compris), le premier point où il
  * ne touche plus aucune station. Un véhicule qui ne touche pas de station n'est jamais déplacé.
  */
-function besideStops(m: L.Map, v: Vehicle, p: L.LatLngTuple, h: number, stops: L.Point[], min: number): L.LatLngTuple {
-  const gap = (q: L.LatLngTuple): number => { const pt = m.latLngToContainerPoint(q); let d = Infinity; for (const s of stops) d = Math.min(d, s.distanceTo(pt)); return d; };
-  if (gap(p) >= min) return p;
+function besideStops(m: L.Map, v: Vehicle, p: L.LatLngTuple, h: number, gap: (p: L.LatLngTuple) => number, min: number, now: number): L.LatLngTuple {
+  const initialGap = gap(p);
+  if (initialGap >= min) return p;
   const metersPerPx = 40_075_016.7 * Math.cos((p[0] * Math.PI) / 180) / (256 * 2 ** m.getZoom());
-  const at = (px: number): L.LatLngTuple | null => vehiclePosAlong(v, px * metersPerPx);
+  const at = (px: number): L.LatLngTuple | null => vehiclePosAlong(v, px * metersPerPx, now);
   // arrive-t-il vers la station la plus proche, ou en repart-il ? (sa distance diminue-t-elle un peu plus loin sur le tracé ?)
   const ahead = at(4);
-  const arriving = ahead ? gap(ahead) < gap(p) : true;
+  const arriving = ahead ? gap(ahead) < initialGap : true;
   for (const sign of arriving ? [-1, 1] : [1, -1]) {
     for (let px = 3; px <= min * 4; px += 3) {
       const q = at(sign * px);
@@ -219,23 +314,21 @@ function besideStops(m: L.Map, v: Vehicle, p: L.LatLngTuple, h: number, stops: L
 }
 
 function syncVehicles(): void {
-  if (!map || !vehLayer) return;
+  if (!map || !vehLayer || zooming || dragging || document.hidden || !host?.isConnected) return;
   const b = map.getBounds().pad(0.3), seen = new Set<string>();
-  if (zooming) return;
-  // icônes des stations à l'écran (en pixels), pour que les véhicules ne les recouvrent pas
-  const mp = map, stopPts: L.Point[] = [];
-  for (const [id, layer] of shown) if (id.startsWith("s:")) stopPts.push(mp.latLngToContainerPoint((layer as L.Marker).getLatLng()));
   const clearance = shownMode === "icons" ? 33 : 20;
   // de loin, seuls les trains restent affichés (peu nombreux, ils traversent toute la carte)
   const show = map.getZoom() >= DOT_ZOOM, trainsOnly = !show && map.getZoom() >= 10;
-  let count = 0;
+  const gap = show || trainsOnly ? stopGap(map, clearance) : null;
+  const now = serverNow();
   for (const v of show || trainsOnly ? VEHICLES.values() : []) {
     const k = vehicleKind(v);
     if (trainsOnly && k !== "ter") continue;
     if (!S.layers[k] || (S.filter !== "all" && S.filter !== k)) continue;
-    const h = Math.round(vehicleHeading(v)), raw = vehiclePos(v);
-    if (!b.contains(raw) || ++count > 150) continue;
-    const p = stopPts.length ? besideStops(mp, v, raw, h, stopPts, clearance) : raw;
+    const raw = vehiclePos(v, now);
+    if (!b.contains(raw)) continue;
+    const h = Math.round(vehicleHeading(v, now));
+    const p = gap ? besideStops(map, v, raw, h, gap, clearance, now) : raw;
     seen.add(v.id);
     let m = vehMarkers.get(v.id);
     if (!m) {
@@ -258,6 +351,7 @@ function syncVehicles(): void {
       const arrow = m.getElement()?.querySelector<HTMLElement>(".va");
       if (arrow) arrow.style.transform = `rotate(${h}deg)`;
     }
+    if (seen.size >= 150) break;
   }
   for (const [id, m] of vehMarkers) if (!seen.has(id)) { vehLayer.removeLayer(m); vehMarkers.delete(id); }
   followTick();
@@ -339,7 +433,7 @@ function startVehicles(): void {
   if (vehTimer) return;
   const tick = (): void => {
     if (!host?.isConnected) { window.clearInterval(vehTimer); vehTimer = 0; return; }
-    if (document.hidden) return;
+    if (document.hidden || dragging || zooming) return;
     refreshVehicles(() => { syncVehicles(); if (S.overlay?.k === "veh") render(); });
     syncVehicles();
   };

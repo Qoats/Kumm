@@ -33,13 +33,14 @@ function csv(line: string): string[] {
 }
 
 const HOUR = 3600_000;
+const yieldWorker = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 function zipEntries(buf: Uint8Array): Set<string> {
   const names = new Set<string>();
   unzipSync(buf, { filter: f => { if (f.originalSize > 256 * 1024 * 1024) throw Error("Fichier GTFS trop volumineux"); names.add(f.name); return false; } });
   return names;
 }
 /** Incremental inflation/UTF-8 decoding avoids a second full string and an array of a million CSV lines. */
-async function eachRow(buf: Uint8Array, entries: Set<string>, file: string, fn: (row: string[], col: Record<string, number>) => void) {
+async function eachRow(buf: Uint8Array, entries: Set<string>, file: string, fn: (row: string[], col: Record<string, number>) => void, background: boolean) {
   if (!entries.has(file)) throw Error(file + " absent du GTFS");
   let header: Record<string, number> | undefined, rest = "", failure: Error | undefined;
   const decoder = new TextDecoder();
@@ -61,7 +62,11 @@ async function eachRow(buf: Uint8Array, entries: Set<string>, file: string, fn: 
     entry.start();
   });
   unzip.register(UnzipInflate);
-  for (let offset = 0; offset < buf.length; offset += 65536) { unzip.push(buf.subarray(offset, offset + 65536), offset + 65536 >= buf.length); if (failure) throw failure; }
+  for (let offset = 0; offset < buf.length; offset += 65536) {
+    unzip.push(buf.subarray(offset, offset + 65536), offset + 65536 >= buf.length);
+    if (failure) throw failure;
+    if (background && offset % 262144 === 0) await yieldWorker();
+  }
   if (!header) throw Error(file + " vide");
 }
 
@@ -96,12 +101,14 @@ const isTram = (route: Route): boolean => route.type === 0 || (route.type >= 900
 const isActive = (s: Service, day: { date: string; dow: number }): boolean =>
   s.exceptions.get(day.date) ?? (s.from <= day.date && day.date <= s.to && s.days[day.dow] === true);
 let feed: Feed | null = null;
+let validity: string | undefined;
 
 
 
 
-async function parse(buf: Uint8Array): Promise<Feed> {
+async function parse(buf: Uint8Array, background: boolean): Promise<Feed> {
   const entries = zipEntries(buf);
+  const read = (file: string, fn: Parameters<typeof eachRow>[3]) => eachRow(buf, entries, file, fn, background);
   const services = new Map<string, Service>();
   const service = (id: string): Service => {
     const old = services.get(id);
@@ -110,22 +117,22 @@ async function parse(buf: Uint8Array): Promise<Feed> {
     services.set(id, created);
     return created;
   };
-  if (entries.has("calendar.txt")) await eachRow(buf, entries, "calendar.txt", (r, c) => {
+  if (entries.has("calendar.txt")) await read("calendar.txt", (r, c) => {
     const s = service(r[c["service_id"]]);
     s.from = r[c["start_date"]];
     s.to = r[c["end_date"]];
     s.days = WEEK.map(day => r[c[day]] === "1");
   });
-  if (entries.has("calendar_dates.txt")) await eachRow(buf, entries, "calendar_dates.txt", (r, c) => {
+  if (entries.has("calendar_dates.txt")) await read("calendar_dates.txt", (r, c) => {
     service(r[c["service_id"]]).exceptions.set(r[c["date"]], r[c["exception_type"]] === "1");
   });
 
   const routes = new Map<string, Route>(), stopById = new Map<string, Stop>(), trips = new Map<string, Trip>();
-  await eachRow(buf, entries, "routes.txt", (r, c) => {
+  await read("routes.txt", (r, c) => {
     const id = r[c["route_id"]];
     routes.set(id, { code: railway ? "TER" : r[c["route_short_name"]] || id, name: r[c["route_long_name"]], type: Number(r[c["route_type"]]), color: r[c["route_color"]], text: r[c["route_text_color"]] });
   });
-  await eachRow(buf, entries, "stops.txt", (r, c) => {
+  await read("stops.txt", (r, c) => {
     const id = r[c["stop_id"]], lat = Number(r[c["stop_lat"]]), lon = Number(r[c["stop_lon"]]);
     if (railway && !id.startsWith("StopPoint:OCETrain TER-")) return;
     if (id && lat && lon && Number.isFinite(lat) && Number.isFinite(lon)) stopById.set(id, {
@@ -133,12 +140,12 @@ async function parse(buf: Uint8Array): Promise<Feed> {
       name: r[c["stop_name"]], lat, lon, lines: new Set()
     });
   });
-  await eachRow(buf, entries, "trips.txt", (r, c) => {
+  await read("trips.txt", (r, c) => {
     const id = r[c["trip_id"]], route = routes.get(r[c["route_id"]]), s = services.get(r[c["service_id"]]);
     if (route && s) trips.set(id, { id, route, service: s, dest: railway ? "" : r[c["trip_headsign"]], num: railway ? r[c["trip_headsign"]] : "", direction: r[c["direction_id"]], calls: [] });
   });
   let lookback = 1;
-  await eachRow(buf, entries, "stop_times.txt", (r, c) => {
+  await read("stop_times.txt", (r, c) => {
     const trip = trips.get(r[c["trip_id"]]), stop = stopById.get(r[c["stop_id"]]);
     if (!trip || !stop) return;
     const dep = seconds(r[c["departure_time"]] || r[c["arrival_time"]] || "");
@@ -151,7 +158,9 @@ async function parse(buf: Uint8Array): Promise<Feed> {
 
   const byStop = new Map<Stop, Visit[]>();
   const counts = new Map<string, Map<string, { variant: LineRoute; count: number }>>();
+  let processed = 0;
   for (const [id, trip] of trips) {
+    if (background && ++processed % 512 === 0) await yieldWorker();
     trip.calls.sort((a, b) => a.seq - b.seq);
     if (trip.calls.length < 2) { trips.delete(id); continue; }
     trip.dest ||= trip.calls.at(-1)!.stop.name;
@@ -274,5 +283,17 @@ function scheduledCourses(now: number, horizon = 2 * HOUR, back = 60_000): { cou
 }
 
 
-return { load: async (bytes: Uint8Array) => { const next = await parse(bytes); feed = next; courseCache = null; }, validUntil: () => feed ? [...feed.trips.values()].reduce((max, t) => { const dates = [t.service.to, ...[...t.service.exceptions].filter(([, active]) => active).map(([d]) => d)]; return dates.reduce((a, b) => a > b ? a : b, max); }, "") : "", scheduledStops, scheduledLines, scheduledDepartures, scheduledLineRoute, scheduledQuayLines, scheduledQuayModes, scheduledVisits, scheduledCourses, scheduledNearby };
+function validUntil(): string {
+  if (validity !== undefined) return validity;
+  let end = "";
+  const services = new Set<Service>();
+  for (const trip of feed?.trips.values() ?? []) services.add(trip.service);
+  for (const service of services) {
+    if (service.to > end) end = service.to;
+    for (const [date, active] of service.exceptions) if (active && date > end) end = date;
+  }
+  return validity = end;
+}
+
+return { load: async (bytes: Uint8Array, background = false) => { feed = await parse(bytes, background); validity = undefined; courseCache = null; }, validUntil, scheduledStops, scheduledLines, scheduledDepartures, scheduledLineRoute, scheduledQuayLines, scheduledQuayModes, scheduledVisits, scheduledCourses, scheduledNearby };
 }

@@ -1,4 +1,4 @@
-import { AUTONOMOUS, STATIC_SITE, syncLabel } from "./local";
+import { AUTONOMOUS, STATIC_SITE } from "./local";
 import type { Place, Poi, Stop, StopDeparture } from "../../shared/types";
 import { CONTREMARQUE_TER, TER_STATIONS_EMS } from "../../shared/ter";
 import type { PlannedDeparture } from "./api";
@@ -7,6 +7,7 @@ import { CONFIG, VERSION } from "./config";
 import { ALL_LINES, COLORS, DIRS, TRAMS, isHub, lineText, MESSAGES, MSG_STATE, hasAlert, isElevatorMsg, messagesForStop, stopLabel, isTram, kindOfStop, lineKind, lineLabel, messagesFor } from "./data";
 import type { TrafficMsg } from "./data";
 import { KINDS, LAYERS } from "./kinds";
+import { bundledStopCounts } from "./map-stops";
 import { ACCENTS, ACCENT_TOKENS, THEMES, THEME_TOKENS, UIS } from "./themes";
 import type { Accent, Theme, Tokens, Ui } from "./themes";
 import { CTS_APP_ANDROID, CTS_APP_IOS, CTS_CONTACT, CTS_FAQ, CTS_OBJETS_TROUVES, KUMM_CONTACT, isIOS } from "./links";
@@ -30,7 +31,6 @@ import type { LL } from "./geo";
 import { esc, fold } from "./util";
 import { VEHICLES, followInfo, serverNow } from "./vehicles";
 import { NATIVE, PUSH_READY, arrivalKey, arrivals } from "./alerts";
-import { CAN_UPDATE } from "./update";
 
 /* ============ COMPOSANTS ============ */
 /** Pastille d'une ligne ; alert : petit « ! » posé sur le coin (le texte à côté reste aligné avec les autres tuiles) */
@@ -322,8 +322,13 @@ export function screenLines(): string {
 }
 
 export const layerCounts = (): Record<Layer, number> => {
-  const c: Record<Layer, number> = { tram: 0, bus: 0, ter: 0, velhop: 0, velopark: 0, pr: 0, flexhop: 0 };
+  const c: Record<Layer, number> = { tram: 0, bus: 0, ter: 0, velhop: 0, velopark: 0, pr: 0 };
   STOPS.forEach(s => { c[kindOfStop(s)]++; });
+  if (AUTONOMOUS) {
+    c.tram ||= bundledStopCounts.tram;
+    c.bus ||= bundledStopCounts.bus;
+    c.ter ||= bundledStopCounts.ter;
+  }
   POIS.forEach(p => { c[p.kind]++; });
   return c;
 };
@@ -1171,13 +1176,9 @@ export function overlaySettings(): string {
     ${CONFIG.CTS_TRAFFIC && S.alerts.enabled ? alertSettings() : ""}`}
     <div class="sub">À propos</div>
     <div class="box" style="display:block"><div class="about"><img src="/favicon.svg" width="52" height="52" alt=""><div><b>Kumm · version ${VERSION}</b><div class="src" style="margin-top:2px">Transports de Strasbourg</div></div></div>
-      <div class="src">Horaires théoriques et arrêts : CTS / Eurométropole de Strasbourg · Licence Ouverte 2.0 <a href="https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts" target="_blank" rel="noopener noreferrer">Source</a><br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>${STATIC_SITE ? "" : "Vélhop : flux GBFS nextbike / Eurométropole<br>"}Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Fond de carte : OpenFreeMap, © OpenMapTiles<br>Adresses : Base Adresse Nationale<br>Trajets : ${AUTONOMOUS ? "calcul local sur GTFS CTS / SNCF" : "Transitous (MOTIS)"}<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires théoriques) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
+      <div class="src">Horaires théoriques et arrêts : CTS / Eurométropole de Strasbourg · Licence Ouverte 2.0 <a href="https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts" target="_blank" rel="noopener noreferrer">Source</a><br>Parkings relais et places : Eurométropole de Strasbourg (open data, Licence Ouverte)<br>${STATIC_SITE ? "" : "Vélhop : flux GBFS nextbike / Eurométropole<br>"}Véloparks : CTS et Strasbourg Mobilités<br>Cartes et marche à pied : © contributeurs OpenStreetMap<br>Fond de carte : OpenFreeMap, © OpenMapTiles<br>Adresses : ${AUTONOMOUS ? '<a href="https://data.strasbourg.eu/explore/dataset/referentiel_adresse_eurometrostras/information/" target="_blank" rel="noopener noreferrer">Ville et Eurométropole de Strasbourg</a> · Licence Ouverte 2.0 · ' : ""}Base Adresse Nationale<br>Trajets : ${AUTONOMOUS ? "calcul local sur GTFS CTS / SNCF" : "Transitous (MOTIS)"}<br>Stations de tram : plan CartoMetro<br>Trains TER (gares, horaires théoriques) : SNCF open data ; voies ferrées : © contributeurs OpenStreetMap<br>Météo : Open-Meteo (CC BY 4.0)<br>Application indépendante, non affiliée à la CTS, à la SNCF ni à l’Eurométropole</div>
       <div class="src" style="margin-top:10px"><a href="https://kumm.fr/mentions-legales.html" target="_blank" rel="noopener">Mentions légales</a> · <a href="https://kumm.fr/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></div></div>
-    <button class="ghost" data-act="replayOnb">Revoir la présentation</button>
-    ${AUTONOMOUS ? `<p>Horaires théoriques · CTS / SNCF</p><p>Dernière synchronisation : ${esc(syncLabel())}</p><button class="ghost" data-act="syncGtfs">Actualiser les données horaires</button><p>Passages en temps réel, retards, avances, suppressions, perturbations et météo en direct : Bientôt disponible.</p><p>Les fonds de carte et recherches d’adresses nécessitent Internet.</p>` : ""}
-    ${STATIC_SITE ? "" : CAN_UPDATE ? `<button class="ghost" data-act="checkUpdate">Rechercher des mises à jour</button>` : `<a href="https://play.google.com/store/apps/details?id=fr.kumm.app" target="_blank" rel="noopener">Mises à jour Google Play</a>`}
-    <a href="https://github.com/Qoats/Kumm/releases" target="_blank" rel="noopener">${STATIC_SITE ? "Télécharger l’application Android (GitHub)" : "Releases GitHub"}</a>
-    <button class="ghost" data-reset="1">Rétablir les réglages d’origine</button>
+    ${STATIC_SITE ? `<a href="https://github.com/Qoats/Kumm/releases" target="_blank" rel="noopener">Télécharger l’application Android (GitHub)</a>` : ""}
     ${NATIVE || STATIC_SITE ? "" : `<a class="ghost" href="/deconnexion" style="display:block;text-align:center;text-decoration:none;margin-top:10px">Se déconnecter</a>`}
   </div></main></div>`;
 }

@@ -30,7 +30,7 @@ Kumm (« viens » en alsacien) est une application Android indépendante pour le
 
 1. Ouvrez la [dernière version](https://github.com/Qoats/Kumm/releases/latest) depuis votre téléphone et téléchargez **`kumm.apk`**.
 2. Ouvrez le fichier. Android vous demandera d'autoriser l'installation depuis cette source : acceptez pour cette fois seulement.
-3. Au premier lancement, gardez Internet actif quelques secondes : l'application télécharge les horaires officiels. Ensuite, ils restent sur le téléphone.
+3. Les horaires théoriques CTS sont inclus et disponibles dès le premier lancement hors connexion. Une connexion permet de télécharger les horaires TER et d’actualiser les données.
 
 > **Vous avez déjà une ancienne version (0.52.x) ?** La version 0.53 est signée avec une nouvelle clé : Android refuse de la poser par-dessus. Désinstallez l'ancienne version d'abord ; vos favoris enregistrés sur le téléphone seront perdus. Les versions suivantes se mettront à jour normalement.
 
@@ -40,7 +40,7 @@ Une version web existe aussi sur [app.kumm.fr](https://app.kumm.fr) : mêmes cal
 
 ## Comment ça marche
 
-Kumm lit directement les **données ouvertes officielles** : le GTFS de la CTS (trams et bus) et celui de la SNCF (TER). Les horaires sont stockés sur le téléphone, recalculés toutes les 30 secondes au premier plan et actualisés chaque jour quand Internet est disponible.
+Kumm utilise les **données ouvertes officielles** de la CTS (trams et bus) et de la SNCF (TER). Les prochains départs sont recalculés toutes les 30 secondes au premier plan. Quand Internet est disponible, l’application vérifie en arrière-plan si les fichiers ont changé, avec un intervalle de 20 minutes entre les contrôles réussis. Android peut différer les tâches quand l’application est en arrière-plan.
 
 Deux choses à savoir :
 
@@ -53,7 +53,7 @@ Les fonctions qui exigent vraiment le temps réel (informations trafic, ponctual
 
 - Aucun compte, aucune publicité, et aucun serveur Kumm : l'application n'envoie rien à un serveur du projet.
 - Vos favoris et vos réglages restent sur votre téléphone.
-- L'application contacte directement les sources publiques, seulement quand c'est nécessaire : horaires CTS et SNCF, fonds de carte OpenStreetMap, recherche d'adresses (Base Adresse Nationale), calcul des cheminements à pied et à vélo (OpenStreetMap) et la page des versions sur GitHub.
+- La recherche d’adresses dans l’Eurométropole se fait sur l’appareil. Si aucune adresse locale ne correspond et qu’une connexion est disponible, l’application peut consulter la Base Adresse Nationale. Elle contacte aussi les autres sources publiques au besoin pour les horaires, les cheminements et les mises à jour.
 - Votre position sert à afficher les arrêts proches sur l'appareil. Pour calculer un cheminement à pied ou à vélo, les coordonnées du trajet sont envoyées au service de routage OpenStreetMap.
 
 ## Données et licences
@@ -63,7 +63,7 @@ Les fonctions qui exigent vraiment le temps réel (informations trafic, ponctual
 | Arrêts, lignes et horaires CTS | CTS / Eurométropole de Strasbourg, données ouvertes sur [transport.data.gouv.fr](https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts), [Licence Ouverte 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/) |
 | Gares et horaires TER | SNCF, données ouvertes sur [transport.data.gouv.fr](https://transport.data.gouv.fr/datasets/horaires-sncf) (ODbL) |
 | Fonds de carte, tracés des lignes, voies ferrées, cheminements | © contributeurs OpenStreetMap ([ODbL](https://www.openstreetmap.org/copyright)) |
-| Adresses | Base Adresse Nationale, via la Géoplateforme de l'IGN |
+| Adresses | [Référentiel adresse de l’Eurométropole de Strasbourg](https://data.strasbourg.eu/explore/dataset/referentiel_adresse_eurometrostras/information/) (Licence Ouverte 2.0) et Base Adresse Nationale, via la Géoplateforme de l’IGN |
 | Parkings relais | Eurométropole de Strasbourg, open data |
 
 Le code de Kumm est publié sous [licence MIT](LICENSE). Les données gardent les conditions de leurs producteurs.

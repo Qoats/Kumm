@@ -12,7 +12,8 @@ Version proposée : 0.54.0. Même application Capacitor, identifiant `fr.kumm.ap
 | `/api/line-route`, `/quay-lines`, `/quay-modes` | Parcours et modes calculés sur le GTFS |
 | `/geo/transit`, `/geo/stoptimes` | Calcul local des services actifs et correspondances ; horaires théoriques uniquement |
 | `/tiles/*` | Tuiles OSM directement, attribution conservée, pas de téléchargement massif |
-| `/geo/address`, `/geo/walk`, `/geo/bike` | IGN / routage OSM directement ; nécessitent Internet |
+| `/geo/address` | Recherche locale dans le référentiel d’adresses de l’Eurométropole embarqué. En l’absence de résultat local, recours à l’IGN si Internet est disponible |
+| `/geo/walk`, `/geo/bike` | Graphe de rues embarqué pour l’Eurométropole, recours au routage OSM en ligne si nécessaire |
 | `/poi/pr`, `/poi/velhop` | P+R de référence existants ; informations statiques GBFS en direct puis conservées sur le téléphone |
 | `/api/vehicles` | Calculé sur le téléphone (`web/src/local-vehicles.ts`, dans le worker GTFS) : positions théoriques d’après les courses GTFS CTS et TER, tracés `data/shapes.json` et `data/rail.json`, attente aux terminus ; l’interface anime ensuite chaque véhicule (accélération, croisière, freinage). Aucun horaire ajouté, aucun appel réseau |
 | `/trip`, `/ride`, `/messages`, `/stats`, `/reports`, alertes et prévisions de disponibilité | Écrans, commandes et ressources conservés ; « Bientôt disponible », pas d’appel au serveur ou à SIRI |
@@ -27,9 +28,11 @@ Le serveur web existant reste disponible pour les installations web. Ses protect
 - CTS : <https://opendata.cts-strasbourg.eu/google_transit.zip>, référencé par le [catalogue national CTS](https://transport.data.gouv.fr/datasets/donnees-theoriques-gtfs-et-temps-reel-siri-lite-du-reseau-cts), Licence Ouverte 2.0.
 - SNCF : <https://eu.ftp.opendatasoft.com/sncf/plandata/Export_OpenData_SNCF_GTFS_NewTripId.zip>, source ouverte déjà utilisée par Kumm ; sélection des trains TER par les identifiants officiels des points d’arrêt. Les TGV et cars ne sont pas présentés comme des TER.
 
-`KummGtfs` télécharge séquentiellement les deux sources dans le stockage privé Android, avec ETag / Last-Modified. Un verrou natif commun aux appels de l’application et à la tâche Android empêche les téléchargements concurrents. Les archives sont limitées à 64 Mio. Une erreur conserve la génération publiée ; HTTP 429/503 respecte Retry-After et applique une pause. Les fichiers sont préparés avant la commutation des métadonnées de génération ; la base SQLite du widget est préparée séparément et publiée avec ces métadonnées.
+`npm run build:android` récupère et valide le GTFS CTS officiel à chaque compilation. L’archive et son manifeste sont intégrés à l’APK. Au premier lancement, `KummGtfs` installe cette copie dans le stockage privé et l’interface peut la lire immédiatement, même sans réseau. Une copie locale vérifiée depuis la compilation est conservée. Le premier téléchargement du TER se fait en ligne.
 
-`GtfsJob` utilise JobScheduler, période 24 heures, réseau requis, persistance après redémarrage. Android décide du moment effectif selon ses contraintes. Une consultation à l’ouverture et chaque heure en premier plan récupère les générations natives, avec téléchargement seulement si le contrôle date de plus de 24 heures. Le bouton « Actualiser les données horaires » et celui de l’écran d’itinéraires demandent une vérification conditionnelle immédiate.
+`KummGtfs` actualise les deux sources dans le stockage privé Android, avec ETag / Last-Modified. Un verrou natif commun aux appels de l’application et à la tâche Android empêche les téléchargements concurrents. Les archives sont limitées à 64 Mio. Une erreur conserve la génération publiée. HTTP 429/503 respecte Retry-After et applique une pause. Les fichiers sont préparés avant la commutation des métadonnées de génération. La base SQLite du widget est préparée séparément.
+
+`GtfsJob` demande à Android une vérification toutes les 20 minutes quand Internet est disponible. Android peut différer une tâche en arrière-plan. En premier plan, l’application vérifie aussi à la reprise et à la validation d’un nouveau réseau. Le dernier contrôle réussi est conservé par source. Un changement de réseau avant 20 minutes ne déclenche donc aucun téléchargement. Les archives actuelles restent consultables pendant le téléchargement et la préparation de leurs remplaçantes. Le bouton « Réessayer » apparaît en cas d’indisponibilité des horaires CTS.
 
 `local-worker.ts` conserve une copie validée dans IndexedDB : lecture locale au démarrage, parsing hors du fil d’interface, transaction de remplacement seulement après validation. Une archive corrompue ne remplace pas les horaires exploitables. La période de validité est calculée sur les calendriers et les exceptions ; l’interface affiche la dernière synchronisation et un avertissement si les données sont périmées. Il n’existe aucun retour vers des horaires fictifs ou vers le VPS.
 
@@ -47,7 +50,7 @@ La réactivation future du temps réel exige les autorisations fournisseur, une 
 
 ## Distribution
 
-Le profil `play` retire le module d’installation APK et `REQUEST_INSTALL_PACKAGES` ; il renvoie vers Google Play. Le profil `sideload` vérifie périodiquement les releases stables officielles, sans téléchargement d’APK avant l’accord de l’utilisateur. Le refus mémorise le code de version ; la recherche manuelle permet de revoir une version ignorée. Une installation reconnue comme provenant de Google Play utilise ce canal.
+Le profil `play` retire le module d’installation APK et `REQUEST_INSTALL_PACKAGES` et renvoie vers Google Play quand une mise à jour est proposée. Le profil `sideload` vérifie périodiquement les releases stables officielles, sans téléchargement d’APK avant l’accord de l’utilisateur. Le refus mémorise le code de la version ignorée. Une installation reconnue comme provenant de Google Play utilise ce canal.
 
 Le manifeste `latest.json` accompagne `kumm.apk` dans la même GitHub Release. L’installateur natif impose une URL de release du dépôt Qoats/Kumm, SHA-256, nom de paquet, code croissant et certificat identique à l’application installée. Android demande encore confirmation de l’installation. Une annulation ou un retour ferme la proposition et laisse l’application utilisable.
 

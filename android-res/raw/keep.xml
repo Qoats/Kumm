@@ -2,5 +2,5 @@
 <!-- Ressources chargées par leur nom (Resources.getIdentifier dans WidgetCore.java : thèmes des widgets, icônes, mises en page).
      Sans cette liste, shrinkResources les croit inutilisées et les supprime de l'APK (widgets sans fond ni icônes). -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/w_*,@layout/w_*,@xml/w_*,@id/*,@drawable/ic_stat_kumm,@drawable/splash,@mipmap/*"
+    tools:keep="@drawable/w_*,@layout/w_*,@xml/w_*,@color/w_*,@id/*,@drawable/ic_stat_kumm,@drawable/splash,@mipmap/*"
     tools:shrinkMode="safe" />

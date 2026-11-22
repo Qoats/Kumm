@@ -1,10 +1,11 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import type { PluginListenerHandle } from "@capacitor/core";
 /** Site statique (GitHub Pages) : mêmes calculs locaux qu'Android, archives GTFS servies par le site lui-même */
 export const STATIC_SITE = import.meta.env["VITE_STATIC"] === "1" && !Capacitor.isNativePlatform();
 export const AUTONOMOUS = Capacitor.getPlatform() === "android" || STATIC_SITE;
 type Source = "cts" | "ter";
-interface Status { checked: number; revision: string; etag?: string; modified?: string; error?: string; expired?: boolean; validUntil?: string }
-interface GtfsBridge { sync(o: { manual: boolean }): Promise<Record<Source, Status>>; read(o: { source: Source }): Promise<{ data?: string; bytes?: Uint8Array }> }
+interface Status { checked: number; revision: string; etag?: string; modified?: string; error?: string; expired?: boolean; validUntil?: string; bundled?: boolean }
+interface GtfsBridge { sync(o: { manual: boolean }): Promise<Record<Source, Status>>; read(o: { source: Source; revision: string }): Promise<{ path?: string; data?: string; bytes?: Uint8Array }> }
 
 /**
  * Archives du site (publiées chaque jour depuis transport.data.gouv.fr par scripts/fetch-open-data.mjs) :
@@ -30,62 +31,91 @@ const webGtfs: GtfsBridge = {
     return { bytes: new Uint8Array(await r.arrayBuffer()) };
   }
 };
-const Gtfs: GtfsBridge = STATIC_SITE ? webGtfs : registerPlugin<GtfsBridge>("KummGtfs");
+const nativeGtfs = registerPlugin<GtfsBridge & {
+  cached(): Promise<Record<Source, Status>>;
+  addListener(event: "networkReady", listener: () => void): Promise<PluginListenerHandle>;
+}>("KummGtfs");
+const Gtfs = STATIC_SITE ? webGtfs : nativeGtfs;
+
+export function onScheduleNetworkReady(listener: () => void): void {
+  if (!STATIC_SITE) void nativeGtfs.addListener("networkReady", listener).catch(console.warn);
+}
 export let LOCAL_STATUS: Partial<Record<Source, Status>> = {};
-/** État visible du chargement des horaires : l'écran affiche un bandeau tant que la liste d'arrêts est vide */
+/** État visible du chargement des horaires et des erreurs de synchronisation. */
 export const LOCAL_STATE: { phase: "idle" | "loading" | "error"; error?: string; since: number } = { phase: "idle", since: 0 };
 function setState(phase: "idle" | "loading" | "error", error?: string): void {
   LOCAL_STATE.phase = phase; LOCAL_STATE.error = error; LOCAL_STATE.since = Date.now();
   window.dispatchEvent(new Event("kumm:gtfs-state"));
 }
-let worker: Worker | undefined, seq = 0;
+let worker: Worker | undefined, seq = 0, startup: Promise<void> | undefined;
 const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
-function rpc<T>(data: object): Promise<T> {
+function rpc<T>(data: object, transfer: Transferable[] = []): Promise<T> {
   worker ??= new Worker(new URL("./local-worker.ts", import.meta.url), { type: "module" });
   worker.onmessage = e => { const p = pending.get(e.data.id); if (!p) return; pending.delete(e.data.id); e.data.error ? p.reject(Error(e.data.error)) : p.resolve(e.data.result); };
-  worker.onerror = () => { setState("error", "Lecture des horaires interrompue (mémoire du téléphone ?)"); for (const p of pending.values()) p.reject(Error("Lecture GTFS interrompue")); pending.clear(); worker?.terminate(); worker = undefined; };
-  return new Promise((resolve, reject) => { const id = ++seq; pending.set(id, { resolve, reject }); worker!.postMessage({ id, ...data }); });
+  worker.onerror = () => { setState("error", "Lecture des horaires interrompue (mémoire du téléphone ?)"); for (const p of pending.values()) p.reject(Error("Lecture GTFS interrompue")); pending.clear(); worker?.terminate(); worker = undefined; startup = undefined; };
+  return new Promise((resolve, reject) => { const id = ++seq; pending.set(id, { resolve, reject }); worker!.postMessage({ id, ...data }, transfer); });
 }
 export const localQuery = <T>(path: string): Promise<T> => rpc<T>({ method: "query", path });
 let syncing: Promise<void> | undefined, retryAt = 0;
+function prepareLocal(): Promise<void> {
+  // Une reprise Android peut demander une synchronisation avant la fin du premier affichage.
+  return startup ??= (async () => {
+    LOCAL_STATUS = await rpc({ method: "status" });
+    if (!STATIC_SITE && !LOCAL_STATUS.cts) {
+      try { await importArchives(await nativeGtfs.cached()); }
+      catch (e) { console.warn("Horaires Android en cache indisponibles", e); }
+    }
+  })().catch(e => { startup = undefined; throw e; });
+}
+
 export async function localInit(): Promise<void> {
-  LOCAL_STATUS = await rpc({ method: "status" });
+  await prepareLocal();
   if (Object.keys(LOCAL_STATUS).length) void syncLocal(false).catch(console.warn);
   else await syncLocal(false);
 }
-/** Conditional requests only on manual refresh or after 24 hours. One synchronization at a time. */
+
+async function importArchives(available: Record<Source, Status>): Promise<string[]> {
+  const errors: string[] = [];
+  let changed = false;
+  for (const source of ["cts", "ter"] as Source[]) {
+    const next = available[source], old = LOCAL_STATUS[source];
+    if (next.error) errors.push(source.toUpperCase() + " : " + next.error);
+    if (!next.revision) continue;
+    try {
+      if (old?.revision !== next.revision) {
+        const r = source === "cts" && next.bundled ? { path: "/data/cts.zip" } : await Gtfs.read({ source, revision: next.revision });
+        if (r.path) {
+          const archiveUrl = next.bundled ? r.path : Capacitor.convertFileSrc(r.path);
+          await rpc({ method: "save", source, value: next, archiveUrl });
+        } else {
+          const bytes = r.bytes ?? Uint8Array.from(atob(r.data ?? ""), c => c.charCodeAt(0));
+          await rpc({ method: "save", source, value: { bytes, ...next } }, bytes.buffer instanceof ArrayBuffer ? [bytes.buffer] : []);
+        }
+        changed = true;
+      } else if (next.checked !== old.checked) await rpc({ method: "checked", source, checked: next.checked });
+    } catch (e) { errors.push(source.toUpperCase() + " : " + String(e)); }
+  }
+  LOCAL_STATUS = await rpc({ method: "status" });
+  if (changed) window.dispatchEvent(new Event("kumm:gtfs"));
+  return errors;
+}
+
+/** Native verifies freshness per feed. Background errors leave the current schedule in service. */
 export function syncLocal(manual = true): Promise<void> {
   if (syncing) return syncing;
   if (Date.now() < retryAt) return Promise.reject(Error("Nouvel essai dans une minute"));
   return syncing = (async () => {
-    setState("loading");
+    await prepareLocal();
     LOCAL_STATUS = await rpc({ method: "status" });
-    const errors: string[] = [];
-    let changed = false;
-    const native = await Gtfs.sync({ manual });
-    for (const source of ["cts", "ter"] as Source[]) {
-      const n = native[source], old = LOCAL_STATUS[source];
-      if (n.error) errors.push(source.toUpperCase() + " : " + n.error);
-      if (!n.revision) continue;
-      try {
-        if (old?.revision !== n.revision) {
-          const r = await Gtfs.read({ source });
-          const bytes = r.bytes ?? Uint8Array.from(atob(r.data ?? ""), c => c.charCodeAt(0));
-          await rpc({ method: "save", source, value: { bytes, ...n } }); changed = true;
-        } else if (n.checked !== old.checked) await rpc({ method: "checked", source, checked: n.checked });
-      } catch (e) { errors.push(source.toUpperCase() + " : " + String(e)); }
-    }
-    LOCAL_STATUS = await rpc({ method: "status" });
-    if (changed) window.dispatchEvent(new Event("kumm:gtfs"));
+    if (!LOCAL_STATUS.cts) setState("loading");
+    const errors = await importArchives(await Gtfs.sync({ manual }));
     if (errors.length) { retryAt = Date.now() + 60_000; throw Error(errors.join(" · ")); }
-    setState("idle");
+    if (LOCAL_STATE.phase !== "idle") setState("idle");
 
-  })().catch(e => { setState(Object.keys(LOCAL_STATUS).length ? "idle" : "error", String(e instanceof Error ? e.message : e)); throw e; })
+  })().catch(e => {
+    if (!LOCAL_STATUS.cts) setState("error", String(e instanceof Error ? e.message : e));
+    else if (LOCAL_STATE.phase !== "idle") setState("idle");
+    throw e;
+  })
     .finally(() => { syncing = undefined; });
-}
-export function syncLabel(): string {
-  return (["cts", "ter"] as Source[]).map(s => {
-    const d = LOCAL_STATUS[s];
-    return `${s.toUpperCase()} : ${d ? new Date(d.checked).toLocaleString("fr-FR") + (d.expired ? " · Données périmées" : "") + (Date.now() - d.checked > 86400_000 ? " · Synchronisation ancienne" : "") : "non téléchargé"}`;
-  }).join(" · ");
 }

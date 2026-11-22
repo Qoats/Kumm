@@ -67,6 +67,10 @@ public class LocalTimetableTest {
             server.takeRequest();
             server.enqueue(new okhttp3.mockwebserver.MockResponse().setResponseCode(304)); download.invoke(null,c,"cts",url);
             assertEquals("\"official-v1\"",server.takeRequest().getHeader("If-None-Match")); assertEquals(revision,p.getString("cts.revision",""));
+            server.enqueue(new okhttp3.mockwebserver.MockResponse().setHeader("ETag", "\"official-v2\"").setBody(new okio.Buffer().write(valid)));
+            download.invoke(null,c,"cts",url);
+            assertEquals("\"official-v2\"",p.getString("cts.etag",""));
+            assertEquals(revision,p.getString("cts.revision","")); assertEquals(database,p.getString("database",""));
             server.enqueue(new okhttp3.mockwebserver.MockResponse().setBody(new okio.Buffer().write(new byte[]{1,2,3})));
             try { download.invoke(null,c,"cts",url); fail("Archive corrompue acceptée"); } catch (java.lang.reflect.InvocationTargetException expected) {}
             assertEquals(revision,p.getString("cts.revision","")); assertEquals(database,p.getString("database",""));
@@ -74,6 +78,38 @@ public class LocalTimetableTest {
             try { download.invoke(null,c,"cts",url); fail("Limite ignorée"); } catch (java.lang.reflect.InvocationTargetException expected) {}
             assertTrue(p.getLong("cts.retry",0) >= System.currentTimeMillis()+3500000);
         } finally {server.shutdown();}
+    }
+
+    @Test public void scheduledChecksRespectTheTwentyMinuteWindowAndUpgradeTheExistingJob() {
+        long now = 2_000_000, interval = KummGtfs.CHECK_INTERVAL;
+        assertEquals(20 * 60_000L, interval);
+        assertFalse(KummGtfs.needsCheck(now, now - interval + 1, 0, true, false));
+        assertTrue(KummGtfs.needsCheck(now, now - interval, 0, true, false));
+        assertFalse(KummGtfs.needsCheck(now, 0, now + 1, false, false));
+        assertTrue(KummGtfs.needsCheck(now, now - 1, 0, false, false));
+
+        Context c = RuntimeEnvironment.getApplication();
+        android.app.job.JobScheduler scheduler = c.getSystemService(android.app.job.JobScheduler.class);
+        scheduler.schedule(new android.app.job.JobInfo.Builder(7412, new android.content.ComponentName(c, GtfsJob.class))
+            .setPeriodic(86_400_000).setRequiredNetworkType(android.app.job.JobInfo.NETWORK_TYPE_ANY).build());
+        KummGtfs.schedule(c);
+        assertEquals(interval, scheduler.getPendingJob(7412).getIntervalMillis());
+        assertEquals(android.app.job.JobInfo.NETWORK_TYPE_ANY, scheduler.getPendingJob(7412).getNetworkType());
+    }
+
+    @Test public void bundledCtsSeedsAnOfflineInstallAndPreservesMoreRecentlyCheckedData() throws Exception {
+        Context c = RuntimeEnvironment.getApplication();
+        android.content.SharedPreferences p = c.getSharedPreferences("official-gtfs", Context.MODE_PRIVATE);
+        String bundled = KummGtfs.installBundledCts(c);
+        assertFalse(bundled.isEmpty());
+        assertEquals(bundled, p.getString("cts.revision", ""));
+        File directory = new File(c.getFilesDir(), "gtfs");
+        assertTrue(new File(directory, "cts-" + bundled + ".zip").isFile());
+
+        java.nio.file.Files.copy(archive(c, true).toPath(), new File(directory, "cts-newer.zip").toPath());
+        p.edit().putLong("cts.checked", p.getLong("cts.checked", 0) + 60_000).putString("cts.revision", "newer").commit();
+        assertEquals(bundled, KummGtfs.installBundledCts(c));
+        assertEquals("newer", p.getString("cts.revision", ""));
     }
 
     @Test public void officialArchivesWhenProvided() throws Exception {

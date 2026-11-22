@@ -1,6 +1,7 @@
 import { AUTONOMOUS } from "./local";
 import { publicJson } from "./local-services";
 import { offlineRoute } from "./offline-routes";
+import { offlineAddresses } from "./offline-addresses";
 import type { Place, WalkRoute, WalkStep } from "../../shared/types";
 import type { AddressResponse, OsrmResponse, OsrmStep } from "../../shared/geo-api";
 import type { LL } from "./geo";
@@ -60,8 +61,12 @@ export async function fetchWalk(from: LL, to: LL): Promise<WalkRoute> {
   return { distance: r.distance, duration: r.duration, coords: r.geometry.coordinates, steps: r.legs.flatMap(l => l.steps).map(toStep) };
 }
 
-/** Recherche d'adresses (base adresse nationale), résultats du Bas-Rhin en premier */
+/** Recherche locale dans l’Eurométropole, complétée par la BAN quand le réseau est disponible. */
 export async function geocode(q: string): Promise<Place[]> {
+  if (AUTONOMOUS) {
+    const matches = await offlineAddresses(q).catch(() => []);
+    if (matches.length || !navigator.onLine) return matches;
+  }
   const j = await getJson<AddressResponse>("/geo/address?q=" + encodeURIComponent(q));
   const all = (j.features ?? []).map(f => ({
     label: f.properties.label, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1],

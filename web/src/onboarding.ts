@@ -28,8 +28,8 @@ export function onboardingSteps(): StepId[] {
   return allSteps();
 }
 
-/** Toutes les étapes (premier lancement, ou « Revoir la présentation » dans les réglages) */
-export function allSteps(): StepId[] {
+/** Toutes les étapes du premier lancement. */
+function allSteps(): StepId[] {
   const all: StepId[] = ["welcome", "features", "map", "where", "location", "alerts", "terms"];
   return all.filter(id => id !== "alerts" || (!AUTONOMOUS && NATIVE && PUSH_READY));   // alertes push : application Android avec serveur seulement
 }
@@ -43,7 +43,7 @@ export const onboardingDone = (): boolean => load().done === true;
 
 const ALL_LEGEND: [Layer, string][] = [
   ["tram", "Station de tram"], ["bus", "Arrêt de bus"], ["ter", "Gare (trams, bus et trains)"],
-  ["velhop", "Station Vélhop"], ["velopark", "Vélopark"], ["pr", "Parking relais"], ["flexhop", "Arrêt Flex’hop (sur réservation)"]
+  ["velhop", "Station Vélhop"], ["velopark", "Vélopark"], ["pr", "Parking relais"]
 ];
 
 const LEGEND: [Layer, string][] = STATIC_SITE ? ALL_LEGEND.filter(([k]) => k !== "velhop") : ALL_LEGEND;
@@ -90,7 +90,7 @@ export function onboardingView(steps: StepId[], i: number, refused = false): str
       break;
     case "where":
       body = `<h1>Où trouver quoi</h1>
-        ${row(ic("sliders"), "Réglages", AUTONOMOUS ? "En haut de l’accueil : thème, mises à jour, version de l’application, mentions légales." : "En haut de l’accueil : thème, alertes trafic, version de l’application, mentions légales.")}
+        ${row(ic("sliders"), "Réglages", AUTONOMOUS ? "En haut de l’accueil : thème, accessibilité, version de l’application, mentions légales." : "En haut de l’accueil : thème, alertes trafic, version de l’application, mentions légales.")}
         ${row(ic("heart"), "Favoris", "Touchez le cœur sur la fiche d’un arrêt pour voir ses passages dès l’accueil.")}
         ${AUTONOMOUS ? "" : row(ic("mail"), "Infos trafic", "En haut de l’accueil, toutes les perturbations en cours.")}
         ${row(ic("pin"), "Carte", "En bas de l’écran : la carte, les arrêts et les départs autour de vous.")}

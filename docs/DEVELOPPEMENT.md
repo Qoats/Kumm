@@ -129,12 +129,12 @@ Pas encore branchés : Flex'hop (zones de transport à la demande) ; les TGV et 
 - `/health` → `trains_ter` : nombre de trains, âge du temps réel, dernière erreur. `TER_POLL_S=0` désactive les trains.
 
 ## Carte : catégories de points
-Chaque catégorie a sa couleur, sa forme et son symbole : Tram (cercle bleu), Bus (carré turquoise), Vélhop (cercle vert), Vélopark (losange vert foncé, « P »), P+R (hexagone bleu), Flex'hop (écusson rose) et Gare TER (octogone violet). Les boutons en haut de la carte affichent ou masquent chaque catégorie.
+Chaque catégorie a sa couleur, sa forme et son symbole : Tram (cercle bleu), Bus (carré turquoise), Vélhop (cercle vert), Vélopark (losange vert foncé, « P »), P+R (hexagone bleu) et Gare TER (octogone violet). Les boutons en haut de la carte affichent ou masquent chaque catégorie.
 
 Sources de données réelles :
 - **Tram / bus** : liste d'arrêts de la CTS. **Gares TER** : gares SNCF de l'Eurométropole (`shared/ter.ts`).
 - **P+R et Vélopark** : endpoints `park-and-ride` et `veloparc` de l'API CTS.
-- **Vélhop et Flex'hop** : pas encore branchés (le bouton est grisé et l'indique).
+- **Vélhop** : pas encore branché (le bouton est grisé et l'indique).
 Si une catégorie reste vide, ouvrez `http://localhost:3000/api/veloparc` (ou `park-and-ride`) et regardez ce que renvoie la CTS.
 
 ## Itinéraires avec correspondances

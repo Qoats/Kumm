@@ -10,12 +10,12 @@
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node --env-file=.env dist/server/index.js",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.server.json --noEmit",
-    "test": "node --import tsx --test tests/kumm.test.mjs tests/android-release.test.mjs tests/android-local.test.mjs tests/walk-graph.test.mjs tests/map-pack.test.mjs",
-    "build:android": "vite build --mode android && cap sync android",
+    "test": "node --import tsx --test tests/kumm.test.mjs tests/android-release.test.mjs tests/android-local.test.mjs tests/walk-graph.test.mjs tests/map-pack.test.mjs tests/address-index.test.mjs",
+    "build:android": "vite build --mode android && node scripts/fetch-open-data.mjs dist/web cts && node --import tsx scripts/build-map-stops.mjs dist/web && node scripts/build-address-index.mjs dist/web && cap sync android",
     "android:open": "cap open android",
     "check:secrets": "node scripts/check-secrets.mjs",
     "build:shapes": "node scripts/build-shapes.mjs",
-    "build:pages": "vite build --mode pages --outDir ../dist/pages && node scripts/fetch-open-data.mjs dist/pages"
+    "build:pages": "vite build --mode pages --outDir ../dist/pages && node scripts/fetch-open-data.mjs dist/pages && node --import tsx scripts/build-map-stops.mjs dist/pages && node scripts/build-address-index.mjs dist/pages"
   },
   "engines": {
     "node": ">=22.12.0"

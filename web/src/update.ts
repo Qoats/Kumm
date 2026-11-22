@@ -23,10 +23,10 @@ export const PLAY_URL = "https://play.google.com/store/apps/details?id=fr.kumm.a
 export const CAN_UPDATE = PLAY_UPDATES || (import.meta.env["VITE_SIDELOAD_UPDATES"] === "1" && ANDROID && Capacitor.isPluginAvailable("KummUpdater"));
 
 /** Version plus récente que celle installée, null si à jour ; « unpublished » : le serveur n'a encore aucun APK à distribuer */
-export async function checkUpdate(manual = false): Promise<Release | null | "unpublished"> {
+export async function checkUpdate(): Promise<Release | null | "unpublished"> {
   if (!CAN_UPDATE) return null;
-  if (!manual && Date.now() - Number(localStorage.getItem("release-checked") ?? 0) < 86400000) return null;
-  if (!PLAY_UPDATES && (await Updater.source()).play) { if (manual) throw Error("Utilisez Google Play pour mettre Kumm à jour"); return null; }
+  if (Date.now() - Number(localStorage.getItem("release-checked") ?? 0) < 86400000) return null;
+  if (!PLAY_UPDATES && (await Updater.source()).play) return null;
   const info = await App.getInfo();
   const r = await CapacitorHttp.get({ url: "https://api.github.com/repos/Qoats/Kumm/releases/latest", headers: { Accept: "application/vnd.github+json" }, connectTimeout: 10000, readTimeout: 15000 });
   if (r.status === 404) { localStorage.setItem("release-checked", String(Date.now())); return "unpublished"; }

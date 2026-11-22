@@ -1034,6 +1034,10 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 :root[data-ui="papier"] .veh .va::before{border-bottom-color:var(--ink)}
 /* carte claire un peu adoucie, pour s'accorder au papier */
 :root[data-ui="papier"][data-palette=""][data-scheme="light"] .leaflet-tile-pane{filter:sepia(.12) saturate(.85) brightness(.99)}
+@media(pointer:coarse){
+  :root[data-ui="papier"][data-palette=""][data-scheme="light"] .leaflet-tile-pane{filter:none}
+  :root[data-ui="papier"][data-palette=""][data-scheme="light"] .leaflet-tile-pane > .leaflet-layer{filter:sepia(.12) saturate(.85) brightness(.99)}
+}
 /* fiche d'un arrêt : barre d'actions (y aller, autre horaire) */
 .sacts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}
 .sacts.one{grid-template-columns:1fr}

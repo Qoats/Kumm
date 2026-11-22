@@ -1,7 +1,9 @@
 import { AUTONOMOUS } from "./local";
 import * as L from "leaflet";
+import type { Map as VectorMap } from "maplibre-gl";
 import { url } from "./config";
 import { loadMapLibre, offlineStyle } from "./offline-map";
+import { addStopLayers, bundledStopFeatures, stopImages } from "./map-stops";
 
 /** Tuiles servies par notre serveur (même origine : identifiées, gardées en mémoire, lisibles par le canevas) */
 const TILE_URL = AUTONOMOUS ? "https://tile.openstreetmap.org/{z}/{x}/{y}.png" : url("/tiles/{z}/{x}/{y}.png");
@@ -58,8 +60,14 @@ export const wantsDarkMap = (): boolean => {
 
 const onlineBase = (dark: boolean): L.GridLayer => dark ? new DarkTiles({ maxZoom: 19 }) : L.tileLayer(TILE_URL, { maxZoom: 19 });
 
+export const usesTouchMap = (): boolean => window.matchMedia("(pointer: coarse)").matches;
+
 function hasWebGL(): boolean {
-  try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") ?? c.getContext("webgl")); } catch { return false; }
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    return gl !== null;
+  } catch { return false; }
 }
 
 /**
@@ -69,22 +77,41 @@ function hasWebGL(): boolean {
 class OfflineBase extends L.Layer {
   private inner: L.Layer | null = null;
   private map: L.Map | null = null;
-  constructor(private dark: boolean) { super(); }
+  constructor(private dark: boolean, private stopsReady?: (map: VectorMap) => void) { super(); }
   override onAdd(map: L.Map): this {
     this.map = map;
     void this.attach(map);
     return this;
   }
   private async attach(map: L.Map): Promise<void> {
-    let layer: L.Layer;
     try {
       if (!hasWebGL()) throw new Error("WebGL indisponible");
-      const [ml, plugin, style] = await Promise.all([loadMapLibre(), import("@maplibre/maplibre-gl-leaflet"), offlineStyle(this.dark)]);
-      void ml;
-      layer = plugin.maplibreGL({ style: style as never, interactive: false } as never);
-    } catch { layer = onlineBase(this.dark); }
-    if (this.map !== map) return;       // retirée de la carte pendant le chargement
-    this.inner = layer.addTo(map);
+      const mobile = usesTouchMap();
+      const [, plugin, style, points] = await Promise.all([
+        loadMapLibre(), import("@maplibre/maplibre-gl-leaflet"), offlineStyle(this.dark, mobile),
+        this.stopsReady && Promise.all([stopImages(), bundledStopFeatures()])
+      ]);
+      if (this.map !== map) return;   // retirée de la carte pendant le chargement
+      if (points) addStopLayers(style, mobile, points[1]);
+      const mobileOptions = mobile ? {
+        fadeDuration: 0,
+        pixelRatio: Math.min(window.devicePixelRatio, 1.5),
+        updateInterval: 48
+      } : {};
+      const layer = plugin.maplibreGL({ style, interactive: false, ...mobileOptions });
+      this.inner = layer.addTo(map);
+      if (points) {
+        const [images] = points;
+        const vector = layer.getMaplibreMap();
+        vector.on("styleimagemissing", ({ id }) => {
+          const image = images.get(id);
+          if (image && !vector.hasImage(id)) vector.addImage(id, image, { pixelRatio: 2 });
+        });
+        vector.once("load", () => { if (this.map === map) this.stopsReady?.(vector); });
+      }
+    } catch {
+      if (this.map === map) this.inner = onlineBase(this.dark).addTo(map);
+    }
   }
   override onRemove(map: L.Map): this {
     this.map = null;
@@ -95,6 +122,6 @@ class OfflineBase extends L.Layer {
   }
 }
 
-export function makeBaseLayer(dark = wantsDarkMap()): L.Layer {
-  return AUTONOMOUS ? new OfflineBase(dark) : onlineBase(dark);
+export function makeBaseLayer(dark = wantsDarkMap(), stopsReady?: (map: VectorMap) => void): L.Layer {
+  return AUTONOMOUS ? new OfflineBase(dark, stopsReady) : onlineBase(dark);
 }

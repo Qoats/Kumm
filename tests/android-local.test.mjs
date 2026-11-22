@@ -63,11 +63,11 @@ test('offline journeys include a feasible transfer and arrival-before search', (
 });
 test('worker persists the last valid archive and rejects corrupt synchronization atomically', async () => {
   globalThis.indexedDB=indexedDB;
-  let resolve;
-  globalThis.self={postMessage: v => resolve(v)};
+  const pending = new Map();
+  globalThis.self={postMessage: v => { pending.get(v.id)(v); pending.delete(v.id); }};
   await import('../web/src/local-worker.ts');
   let id=0;
-  const request=data=>new Promise(r=>{resolve=r; self.onmessage({data:{id:++id,...data}});});
+  const request=data=>new Promise(r=>{const seq=++id; pending.set(seq,r); self.onmessage({data:{id:seq,...data}});});
   const save=await request({method:'save',source:'cts',value:{bytes:archive,checked:100,revision:'first'}});
   assert.equal(save.result,true);
   const bad=await request({method:'save',source:'cts',value:{bytes:new Uint8Array([1]),checked:200,revision:'bad'}});
@@ -78,6 +78,17 @@ test('worker persists the last valid archive and rejects corrupt synchronization
   const db=await new Promise((r,j)=>{const req=indexedDB.open('kumm-gtfs',1);req.onsuccess=()=>r(req.result);req.onerror=()=>j(req.error);});
   const stored=await new Promise(r=>{const req=db.transaction('feeds').objectStore('feeds').get('cts');req.onsuccess=()=>r(req.result);});
   assert.equal(stored.revision,'first'); assert.deepEqual(stored.bytes,archive); db.close();
+  const realFetch = globalThis.fetch;
+  let release;
+  globalThis.fetch = () => new Promise(resolve => { release = resolve; });
+  try {
+    const loading = request({ method:'save', source:'cts', archiveUrl:'https://localhost/archive.zip', value:{checked:300,revision:'next'} });
+    const during = await request({method:'status'});
+    assert.equal(during.result.cts.revision,'first');
+    release(new Response(archive));
+    assert.equal((await loading).result,true);
+    assert.equal((await request({method:'status'})).result.cts.revision,'next');
+  } finally { globalThis.fetch = realFetch; }
 });
 test('local vehicle engine: positions follow the official timetable, with layover chains and no invented trips', async () => {
   const { vehiclesAt, buildChains, tripCode } = await import('../web/src/local-vehicles.ts');

@@ -7,7 +7,6 @@ const SHAPES: Record<Shape, string> = {
   square: '<rect x="-11" y="-11" width="22" height="22" rx="6"/>',
   diamond: '<rect x="-9" y="-9" width="18" height="18" rx="3" transform="rotate(45)"/>',
   hexagon: '<polygon points="0,-13 11.3,-6.5 11.3,6.5 0,13 -11.3,6.5 -11.3,-6.5"/>',
-  shield: '<path d="M-11 -9 Q0 -14 11 -9 L11 3 Q11 10 0 14 Q-11 10 -11 3 Z"/>',
   octagon: '<polygon points="-4.6,-11 4.6,-11 11,-4.6 11,4.6 4.6,11 -4.6,11 -11,4.6 -11,-4.6"/>'
 };
 

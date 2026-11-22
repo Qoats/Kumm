@@ -65,7 +65,7 @@ export interface WalkRoute {
 }
 
 /** Autres points d'intérêt de la carte (hors arrêts de bus et de tram) */
-export type PoiKind = "velhop" | "velopark" | "pr" | "flexhop" | "ter";
+export type PoiKind = "velhop" | "velopark" | "pr" | "ter";
 
 export interface Poi {
   id: string;
